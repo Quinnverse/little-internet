@@ -92,5 +92,7 @@ names, attribute names, and `<script>` elements against an allow-list.
 
 ## Error handling
 
-`importSite` and `restoreBackup` return `{ ok: true, project } | { ok: false, reason }`.
+`importSite` and `restoreBackup` return `{ ok: true, value: Project } | { ok: false, reason }`.
+Both go through `zip.ts#readProjectZip`, which reads entry names first, rejects unsafe
+paths, then decompresses only the manifest, then only the assets the manifest references.
 They never throw on malformed input.

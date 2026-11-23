@@ -6,9 +6,13 @@
   "scripts": {
     "dev": "vite",
     "build": "tsc && vite build",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "test": "vitest --run",
+    "typecheck": "tsc",
+    "check:export": "vitest --run tests/export-independence.test.ts"
   },
   "devDependencies": {
+    "@types/jsdom": "^30.0.0",
     "fast-check": "^4.11.0",
     "jsdom": "^31.0.1",
     "typescript": "~7.0.2",
