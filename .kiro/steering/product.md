@@ -84,11 +84,12 @@ Rule: a new feature may only enter by **replacing** one of equal cost.
 - An optional "open on" date may only be shown as a label. A static site cannot really
   lock a file, so the UI must not claim it is locked.
 
-## Room skin
+## Room skin (theme id `room`, replaces the old `meadow`)
 
 The "room" is a visual theme over the same grid, not a new system: post blocks look like
-a diary on a desk, image blocks like picture frames, link blocks like a bookshelf, the
-voice block like an answering machine. Same data, same export.
+a notebook, image blocks like picture frames, link blocks like a bookshelf, the voice
+block like an answering machine, the ghost's spot like a rug. Same data, same export,
+gradients only (no image files). The three themes are `paper`, `midnight`, `room`.
 
 ## Frozen scope — do NOT add
 

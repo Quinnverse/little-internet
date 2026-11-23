@@ -124,18 +124,22 @@
     clear(bubble)
     for (var i = 0; i < children.length; i++) bubble.appendChild(children[i])
     bubble.hidden = false
-    // Keep the bubble on screen (CSSOM edits are allowed by the page CSP).
-    // Above the ghost by default; below when there is no room above.
-    bubble.style.transform = ''
+    // Keep the bubble on screen. Offsets use left/right (not transform) so the page's
+    // scrollable width reflects the final position (CSSOM edits are allowed by the CSP).
+    // It opens above the ghost, or below when there is no room above.
+    bubble.style.left = ''
+    bubble.style.right = ''
     root.classList.remove('ghost-below')
-    var top = bubble.getBoundingClientRect().top + (window.pageYOffset || 0)
-    if (top < 8) root.classList.add('ghost-below')
+    if (bubble.getBoundingClientRect().top < 8) root.classList.add('ghost-below')
     var r = bubble.getBoundingClientRect()
     var vw = document.documentElement.clientWidth || window.innerWidth
     var shift = 0
     if (r.right > vw - 8) shift = vw - 8 - r.right
     if (r.left + shift < 8) shift = 8 - r.left
-    if (shift) bubble.style.transform = 'translateX(' + Math.round(shift) + 'px)'
+    if (shift) {
+      if (root.classList.contains('ghost-floating')) bubble.style.right = Math.round(-shift) + 'px'
+      else bubble.style.left = 'calc(50% + ' + Math.round(shift) + 'px)'
+    }
   }
   var hideBubble = function () {
     bubble.hidden = true

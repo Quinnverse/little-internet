@@ -24,7 +24,7 @@ output; exporting zips it.
 ```ts
 type Project = {
   schemaVersion: 1;
-  site: { slug: string; title: string; tagline: string; theme: 'paper' | 'midnight' | 'meadow' };
+  site: { slug: string; title: string; tagline: string; theme: 'paper' | 'midnight' | 'room' };
   ghost: { enabled: boolean; name: string; color: 'white' | 'mint' | 'peach' | 'lilac' };
   blocks: Block[];
   posts: Post[];

@@ -9,7 +9,7 @@ export const YOUTUBE_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/
 export const VIMEO_ID_PATTERN = /^[0-9]{1,12}$/
 export const ISO_UTC_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
-export const THEMES = ['paper', 'midnight', 'meadow'] as const
+export const THEMES = ['paper', 'midnight', 'room'] as const
 export const GHOST_COLORS = ['white', 'mint', 'peach', 'lilac'] as const
 export const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
 export type ImageMime = (typeof IMAGE_MIMES)[number]
@@ -123,7 +123,8 @@ const SiteSettingsSchema = z.object({
   slug: z.string().regex(SITE_SLUG_PATTERN),
   title: line(80),
   tagline: line(200),
-  theme: z.enum(THEMES),
+  // 'meadow' was replaced by the room skin; old saves keep working.
+  theme: z.preprocess((v) => (v === 'meadow' ? 'room' : v), z.enum(THEMES)),
 })
 
 const GhostSettingsSchema = z.object({

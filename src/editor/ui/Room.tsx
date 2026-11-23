@@ -112,7 +112,7 @@ export function Room(props: { ctx: Ctx }) {
 
   return (
     <section
-      class="screen room"
+      class={`screen room skin-${project.site.theme}`}
       style={{
         '--room-bg': THEME_VARS[project.site.theme].bg,
         '--room-fg': THEME_VARS[project.site.theme].fg,

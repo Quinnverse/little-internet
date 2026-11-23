@@ -282,6 +282,43 @@ try {
   await page.reload()
   await page.getByRole('heading', { name: 'Room' }).waitFor()
   check('editor reloads saved home from IndexedDB', (await page.locator('.tile').count()) === 6)
+
+  // 10. The "room" skin: switch theme, download, and view the independent site
+  await page.getByRole('button', { name: 'Settings', exact: true }).click()
+  await page.locator('.theme-chip', { hasText: 'Room' }).click()
+  await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: 'Room', exact: true }).click()
+  await page.getByRole('heading', { name: 'Room' }).waitFor()
+  await page.waitForTimeout(300)
+  await page.screenshot({ path: join(SHOTS, '12-room-skin-editor.png') })
+  await page.getByRole('button', { name: 'Door', exact: true }).click()
+  const dl2 = page.waitForEvent('download')
+  await page.getByRole('button', { name: 'Download website (.zip)' }).click()
+  const zip2 = join(SHOTS, 'room-skin.zip')
+  await (await dl2).saveAs(zip2)
+  const entries2 = unzipSync(new Uint8Array(readFileSync(zip2)))
+  rmSync(join(SITE_DIR, '@room'), { recursive: true, force: true })
+  for (const [name, data] of Object.entries(entries2)) {
+    const file = join(SITE_DIR, '@room', name)
+    mkdirSync(join(file, '..'), { recursive: true })
+    writeFileSync(file, data)
+  }
+  for (const [label, viewport, isMobile] of [['phone', { width: 390, height: 844 }, true], ['desktop', { width: 1280, height: 900 }, false]]) {
+    const rc = await browser.newContext({ viewport, isMobile, hasTouch: isMobile, reducedMotion: 'reduce' })
+    const rp = await rc.newPage()
+    const rfail = []
+    rp.on('response', (r) => r.status() >= 400 && rfail.push(`${r.status()} ${r.url()}`))
+    await rp.goto(`${SITE}@room/index.html`)
+    await rp.locator('.ghost').waitFor()
+    check(`room skin (${label}): body has theme class`, await rp.evaluate(() => document.body.classList.contains('theme-room')))
+    const spine = await rp.locator('.k-post').first().evaluate((el) => getComputedStyle(el).borderLeftWidth)
+    check(`room skin (${label}): diary looks like a notebook`, spine === '12px', spine)
+    const overflowX = await rp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+    const culprits = overflowX > 0 ? await rp.evaluate(() => [...document.querySelectorAll('body *')].filter((e) => e.getBoundingClientRect().right > document.documentElement.clientWidth + 0.5).slice(0, 5).map((e) => `${e.tagName.toLowerCase()}.${e.className}:${Math.round(e.getBoundingClientRect().right)}`)) : []
+    check(`room skin (${label}): no horizontal scrolling`, overflowX <= 0, `${overflowX}px ${culprits.join(' ')}`)
+    check(`room skin (${label}): no failed requests`, rfail.length === 0, rfail.join(','))
+    await rp.screenshot({ path: join(SHOTS, `13-room-skin-site-${label}.png`), fullPage: true })
+    await rc.close()
+  }
 } catch (e) {
   check('flow completed', false, e instanceof Error ? e.message.split('\n').slice(0, 6).join(' | ') : String(e))
   await page.screenshot({ path: join(SHOTS, 'zz-failure.png') }).catch(() => {})

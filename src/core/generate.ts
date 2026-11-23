@@ -5,7 +5,7 @@ import { publicProjection } from './privacy.ts'
 import { generateFeed } from './rss.ts'
 import { toStored } from './storage.ts'
 import { assetPath, isCanonicalHttpUrl, recordingPath, type Block, type Post, type Project } from './schema.ts'
-import { themeCss } from './themes.ts'
+import { themeCss, themeExtraCss } from './themes.ts'
 import { embedSrc, VIDEO_FRAME_HOSTS } from './video.ts'
 
 export type GenerateOptions = {
@@ -83,7 +83,7 @@ function page({ pub, title, prefix, main, bodyClass }: PageParts): string {
 <link rel="stylesheet" href="${prefix}style.css">
 <link rel="alternate" type="application/rss+xml" title="${h(pub.site.title)}" href="${prefix}feed.xml">
 ${ghost}</head>
-<body class="${bodyClass}">
+<body class="${bodyClass} theme-${pub.site.theme}">
 <div class="wrap">
 <header class="site-header">
 <p class="site-title"><a href="${prefix}index.html">${h(pub.site.title)}</a></p>
@@ -327,7 +327,7 @@ function renderCss(pub: Project): string {
   const rules = pub.blocks
     .map((b) => `.b-${b.id}{grid-column:${b.x + 1} / span ${b.w};grid-row:${b.y + 1} / span ${b.h}}`)
     .join('\n')
-  return `${themeCss(pub.site.theme)}\n${BASE_CSS}${rules}\n`
+  return `${themeCss(pub.site.theme)}\n${BASE_CSS}${themeExtraCss(pub.site.theme)}${rules}\n`
 }
 
 // ---------------------------------------------------------------------------- text

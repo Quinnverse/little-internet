@@ -6,7 +6,7 @@ import { randomId, suggestSiteSlug } from '../ids.ts'
 import { Field, GhostIcon } from './common.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
 
-const THEME_LABEL: Record<Theme, string> = { paper: 'Paper', midnight: 'Midnight', meadow: 'Meadow' }
+const THEME_LABEL: Record<Theme, string> = { paper: 'Paper', midnight: 'Midnight', room: 'Room' }
 
 export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
   const [name, setName] = useState('')

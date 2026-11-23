@@ -107,3 +107,17 @@ test go through the real MediaRecorder path. The test also synthesises a WebM cl
 page (oscillator → MediaRecorder) to exercise "choose a file". It caught two real bugs
 (`video/webm` MIME for audio files; ghost bubble opening off-screen at the top of a page).
 41/41 checks.
+
+## 2026-11-23 — Day 1, late: the room skin
+
+The third theme is now the "room" (replacing `meadow`; old saves with `meadow` load as
+`room`, covered by a test). It is pure CSS over the same grid and data: notebooks, picture
+frames, a bookshelf, an answering machine, a rug under the ghost. One generator, so the
+exported site, the preview and the editor all look the same.
+
+**Screenshot review caught three things the assertions did not:** the RSS link sank into the
+wooden floor (now on a cream pill); a 7 px horizontal scroll on phones, only while the
+ghost's bubble was open (the bubble was nudged back on-screen with `transform`, which does
+not change the page's scrollable width; now `left`/`right`); and the dark theme's sheet
+colours (earlier). The overflow was found by having the e2e list overflowing elements and
+then sampling the page before and after the bubble closed — the cause was not an element.

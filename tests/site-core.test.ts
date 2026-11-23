@@ -95,6 +95,19 @@ describe('compatibility', () => {
     expect(r.ok && r.value.recordings).toEqual([])
   })
 
+  it('maps the retired "meadow" theme to "room"', () => {
+    const p = sample() as unknown as { site: { theme: string } }
+    p.site.theme = 'meadow'
+    const r = parseProject(p)
+    expect(r.ok && r.value.site.theme).toBe('room')
+  })
+
+  it('still rejects unknown themes', () => {
+    const p = sample() as unknown as { site: { theme: string } }
+    p.site.theme = 'neon'
+    expect(parseProject(p).ok).toBe(false)
+  })
+
   it.each([
     ['recording too long', { durationMs: 60_001 }],
     ['bad open-on date', { openOn: '2030-02-30' }],
