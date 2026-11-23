@@ -2,7 +2,7 @@ import type { Project } from './schema.ts'
 
 /**
  * The only view of a Project that may be published or exported.
- * Drops private posts, blocks that show them, and images no public item uses.
+ * Drops private posts, blocks that show them, images no public item uses, and private recordings.
  */
 export function publicProjection(p: Project): Project {
   const posts = p.posts.filter((post) => post.visibility === 'public')
@@ -14,5 +14,6 @@ export function publicProjection(p: Project): Project {
   for (const post of posts) post.imageIds.forEach((id) => usedAssets.add(id))
   for (const b of blocks) if (b.content.kind === 'image') usedAssets.add(b.content.assetId)
   const assets = p.assets.filter((a) => usedAssets.has(a.id))
-  return { ...p, posts, blocks, assets }
+  const recordings = p.recordings.filter((r) => r.visibility === 'public')
+  return { ...p, posts, blocks, assets, recordings }
 }

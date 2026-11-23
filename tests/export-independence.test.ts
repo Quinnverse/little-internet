@@ -31,6 +31,11 @@ const project: Project = {
     { id: 'b2', x: 2, y: 0, w: 2, h: 1, content: { kind: 'links' } },
     { id: 'b3', x: 2, y: 1, w: 1, h: 1, content: { kind: 'ghost-home' } },
     { id: 'b4', x: 0, y: 2, w: 4, h: 1, content: { kind: 'image', assetId: 'sea' } },
+    { id: 'b5', x: 0, y: 3, w: 4, h: 2, content: { kind: 'voice' } },
+  ],
+  recordings: [
+    { id: 'hello', title: 'Hello, visitor', createdAt: '2026-11-21T08:00:00.000Z', visibility: 'public', durationMs: 4200, mime: 'audio/ogg', data: new Uint8Array([79, 103, 103, 83]), openOn: '2030-01-01' },
+    { id: 'secret', title: 'For later', createdAt: '2026-11-22T08:00:00.000Z', visibility: 'private', durationMs: 3000, mime: 'audio/webm', data: new Uint8Array([26, 69, 223, 163]) },
   ],
   links: [{ id: 'l1', title: 'A friend', url: 'https://friend.example/' }],
   webring: { next: 'https://ring.example/next' },
@@ -100,6 +105,7 @@ describe('exported site runs on a plain static host', () => {
     const local = [...pages].map((u) => u.slice(origin.length + base.length)).sort()
     expect(local).toEqual([
       'assets/sea.png',
+      'audio/hello.ogg',
       'feed.xml',
       'ghost.js',
       'index.html',

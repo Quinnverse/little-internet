@@ -18,10 +18,12 @@ const dec = new TextDecoder()
 const ALLOWED_TAGS = new Set([
   'html', 'head', 'meta', 'title', 'link', 'script', 'body', 'div', 'header', 'p', 'a', 'main',
   'section', 'img', 'h1', 'h2', 'ul', 'li', 'time', 'footer', 'nav', 'article', 'figure', 'iframe', 'br',
+  'audio', 'span',
 ])
 const ALLOWED_ATTRS = new Set([
   'charset', 'name', 'content', 'http-equiv', 'rel', 'href', 'type', 'title', 'class', 'id', 'src',
   'alt', 'loading', 'datetime', 'aria-label', 'allow', 'referrerpolicy', 'data-ghost-home', 'defer',
+  'controls', 'preload',
 ])
 
 function htmlFiles(files: Map<string, Uint8Array>) {
@@ -117,6 +119,10 @@ describe('site core properties', () => {
         for (const a of p.assets) {
           if (kept.has(a.id)) continue
           expect(Object.keys(entries).some((n) => n.startsWith(`assets/${a.id}.`))).toBe(false)
+        }
+        for (const r of p.recordings) {
+          const shipped = Object.keys(entries).some((n) => n.startsWith(`audio/${r.id}.`))
+          expect(shipped, `recording ${r.id} (${r.visibility})`).toBe(r.visibility === 'public')
         }
       }),
       RUNS,

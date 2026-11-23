@@ -7,7 +7,9 @@ import {
   isSafeLine,
   isSafeText,
   THEMES,
+  AUDIO_MIMES,
   type Asset,
+  type Recording,
   type Block,
   type BlockContent,
   type Link,
@@ -104,6 +106,20 @@ const postBaseArb: fc.Arbitrary<PostBase> = fc.record(
   { requiredKeys: ['id', 'slug', 'title', 'body', 'createdAt', 'visibility'] },
 )
 
+const recordingArb: fc.Arbitrary<Recording> = fc.record(
+  {
+    id: idArb,
+    title: lineArb(80),
+    createdAt: isoArb,
+    visibility: fc.constantFrom('public' as const, 'private' as const),
+    durationMs: fc.integer({ min: 1, max: 60_000 }),
+    mime: fc.constantFrom(...AUDIO_MIMES),
+    data: fc.uint8Array({ minLength: 1, maxLength: 24 }),
+    openOn: fc.date({ min: new Date('2026-01-01T00:00:00Z'), max: new Date('2099-12-31T00:00:00Z'), noInvalidDate: true }).map((d) => d.toISOString().slice(0, 10)),
+  },
+  { requiredKeys: ['id', 'title', 'createdAt', 'visibility', 'durationMs', 'mime', 'data'] },
+)
+
 const linkArb: fc.Arbitrary<Link> = fc.record({ id: idArb, title: lineArb(80), url: urlArb })
 
 const sizeArb = fc.constantFrom<[1 | 2 | 4, 1 | 2]>([1, 1], [2, 1], [2, 2], [4, 1], [4, 2])
@@ -114,6 +130,7 @@ function blocksArb(postIds: string[], assetIds: string[]): fc.Arbitrary<Block[]>
     fc.constant({ kind: 'links' as const }),
     fc.constant({ kind: 'latest' as const }),
     fc.constant({ kind: 'ghost-home' as const }),
+    fc.constant({ kind: 'voice' as const }),
   ]
   if (postIds.length) contents.push(fc.constantFrom(...postIds).map((postId) => ({ kind: 'post' as const, postId })))
   if (assetIds.length) contents.push(fc.constantFrom(...assetIds).map((assetId) => ({ kind: 'image' as const, assetId })))
@@ -149,6 +166,7 @@ export const projectArb: fc.Arbitrary<Project> = fc
     assets: fc.uniqueArray(assetArb, { selector: (a) => a.id, maxLength: 4 }),
     posts: fc.uniqueArray(postBaseArb, { selector: (p) => p.id, maxLength: 6 }),
     links: fc.uniqueArray(linkArb, { selector: (l) => l.id, maxLength: 4 }),
+    recordings: fc.uniqueArray(recordingArb, { selector: (r) => r.id, maxLength: 4 }),
     webring: fc.record({ prev: urlArb, next: urlArb, random: urlArb, hub: urlArb }, { requiredKeys: [] }),
   })
   .chain(({ assets, posts: rawPosts, ...rest }) => {
@@ -190,5 +208,6 @@ export const markedProjectArb: fc.Arbitrary<Project> = projectArb
           body: `${PRIVATE_MARK}body${n}`,
         }
       }),
+      recordings: p.recordings.map((r, n) => (r.visibility === 'private' ? { ...r, title: `${PRIVATE_MARK}rec${n}` } : r)),
     }
   })

@@ -13,5 +13,6 @@ export function normalize(p: Project): Project {
     blocks: [...p.blocks].sort((a, b) => a.y - b.y || a.x - b.x || cmp(a.id, b.id)),
     assets: [...p.assets].sort((a, b) => cmp(a.id, b.id)),
     links: [...p.links],
+    recordings: [...p.recordings].sort((a, b) => cmp(b.createdAt, a.createdAt) || cmp(a.id, b.id)),
   }
 }

@@ -14,6 +14,18 @@ export const GHOST_COLORS = ['white', 'mint', 'peach', 'lilac'] as const
 export const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
 export type ImageMime = (typeof IMAGE_MIMES)[number]
 
+export const AUDIO_MIMES = ['audio/webm', 'audio/mp4', 'audio/ogg', 'audio/mpeg'] as const
+export type AudioMime = (typeof AUDIO_MIMES)[number]
+export const AUDIO_EXT: Record<AudioMime, string> = {
+  'audio/webm': 'webm',
+  'audio/mp4': 'm4a',
+  'audio/ogg': 'ogg',
+  'audio/mpeg': 'mp3',
+}
+export const MAX_RECORDING_MS = 60_000
+export const MAX_RECORDING_BYTES = 5 * 1024 * 1024
+export const DATE_PATTERN = /^\d{4}-\d{2}-\d{2}$/
+
 export const MIME_EXT: Record<ImageMime, string> = {
   'image/jpeg': 'jpg',
   'image/png': 'png',
@@ -70,6 +82,7 @@ export const BlockContentSchema = z.discriminatedUnion('kind', [
   z.object({ kind: z.literal('links') }),
   z.object({ kind: z.literal('latest') }),
   z.object({ kind: z.literal('ghost-home') }),
+  z.object({ kind: z.literal('voice') }),
 ])
 
 export const BlockSchema = z
@@ -125,6 +138,37 @@ const AssetSchema = z.object({
   data: z.custom<Uint8Array>((v) => v instanceof Uint8Array, 'must be binary data'),
 })
 
+const isoDate = z
+  .string()
+  .regex(ISO_UTC_PATTERN)
+  .refine((s) => new Date(s).toISOString() === s, 'invalid date')
+
+const RecordingBase = {
+  id,
+  title: line(80),
+  createdAt: isoDate,
+  visibility: z.enum(['public', 'private']),
+  durationMs: z.number().int().min(1).max(MAX_RECORDING_MS),
+  mime: z.enum(AUDIO_MIMES),
+  openOn: z
+    .string()
+    .regex(DATE_PATTERN)
+    .refine((s) => new Date(`${s}T00:00:00.000Z`).toISOString().slice(0, 10) === s, 'invalid date')
+    .optional(),
+}
+
+const RecordingSchema = z.object({
+  ...RecordingBase,
+  data: z.custom<Uint8Array>(
+    (v) => v instanceof Uint8Array && v.byteLength > 0 && v.byteLength <= MAX_RECORDING_BYTES,
+    'recording must be 1 byte – 5 MB',
+  ),
+})
+
+const StoredRecordingSchema = z
+  .object({ ...RecordingBase, path: z.string() })
+  .refine((r) => r.path === recordingPath(r.id, r.mime), 'unexpected recording path')
+
 const ProjectShape = {
   schemaVersion: z.literal(1),
   site: SiteSettingsSchema,
@@ -136,6 +180,7 @@ const ProjectShape = {
 }
 
 type Refinable = {
+  recordings: { id: string }[]
   blocks: z.infer<typeof BlockSchema>[]
   posts: z.infer<typeof PostSchema>[]
   links: z.infer<typeof LinkSchema>[]
@@ -153,6 +198,7 @@ function checkReferences(p: Refinable, ctx: z.RefinementCtx): void {
   dup('post slug', p.posts.map((x) => x.slug))
   dup('link id', p.links.map((l) => l.id))
   dup('asset id', p.assets.map((a) => a.id))
+  dup('recording id', p.recordings.map((r) => r.id))
 
   const postIds = new Set(p.posts.map((x) => x.id))
   const assetIds = new Set(p.assets.map((a) => a.id))
@@ -177,7 +223,12 @@ function checkReferences(p: Refinable, ctx: z.RefinementCtx): void {
 }
 
 export const ProjectSchema = z
-  .object({ ...ProjectShape, assets: z.array(AssetSchema).max(500) })
+  .object({
+    ...ProjectShape,
+    assets: z.array(AssetSchema).max(500),
+    // Added after the first saves: older projects have no field and load as [].
+    recordings: z.array(RecordingSchema).max(20).default([]),
+  })
   .superRefine(checkReferences)
 
 /** `site.json` / `backup.json` form: assets are file paths instead of bytes. */
@@ -191,6 +242,7 @@ export const StoredProjectSchema = z
           .refine((a) => a.path === assetPath(a.id, a.mime), 'unexpected asset path'),
       )
       .max(500),
+    recordings: z.array(StoredRecordingSchema).max(20).default([]),
   })
   .superRefine(checkReferences)
 
@@ -202,10 +254,15 @@ export type Post = z.infer<typeof PostSchema>
 export type Link = z.infer<typeof LinkSchema>
 export type Asset = z.infer<typeof AssetSchema>
 export type VideoEmbed = z.infer<typeof VideoSchema>
+export type Recording = z.infer<typeof RecordingSchema>
 export type Theme = (typeof THEMES)[number]
 
 export function assetPath(id: string, mime: ImageMime): string {
   return `assets/${id}.${MIME_EXT[mime]}`
+}
+
+export function recordingPath(id: string, mime: AudioMime): string {
+  return `audio/${id}.${AUDIO_EXT[mime]}`
 }
 
 export type Result<T> = { ok: true; value: T } | { ok: false; reason: string }

@@ -17,6 +17,7 @@ import { processPhoto } from '../images.ts'
 import { assetUrl, Field, formatDate, GhostIcon, Lock, run, Sheet, type Ctx } from './common.tsx'
 import { EntrySheet } from './EntrySheet.tsx'
 import { OwnerGhost } from './OwnerGhost.tsx'
+import { VoiceSheet } from './VoiceSheet.tsx'
 import { Icon } from './icons.tsx'
 
 const SIZES: Array<BlockSize & { label: string }> = [
@@ -34,9 +35,10 @@ const KIND_LABEL: Record<BlockContent['kind'], string> = {
   latest: 'Latest entries',
   links: 'Friends shelf',
   'ghost-home': 'Ghost’s spot',
+  voice: 'Answering machine',
 }
 
-type Sheets = null | 'add' | 'pick-entry' | 'size' | 'ghost' | { note: Block } | { entry: Post }
+type Sheets = null | 'add' | 'pick-entry' | 'size' | 'ghost' | 'voice' | { note: Block } | { entry: Post }
 
 export function Room(props: { ctx: Ctx }) {
   const { ctx } = props
@@ -84,6 +86,8 @@ export function Room(props: { ctx: Ctx }) {
     if (sel.content.kind === 'text') {
       setNoteText(sel.content.text)
       setSheet({ note: sel })
+    } else if (sel.content.kind === 'voice') {
+      setSheet('voice')
     } else if (sel.content.kind === 'post') {
       const postId = sel.content.postId
       const post = project.posts.find((p) => p.id === postId)
@@ -164,7 +168,7 @@ export function Room(props: { ctx: Ctx }) {
             <Icon name="move" /> Move
           </button>
           <button type="button" onClick={() => setSheet('size')}><Icon name="resize" /> Size</button>
-          {(sel.content.kind === 'text' || sel.content.kind === 'post') && (
+          {(sel.content.kind === 'text' || sel.content.kind === 'post' || sel.content.kind === 'voice') && (
             <button type="button" onClick={editSelected}><Icon name="edit" /> Edit</button>
           )}
           <button
@@ -197,6 +201,18 @@ export function Room(props: { ctx: Ctx }) {
             <button type="button" onClick={() => add({ kind: 'latest' }, { w: 2, h: 2 })}><Icon name="list" size={28} /><span>Latest entries</span></button>
             <button type="button" onClick={() => add({ kind: 'links' }, { w: 2, h: 1 })}><Icon name="shelf" size={28} /><span>Friends shelf</span></button>
             <button type="button" onClick={() => add({ kind: 'ghost-home' }, { w: 1, h: 1 })}><Icon name="ghost" size={28} /><span>Ghost’s spot</span></button>
+            <button
+              type="button"
+              onClick={() => {
+                const id = randomId()
+                if (run(ctx, addBlock(id, { kind: 'voice' }, { w: 4, h: 2 }))) {
+                  setSelected(id)
+                  setSheet('voice')
+                }
+              }}
+            >
+              <Icon name="phone" size={28} /><span>Answering machine</span>
+            </button>
           </div>
           {project.posts.length === 0 && <p class="muted">Write a diary entry first to pin it here.</p>}
         </Sheet>
@@ -257,6 +273,7 @@ export function Room(props: { ctx: Ctx }) {
       )}
 
       {sheet === 'ghost' && <OwnerGhost ctx={ctx} onClose={() => setSheet(null)} />}
+      {sheet === 'voice' && <VoiceSheet ctx={ctx} onClose={() => setSheet(null)} />}
 
       {sheet && typeof sheet === 'object' && 'entry' in sheet && (
         <EntrySheet ctx={ctx} post={sheet.entry} onClose={() => setSheet(null)} />
@@ -314,6 +331,19 @@ function Tile(props: { ctx: Ctx; block: Block }) {
           <span class="tile-small muted">{project.links.length ? `${project.links.length} linked` : 'Add friends in Door'}</span>
         </>
       )
+    case 'voice': {
+      const total = project.recordings.length
+      const pub = project.recordings.filter((r) => r.visibility === 'public').length
+      return (
+        <>
+          <Icon name="phone" size={30} />
+          <strong class="tile-title">Answering machine</strong>
+          <span class="tile-small muted">
+            {total === 0 ? 'Tap Edit to leave a message' : `${total} ${total === 1 ? 'message' : 'messages'} · ${pub} public`}
+          </span>
+        </>
+      )
+    }
     case 'ghost-home':
       return (
         <>

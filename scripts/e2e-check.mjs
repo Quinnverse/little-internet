@@ -21,8 +21,11 @@ const check = (name, ok, detail = '') => {
   if (!ok) process.exitCode = 1
 }
 
-const browser = await chromium.launch()
-const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, acceptDownloads: true })
+// Fake microphone so the real MediaRecorder path is exercised; allow audio playback checks.
+const browser = await chromium.launch({
+  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
+})
+const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, acceptDownloads: true, permissions: ['microphone'] })
 const page = await context.newPage()
 const errors = []
 page.on('pageerror', (e) => errors.push(e.message))
@@ -98,6 +101,56 @@ try {
   await page.screenshot({ path: join(SHOTS, '05b-owner-ghost.png') })
   await page.getByRole('button', { name: 'Close' }).click()
 
+  // 4c. Answering machine: record with the (fake) microphone, and choose a file
+  const clip = await page.evaluate(async () => {
+    const ac = new AudioContext()
+    const osc = ac.createOscillator()
+    const dest = ac.createMediaStreamDestination()
+    osc.frequency.value = 440
+    osc.connect(dest)
+    osc.start()
+    const rec = new MediaRecorder(dest.stream, { mimeType: 'audio/webm;codecs=opus' })
+    const chunks = []
+    rec.ondataavailable = (e) => chunks.push(e.data)
+    const done = new Promise((r) => (rec.onstop = r))
+    rec.start()
+    await new Promise((r) => setTimeout(r, 1500))
+    rec.stop()
+    await done
+    osc.stop()
+    return Array.from(new Uint8Array(await new Blob(chunks).arrayBuffer()))
+  })
+  const clipPath = join(SHOTS, 'hello.webm')
+  writeFileSync(clipPath, new Uint8Array(clip))
+
+  await page.getByRole('button', { name: 'Add', exact: true }).click()
+  await page.locator('.add-grid').getByRole('button', { name: /Answering machine/ }).click()
+  await page.getByRole('button', { name: 'Record a message' }).click()
+  await page.locator('.rec-time').waitFor()
+  await page.waitForTimeout(1500)
+  await page.getByRole('button', { name: 'Stop & keep' }).click()
+  await page.getByText('Message saved.').waitFor()
+  check('microphone recording is saved', (await page.locator('.rec-item').count()) === 1)
+  check('new recording is private', (await page.locator('.rec-item').first().getByText('Private').count()) === 1)
+  await page.getByLabel('Message title').first().fill('For later')
+  await page.getByLabel('Message title').first().blur()
+
+  const chooser3 = page.waitForEvent('filechooser')
+  await page.getByRole('button', { name: 'Choose audio file' }).click()
+  await (await chooser3).setFiles(clipPath)
+  await page.locator('.rec-item').nth(1).waitFor()
+  const top = page.locator('.rec-item').first()
+  await top.getByLabel('Message title').fill('Hello, visitor')
+  await top.getByLabel('Message title').blur()
+  await top.getByLabel('Open on (optional)').fill('2030-01-01')
+  await top.getByRole('button', { name: 'Let visitors hear this' }).click()
+  await page.getByText('Visitors can now hear this message.').waitFor()
+  const meta = await top.locator('p.muted').textContent()
+  check('chosen file duration is read (WebM reports Infinity at first)', /0:0[12]/.test(meta), meta)
+  await page.waitForTimeout(400)
+  await page.screenshot({ path: join(SHOTS, '05c-answering-machine.png') })
+  await page.getByRole('button', { name: 'Close' }).click()
+
   // 5. Preview shows the generated site, public only
   await page.getByRole('button', { name: 'Preview' }).click()
   const frame = page.frameLocator('.preview-frame')
@@ -136,6 +189,9 @@ try {
     .map(([, d]) => new TextDecoder().decode(d))
     .join('\n')
   check('export contains no private entry', !allText.includes('Unsent letter') && !allText.includes('Not for anyone yet'))
+  const audioEntries = Object.keys(entries).filter((n) => n.startsWith('audio/'))
+  check('export contains only the public recording', audioEntries.length === 1, audioEntries.join(','))
+  check('export has no private recording title', !allText.includes('For later'))
   check('export contains the photo', Object.keys(entries).some((n) => n.startsWith('assets/') && n.endsWith('.jpg')))
 
   // 7. Independent site on another origin, in a fresh context (no service worker, no app)
@@ -158,6 +214,21 @@ try {
   const img = await vpage.locator('article img').evaluate((el) => el.complete && el.naturalWidth > 0)
   check('photo loads on independent host', img)
   await vpage.screenshot({ path: join(SHOTS, '09-independent-post.png'), fullPage: true })
+  await vpage.goto(`${SITE}@moon/index.html`)
+  const voice = await vpage.locator('#voice audio').evaluate(
+    (a) =>
+      new Promise((resolve) => {
+        a.preload = 'auto'
+        a.addEventListener('loadedmetadata', () => resolve({ ok: true, err: null }), { once: true })
+        a.addEventListener('error', () => resolve({ ok: false, err: a.error && a.error.code }), { once: true })
+        a.load()
+        setTimeout(() => resolve({ ok: false, err: 'timeout' }), 5000)
+      }),
+  )
+  check('public message plays on independent host', voice.ok, JSON.stringify(voice))
+  check('open-on label shown', (await vpage.locator('#voice').innerText()).includes('for 2030-01-01'))
+  check('ghost guide offers the voice messages', await vpage.evaluate(() => JSON.parse(document.getElementById('ghost-data').textContent).guide.some((g) => g.href === 'index.html#voice')))
+  await vpage.locator('#voice').screenshot({ path: join(SHOTS, '09b-independent-voice.png') })
   check('no failed requests on independent host', failed.length === 0, failed.join(', '))
   await visitor.close()
 
@@ -210,9 +281,9 @@ try {
   // 9. Persistence: reload the original editor
   await page.reload()
   await page.getByRole('heading', { name: 'Room' }).waitFor()
-  check('editor reloads saved home from IndexedDB', (await page.locator('.tile').count()) === 5)
+  check('editor reloads saved home from IndexedDB', (await page.locator('.tile').count()) === 6)
 } catch (e) {
-  check('flow completed', false, e instanceof Error ? e.message.split('\n')[0] : String(e))
+  check('flow completed', false, e instanceof Error ? e.message.split('\n').slice(0, 6).join(' | ') : String(e))
   await page.screenshot({ path: join(SHOTS, 'zz-failure.png') }).catch(() => {})
 } finally {
   check('no page errors', errors.length === 0, errors.join(' | '))

@@ -4,7 +4,7 @@ import { normalize } from './normalize.ts'
 import { publicProjection } from './privacy.ts'
 import { generateFeed } from './rss.ts'
 import { toStored } from './storage.ts'
-import { assetPath, isCanonicalHttpUrl, type Block, type Post, type Project } from './schema.ts'
+import { assetPath, isCanonicalHttpUrl, recordingPath, type Block, type Post, type Project } from './schema.ts'
 import { themeCss } from './themes.ts'
 import { embedSrc, VIDEO_FRAME_HOSTS } from './video.ts'
 
@@ -18,6 +18,7 @@ export type SiteFiles = Map<string, Uint8Array>
 export const CSP = [
   "default-src 'none'",
   "img-src 'self' data:",
+  "media-src 'self'",
   "style-src 'self'",
   "script-src 'self'",
   `frame-src ${VIDEO_FRAME_HOSTS.join(' ')}`,
@@ -43,6 +44,7 @@ export function generateSite(project: Project, opts: GenerateOptions = {}): Site
   out.set('ghost.js', ghostRuntime)
   out.set('feed.xml', generateFeed(pub, baseUrl))
   for (const a of pub.assets) out.set(assetPath(a.id, a.mime), a.data)
+  for (const r of pub.recordings) out.set(recordingPath(r.id, r.mime), r.data)
 
   out.set('site.json', `${JSON.stringify(toStored(pub).stored, null, 2)}\n`)
 
@@ -95,8 +97,12 @@ ${renderFooter(pub, prefix)}
 }
 
 function renderIndex(pub: Project): string {
-  const firstLinks = pub.blocks.find((b) => b.content.kind === 'links')?.id
-  const blocks = pub.blocks.map((b) => renderBlock(pub, b, b.id === firstLinks)).join('\n')
+  const anchors = new Set<string>()
+  for (const kind of ['links', 'voice'] as const) {
+    const first = pub.blocks.find((b) => b.content.kind === kind)
+    if (first) anchors.add(first.id)
+  }
+  const blocks = pub.blocks.map((b) => renderBlock(pub, b, anchors.has(b.id))).join('\n')
   return page({
     pub,
     title: pub.site.title,
@@ -106,7 +112,7 @@ function renderIndex(pub: Project): string {
   })
 }
 
-function renderBlock(pub: Project, b: Block, anchorLinks: boolean): string {
+function renderBlock(pub: Project, b: Block, anchor: boolean): string {
   const c = b.content
   let inner = ''
   switch (c.kind) {
@@ -132,8 +138,11 @@ function renderBlock(pub: Project, b: Block, anchorLinks: boolean): string {
     case 'ghost-home':
       inner = '<div class="ghost-home" data-ghost-home></div>'
       break
+    case 'voice':
+      inner = `<h2>Answering machine</h2>\n${voiceList(pub)}`
+      break
   }
-  const id = anchorLinks ? ' id="links"' : ''
+  const id = anchor && (c.kind === 'links' || c.kind === 'voice') ? ` id="${c.kind}"` : ''
   return `<section class="block b-${b.id} k-${c.kind}"${id}>${inner}</section>`
 }
 
@@ -153,6 +162,22 @@ function linkList(pub: Project): string {
     .map((l) => `<li><a href="${h(l.url)}" rel="noopener">${h(l.title)}</a></li>`)
     .join('')
   return `<ul class="links">${items}</ul>`
+}
+
+function voiceList(pub: Project): string {
+  if (pub.recordings.length === 0) return '<p class="muted">No messages yet.</p>'
+  const items = pub.recordings
+    .map((r) => {
+      const label = r.openOn ? ` · <span class="open-on">for ${r.openOn}</span>` : ''
+      const secs = Math.max(1, Math.round(r.durationMs / 1000))
+      return (
+        `<li><p class="rec-title">${h(r.title || 'A message')}</p>` +
+        `<p class="rec-meta"><time datetime="${r.createdAt}">${r.createdAt.slice(0, 10)}</time> · ${secs}s${label}</p>` +
+        `<audio controls preload="none" src="${recordingPath(r.id, r.mime)}"></audio></li>`
+      )
+    })
+    .join('')
+  return `<ul class="voice">${items}</ul>`
 }
 
 function latestList(pub: Project, prefix: string): string {
@@ -212,6 +237,9 @@ function ghostData(pub: Project, prefix: string) {
   const latest = pub.posts[0]
   const latestTitle = latest ? latest.title || latest.createdAt.slice(0, 10) : ''
   if (latest) guide.push({ label: `Read “${latestTitle}”`, href: `${prefix}posts/${latest.slug}.html` })
+  if (pub.recordings.length && pub.blocks.some((b) => b.content.kind === 'voice')) {
+    guide.push({ label: 'Listen to my voice', href: `${prefix}index.html#voice` })
+  }
   if (pub.blocks.some((b) => b.content.kind === 'links')) {
     guide.push({ label: 'Meet my friends', href: `${prefix}index.html#links` })
   }
@@ -258,6 +286,13 @@ a{color:var(--accent)}
 .site-footer{margin-top:24px;color:var(--muted);font-size:.9rem;text-align:center}
 .webring a{margin:0 6px}
 .k-ghost-home{display:grid;place-items:center;overflow:visible;z-index:3}
+.k-voice{overflow:auto}
+.voice{list-style:none;padding:0!important;margin:0}
+.voice li{padding:6px 0;border-top:1px dashed var(--border)}
+.voice li:first-child{border-top:0}
+.rec-title{font-weight:700}
+.rec-meta{font-size:.8rem;color:var(--muted)}
+.voice audio{width:100%;height:36px;margin-top:4px}
 .ghost-wrap{position:relative;display:inline-block}
 .ghost-floating{position:fixed;right:16px;bottom:16px;z-index:20}
 .ghost{display:block;width:60px;height:68px;padding:0;border:0;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
@@ -277,6 +312,7 @@ a{color:var(--accent)}
 [data-state=guide] .ghost{transform:scale(1.06)}
 .ghost-bubble{position:absolute;bottom:calc(100% + 10px);left:50%;margin-left:-110px;width:220px;background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:14px;padding:10px 12px;font-size:.9rem;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:30}
 .ghost-floating .ghost-bubble{left:auto;right:0;margin-left:0}
+.ghost-below .ghost-bubble{bottom:auto;top:calc(100% + 10px)}
 .ghost-bubble p{margin:0 0 6px}
 .ghost-bubble ul{margin:0;padding-left:1.1em}
 .ghost-bubble li{margin:4px 0}

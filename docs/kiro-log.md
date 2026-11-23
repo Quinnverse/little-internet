@@ -91,3 +91,19 @@ inherited light text on a light sheet. Fixed, and added e2e assertions on comput
 so it can't regress silently.
 
 **e2e now 33 checks** across phone (390×844), tablet (820×1180) and desktop (1280×800).
+
+## 2026-11-23 — Day 1, night: voice time capsule spec
+
+**Spec: `voice-capsule`.** 4 requirement groups, 7 tasks, all done. The schema change was
+additive (`recordings` with a zod default), so steering `tech.md` was updated with an
+explicit rule for when a schema version bump is needed, instead of silently breaking it.
+
+**Existing properties absorbed the new feature.** Adding recordings to the generators made
+P1 (round trip), P2 (backup), P4 (privacy), P6 (references resolve) and P7 (determinism)
+cover audio immediately; only P4 needed one extra assertion.
+
+**e2e with a fake microphone.** Chromium's `--use-fake-device-for-media-stream` lets the
+test go through the real MediaRecorder path. The test also synthesises a WebM clip in the
+page (oscillator → MediaRecorder) to exercise "choose a file". It caught two real bugs
+(`video/webm` MIME for audio files; ghost bubble opening off-screen at the top of a page).
+41/41 checks.

@@ -30,6 +30,11 @@ const stepArb = fc.oneof(
   fc.record({ t: fc.constant('addLink' as const), title: lineArb(80), url: urlArb }),
   fc.record({ t: fc.constant('deleteLink' as const), i: fc.nat() }),
   fc.record({ t: fc.constant('site' as const), title: lineArb(80), tagline: lineArb(200) }),
+  fc.record({ t: fc.constant('record' as const), title: lineArb(80), ms: fc.integer({ min: 1, max: 60_000 }) }),
+  fc.record({ t: fc.constant('publishRec' as const), i: fc.nat(), pub: fc.boolean() }),
+  fc.record({ t: fc.constant('renameRec' as const), i: fc.nat(), title: lineArb(80), openOn: fc.option(fc.constantFrom('2030-01-01', '2099-12-31')) }),
+  fc.record({ t: fc.constant('deleteRec' as const), i: fc.nat() }),
+  fc.record({ t: fc.constant('addVoiceBlock' as const), s: fc.constantFrom(...sizes) }),
 )
 
 function start(): Project {
@@ -110,6 +115,29 @@ function run(steps: fc.Arbitrary<unknown>[] | unknown[], check: (p: Project, ste
       case 'site':
         cmd = C.updateSite({ title: s.title, tagline: s.tagline })
         break
+      case 'record':
+        if (p.recordings.length < 20) {
+          cmd = C.addRecording({ id: nextId(), title: s.title, createdAt: new Date(1_700_000_000_000 + n * 1000).toISOString(), durationMs: s.ms, mime: 'audio/webm', data: new Uint8Array([1, 2]) })
+        }
+        break
+      case 'publishRec': {
+        const r = at(p.recordings, s.i)
+        if (r) cmd = C.setRecordingVisibility(r.id, s.pub ? 'public' : 'private')
+        break
+      }
+      case 'renameRec': {
+        const r = at(p.recordings, s.i)
+        if (r) cmd = C.updateRecording(r.id, { title: s.title, openOn: s.openOn })
+        break
+      }
+      case 'deleteRec': {
+        const r = at(p.recordings, s.i)
+        if (r) cmd = C.deleteRecording(r.id)
+        break
+      }
+      case 'addVoiceBlock':
+        cmd = C.addBlock(nextId(), { kind: 'voice' }, s.s)
+        break
     }
     if (!cmd) continue
     p = cmd(p)
@@ -149,6 +177,11 @@ describe('editor command properties', () => {
             const old = before.posts.find((x) => x.id === post.id)
             if (old && old.visibility !== post.visibility) expect(s.t).toBe('publish')
             if (post.visibility === 'public') published.add(post.id)
+          }
+          const prevRecs = new Map(before.recordings.map((r) => [r.id, r.visibility]))
+          for (const r of p.recordings) {
+            if (!prevRecs.has(r.id)) expect(r.visibility).toBe('private')
+            else if (prevRecs.get(r.id) !== r.visibility) expect(s.t).toBe('publishRec')
           }
           before = p
         })

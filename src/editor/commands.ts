@@ -15,6 +15,7 @@ import type {
   Link,
   Post,
   Project,
+  Recording,
   Theme,
   VideoEmbed,
 } from '../core/schema.ts'
@@ -52,6 +53,7 @@ export function createProject(input: NewProjectInput, blockIds: [string, string,
     links: [],
     webring: {},
     assets: [],
+    recordings: [],
   }
 }
 
@@ -223,3 +225,32 @@ export const setWebring =
     }
     return { ...p, webring: clean }
   }
+
+// ------------------------------------------------------------------ voice time capsule
+
+export type NewRecordingInput = Omit<Recording, 'visibility'>
+
+/** New recordings are ALWAYS private (voice spec, Requirement 2.1). */
+export const addRecording =
+  (input: NewRecordingInput): Command =>
+  (p) => ({ ...p, recordings: [{ ...input, visibility: 'private' }, ...p.recordings] })
+
+export const updateRecording =
+  (id: string, patch: { title?: string; openOn?: string | null }): Command =>
+  (p) => ({
+    ...p,
+    recordings: p.recordings.map((r) => {
+      if (r.id !== id) return r
+      const { openOn: _o, ...rest } = r
+      const openOn = patch.openOn === undefined ? r.openOn : patch.openOn ?? undefined
+      return { ...rest, ...(patch.title !== undefined ? { title: patch.title } : {}), ...(openOn ? { openOn } : {}) }
+    }),
+  })
+
+export const setRecordingVisibility =
+  (id: string, visibility: Recording['visibility']): Command =>
+  (p) => ({ ...p, recordings: p.recordings.map((r) => (r.id === id ? { ...r, visibility } : r)) })
+
+export const deleteRecording =
+  (id: string): Command =>
+  (p) => ({ ...p, recordings: p.recordings.filter((r) => r.id !== id) })

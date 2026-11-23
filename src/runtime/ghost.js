@@ -125,7 +125,11 @@
     for (var i = 0; i < children.length; i++) bubble.appendChild(children[i])
     bubble.hidden = false
     // Keep the bubble on screen (CSSOM edits are allowed by the page CSP).
+    // Above the ghost by default; below when there is no room above.
     bubble.style.transform = ''
+    root.classList.remove('ghost-below')
+    var top = bubble.getBoundingClientRect().top + (window.pageYOffset || 0)
+    if (top < 8) root.classList.add('ghost-below')
     var r = bubble.getBoundingClientRect()
     var vw = document.documentElement.clientWidth || window.innerWidth
     var shift = 0

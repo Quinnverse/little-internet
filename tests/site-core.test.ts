@@ -45,6 +45,7 @@ function sample(): Project {
     ],
     links: [{ id: 'l1', title: 'A friend', url: 'https://friend.example/' }],
     webring: { prev: 'https://ring.example/prev', next: 'https://ring.example/next' },
+    recordings: [],
   }
 }
 
@@ -83,6 +84,25 @@ describe('validation', () => {
   ])('rejects %s', (_name, mutate) => {
     const p = sample()
     mutate(p)
+    expect(parseProject(p).ok).toBe(false)
+  })
+})
+
+describe('compatibility', () => {
+  it('loads a project saved before recordings existed', () => {
+    const { recordings: _r, ...old } = sample()
+    const r = parseProject(old)
+    expect(r.ok && r.value.recordings).toEqual([])
+  })
+
+  it.each([
+    ['recording too long', { durationMs: 60_001 }],
+    ['bad open-on date', { openOn: '2030-02-30' }],
+    ['unsupported audio type', { mime: 'audio/wav' }],
+    ['empty audio', { data: new Uint8Array() }],
+  ])('rejects %s', (_label, patch) => {
+    const p = sample()
+    p.recordings = [{ id: 'r1', title: 'Hi', createdAt: '2026-11-21T08:00:00.000Z', visibility: 'public', durationMs: 1000, mime: 'audio/ogg', data: new Uint8Array([1]), ...patch } as never]
     expect(parseProject(p).ok).toBe(false)
   })
 })

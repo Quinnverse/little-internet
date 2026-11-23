@@ -79,7 +79,7 @@ export function readProjectZip(
   const stored = StoredProjectSchema.safeParse(json)
   if (!stored.success) return fail(`${manifestName} is invalid: ${describe(stored.error)}`)
 
-  const wanted = new Set(stored.data.assets.map((a) => a.path))
+  const wanted = new Set([...stored.data.assets.map((a) => a.path), ...stored.data.recordings.map((r) => r.path)])
   let declaredTotal = 0
   let tooBig: string | undefined
   let files: Record<string, Uint8Array>
@@ -96,12 +96,12 @@ export function readProjectZip(
       },
     })
   } catch {
-    return fail('Could not read images from the ZIP.')
+    return fail('Could not read files from the ZIP.')
   }
-  if (tooBig) return fail(`Image is too large: ${tooBig}`)
+  if (tooBig) return fail(`File is too large: ${tooBig}`)
   const assetFiles = new Map<string, Uint8Array>()
   for (const [name, data] of Object.entries(files)) {
-    if (data.byteLength > LIMITS.maxAssetBytes) return fail(`Image is too large: ${name}`)
+    if (data.byteLength > LIMITS.maxAssetBytes) return fail(`File is too large: ${name}`)
     assetFiles.set(name, data)
   }
 

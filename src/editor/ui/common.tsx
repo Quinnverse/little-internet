@@ -21,13 +21,18 @@ export function run(ctx: Ctx, cmd: Command, okMessage?: string): boolean {
 
 const urlCache = new WeakMap<Uint8Array, string>()
 
-export function assetUrl(asset: Asset): string {
-  let url = urlCache.get(asset.data)
+/** Object URL for in-memory bytes, cached per byte array. */
+export function blobUrl(data: Uint8Array, mime: string): string {
+  let url = urlCache.get(data)
   if (!url) {
-    url = URL.createObjectURL(new Blob([asset.data as BlobPart], { type: asset.mime }))
-    urlCache.set(asset.data, url)
+    url = URL.createObjectURL(new Blob([data as BlobPart], { type: mime }))
+    urlCache.set(data, url)
   }
   return url
+}
+
+export function assetUrl(asset: Asset): string {
+  return blobUrl(asset.data, asset.mime)
 }
 
 export function Sheet(props: { title: string; onClose: () => void; children: ComponentChildren }) {
