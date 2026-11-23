@@ -82,6 +82,15 @@ body.theme-room::after{content:"";position:fixed;left:0;right:0;bottom:0;height:
 .theme-room .k-text{background:#fff1a0;transform:rotate(-1.4deg);padding:10px 12px;box-shadow:2px 4px 6px rgba(60,35,20,.3);border-radius:2px}
 .theme-room .post article{background:repeating-linear-gradient(#f8efd9 0 27px,#dfe3ea 27px 28px);border-left:14px solid #7a3b2e;border-radius:3px 10px 10px 3px;padding:12px 18px;box-shadow:3px 4px 0 rgba(60,35,20,.3)}
 .theme-room .post figure img{border:8px solid #6b4423;border-radius:0;box-sizing:border-box}
+.theme-room .site-header{border-bottom-color:#8a6a4a}
+.theme-room .site-title{letter-spacing:.01em}
+/* A room you can feel: a subtle wall-panel behind the centred grid on wide screens. */
+@media (min-width:760px){
+  body.theme-room{background:repeating-linear-gradient(90deg,#e7d5b6 0 34px,#e2cdaa 34px 68px)}
+  .theme-room .wrap{background:repeating-linear-gradient(90deg,#eddfc5 0 26px,#e8d6b5 26px 52px);border-left:2px solid #c9ad86;border-right:2px solid #c9ad86;border-radius:6px 6px 0 0;padding-left:22px;padding-right:22px;box-shadow:0 0 0 6px rgba(120,80,45,.08)}
+  .theme-room .grid{--gap:14px}
+  .theme-room .k-latest,.theme-room .k-post{box-shadow:4px 6px 0 rgba(60,35,20,.34)}
+}
 @media (prefers-reduced-motion:reduce){.theme-room .k-text{transform:none}}
 `
 

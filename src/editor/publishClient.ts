@@ -13,7 +13,12 @@ import type { Project } from '../core/schema.ts'
 
 const TOKEN_STORAGE_PREFIX = 'little-internet:publish-token:'
 const API_STORAGE_KEY = 'little-internet:publish-api'
-const DEFAULT_API = import.meta.env?.VITE_PUBLISH_API || 'https://little.quinnverse.tech'
+// Default to the same origin the editor is served from: publish API and editor
+// share one host in deployment, so no CORS and no hard-coded domain. Override
+// with VITE_PUBLISH_API at build time or via the in-app "Advanced" field.
+const DEFAULT_API =
+  import.meta.env?.VITE_PUBLISH_API ||
+  (typeof location !== 'undefined' ? location.origin : 'https://resurrection.quinnverse.tech')
 
 export type PublishResult = { ok: true; url: string; status: 'created' | 'updated' } | { ok: false; reason: string }
 
