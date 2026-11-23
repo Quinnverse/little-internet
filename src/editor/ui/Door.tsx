@@ -9,6 +9,7 @@ import { randomId } from '../ids.ts'
 import { Field, run, type Ctx } from './common.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
 import { Icon } from './icons.tsx'
+import { PublishPanel } from './PublishPanel.tsx'
 
 export function Door(props: { ctx: Ctx }) {
   const { ctx } = props
@@ -79,6 +80,9 @@ export function Door(props: { ctx: Ctx }) {
         <button type="button" class="btn" onClick={() => load('backup')}>Restore backup</button>
         <button type="button" class="btn" onClick={() => load('site')}>Import website ZIP</button>
       </div>
+
+      <h2>Open your door online</h2>
+      <PublishPanel ctx={ctx} />
 
       <h2>Friends</h2>
       <Links ctx={ctx} />

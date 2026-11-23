@@ -1,0 +1,23 @@
+# Standalone mode (OPTIONAL). Caddy binds host 80/443 and manages TLS via ACME.
+# Requires DNS for little.quinnverse.tech -> this host and open 80/443.
+little.quinnverse.tech {
+	@backend path /api/* /healthz /@*
+	reverse_proxy @backend app:8788
+
+	handle {
+		root * /srv/dist
+		encode gzip
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+}

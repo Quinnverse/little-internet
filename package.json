@@ -11,7 +11,10 @@
     "typecheck": "tsc",
     "check:export": "vitest --run tests/export-independence.test.ts",
     "e2e": "bash scripts/e2e.sh",
-    "icons": "node scripts/make-icons.mjs"
+    "e2e:publish": "node scripts/e2e-publish.mjs",
+    "icons": "node scripts/make-icons.mjs",
+    "build:ghost": "node scripts/build-ghost-source.mjs",
+    "server": "node server/index.mjs"
   },
   "devDependencies": {
     "@preact/preset-vite": "^2.10.6",

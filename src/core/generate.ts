@@ -1,4 +1,4 @@
-import ghostRuntime from '../runtime/ghost.js?raw'
+import { ghostRuntime } from './ghost-source.ts'
 import { escapeHtml, jsonForScript } from './escape.ts'
 import { normalize } from './normalize.ts'
 import { publicProjection } from './privacy.ts'

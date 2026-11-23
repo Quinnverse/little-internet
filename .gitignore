@@ -25,3 +25,12 @@ dist-ssr
 
 # local end-to-end check output
 .e2e/
+e2e-shots/
+e2e-publish-shots/
+
+# publish service data + secrets (NEVER commit)
+data/
+.env
+*.tar.gz
+
+# NOTE: do NOT ignore /.kiro — required by Kiroween rules; it is tracked above.

@@ -1,0 +1,26 @@
+# Behind-proxy mode (DEFAULT). Caddy serves plain HTTP on :80 inside the
+# container; an existing edge proxy terminates TLS for little.quinnverse.tech
+# and forwards here (host ports 8080 by default). Caddy does NOT bind 80/443.
+:80 {
+	# Publish API, health check and all published sites go to the Node service.
+	@backend path /api/* /healthz /@*
+	reverse_proxy @backend app:8788
+
+	# Everything else is the editor PWA (static build). SPA fallback to index.html.
+	handle {
+		root * /srv/dist
+		encode gzip
+		try_files {path} /index.html
+		file_server
+	}
+
+	header {
+		X-Content-Type-Options "nosniff"
+		Referrer-Policy "no-referrer"
+		-Server
+	}
+	log {
+		output stdout
+		format console
+	}
+}

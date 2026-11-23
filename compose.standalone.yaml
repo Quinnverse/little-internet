@@ -1,0 +1,18 @@
+# OPTIONAL override: bind host 80/443 and let Caddy manage TLS automatically.
+# Use ONLY on a machine where nothing else owns 80/443.
+#   docker compose -f compose.yaml -f compose.standalone.yaml up -d
+# Requires DNS A/AAAA for little.quinnverse.tech to point at this host and
+# ports 80/443 reachable from the internet for the ACME challenge.
+name: little-internet
+
+services:
+  caddy:
+    ports: !override
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes: !override
+      - ./deploy/Caddyfile.standalone:/etc/caddy/Caddyfile:ro
+      - ./dist:/srv/dist:ro
+      - ./data/caddy:/data
+      - ./data/caddy-config:/config

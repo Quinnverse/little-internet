@@ -1,7 +1,7 @@
 import fc from 'fast-check'
 import { JSDOM } from 'jsdom'
 import { describe, expect, it } from 'vitest'
-import ghostSource from '../src/runtime/ghost.js?raw'
+import { ghostRuntime as ghostSource } from '../src/core/ghost-source.ts'
 import { jsonForScript } from '../src/core/escape.ts'
 import type { Post } from '../src/core/schema.ts'
 import { askMemories, onThisDay } from '../src/editor/memories.ts'

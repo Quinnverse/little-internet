@@ -1,0 +1,11 @@
+node_modules
+data
+dist
+.e2e
+e2e-shots
+.git
+.env
+*.log
+docs
+tests
+scripts

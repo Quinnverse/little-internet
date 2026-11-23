@@ -13,6 +13,13 @@ self.addEventListener('fetch', (event) => {
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
 
+  // Published visitor sites and the publish API must NEVER be served from the
+  // editor's Cache Storage. When the editor shares an origin with
+  // /@username/ sites, this SW's scope would otherwise cover them, and a
+  // network-first shell cache could resurrect an unpublished site offline.
+  // Let the browser handle those requests directly (the server sends no-store).
+  if (/^\/@[a-z0-9-]+(?:\/|$)/.test(url.pathname) || /^\/api\//.test(url.pathname) || url.pathname === '/healthz') return
+
   const scope = new URL(self.registration.scope)
   const previewBase = new URL('preview/', scope)
   if (url.href.startsWith(previewBase.href)) {

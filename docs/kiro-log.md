@@ -121,3 +121,56 @@ ghost's bubble was open (the bubble was nudged back on-screen with `transform`, 
 not change the page's scrollable width; now `left`/`right`); and the dark theme's sheet
 colours (earlier). The overflow was found by having the e2e list overflowing elements and
 then sampling the page before and after the bubble closed — the cause was not an element.
+
+## 2026-11-23 — R1: online publish, privacy audit and competition package
+
+**Goal (owner instruction):** stop adding features; make Little Internet truly
+publishable, shareable, private and portable. No accounts, no new features.
+
+**Serving the core in Node.** `generate.ts` imported the ghost runtime with
+Vite-only `?raw`. Made `src/runtime/ghost.js` the single source of truth and
+generated `src/core/ghost-source.ts` (a string constant) via
+`scripts/build-ghost-source.mjs`. Both the browser build and the Node publish
+server now import the same renderer. A property test asserts generated HTML has
+no inline scripts beyond the JSON `ghost-data` block.
+
+**Publish service (zero heavy deps).** `node:http` + the existing zod schemas +
+`generateSite`. Strict publish envelope, media MIME/size/count limits, URL
+allow-list, path-traversal guards, request-size cap, per-IP rate limit, salted
+token-hash ownership, atomic dir swap with rollback, unpublish -> 410,
+`Cache-Control: no-store`, health check and structured logs. The credential is
+generated in the browser, stored only in localStorage and in `X-Site-Token`,
+never in site.json / ZIP / logs.
+
+**Real bugs found and fixed this round (not hypothetical):**
+1. Username validation built a regex from `SITE_SLUG_PATTERN.toString()`, which
+   embedded the `/.../` delimiters and rejected every name. Fixed by using the
+   RegExp object directly; added cases for reserved/malformed/too-long names.
+2. Oversized publish requests called `req.destroy()`, so the client got a
+   connection reset instead of a clean 413. Fixed by draining the stream and
+   returning a real 413; integration test asserts the 413 status.
+3. Service-worker scope: the editor SW (scope `./`) would also cover
+   `/@username/` when editor and sites share an origin, and its network-first
+   shell cache could resurrect an unpublished site offline. Fixed by making the
+   SW ignore `/@*`, `/api/*` and `/healthz` entirely.
+4. Publish UI kept the "Unpublish" button after unpublishing because the button
+   state was derived from localStorage at render time with no re-render. Fixed
+   with explicit published-name state; E2E now asserts the button resets.
+5. CORS preflight (OPTIONS) returned 404 when editor and API were on different
+   origins. Added an optional `corsOrigin` (off by default; production is
+   same-origin), so local E2E can drive the real UI.
+
+**Verification actually run (2026-11-23):**
+- Unit/property tests: 75 baseline -> 102 passed (added publish + privacy PBT).
+- E2E on system Chrome: original 49/49; new publish E2E 12/12, including
+  375/768/1440 viewports with no horizontal overflow and unpublish -> 410.
+- Manual HTTP e2e against the real server binary: publish -> serve -> private
+  media 404 -> unpublish -> 410.
+
+**Honest tooling notes.** This build used Kiro Web in Vibe mode with steering
+and spec-driven development. No Kiro hooks, custom agents, MCP servers or Kiro
+Crew were configured, so the write-up says so rather than claiming them.
+Playwright's browser download stalled in this environment; tests were driven
+through the locally installed Google Chrome channel instead (no functional
+difference for these checks). No physical iPhone/Android device was available:
+the device checklist is explicitly NOT TESTED.

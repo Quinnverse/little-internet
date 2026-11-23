@@ -1,0 +1,40 @@
+# Little Internet — independent deployment on a subdomain.
+# DEFAULT MODE: does NOT bind host 80/443. Caddy listens on CADDY_HTTP_PORT
+# (default 8080) and expects HTTPS to be terminated by an existing edge proxy.
+# See deploy/README.md for the standalone (bind 80/443) override and DNS steps.
+name: little-internet
+
+services:
+  app:
+    build: .
+    image: little-internet-publish:local
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      # Override .env: inside Docker the service must listen on all interfaces
+      # so Caddy (another container) can reach it.
+      HOST: 0.0.0.0
+      PORT: 8788
+    volumes:
+      - ./data:/data
+    expose:
+      - "8788"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8788/healthz').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+
+  caddy:
+    image: caddy:2-alpine
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "${CADDY_HTTP_PORT:-8080}:80"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./dist:/srv/dist:ro
+      - ./data/caddy:/data
+      - ./data/caddy-config:/config

@@ -22,9 +22,15 @@ const check = (name, ok, detail = '') => {
 }
 
 // Fake microphone so the real MediaRecorder path is exercised; allow audio playback checks.
-const browser = await chromium.launch({
-  args: ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required'],
-})
+// Prefer a locally installed Chrome channel so no large browser download is needed;
+// fall back to Playwright's bundled Chromium when available.
+const LAUNCH_ARGS = ['--use-fake-device-for-media-stream', '--use-fake-ui-for-media-stream', '--autoplay-policy=no-user-gesture-required']
+let browser
+try {
+  browser = await chromium.launch({ channel: 'chrome', args: LAUNCH_ARGS })
+} catch {
+  browser = await chromium.launch({ args: LAUNCH_ARGS })
+}
 const context = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, acceptDownloads: true, permissions: ['microphone'] })
 const page = await context.newPage()
 const errors = []

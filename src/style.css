@@ -325,3 +325,11 @@ input[aria-invalid='true'] { border-color: var(--danger); }
 .skin-room .tile-latest .muted { color: #5a3d1c; }
 .skin-room .tile-text { background: #fff1a0; color: #3b2a1e; transform: rotate(-1deg); }
 @media (prefers-reduced-motion: reduce) { .skin-room .tile-text { transform: none; } }
+
+/* ---------- online publishing ---------- */
+.publish-result { margin: 12px 0; padding: 10px 12px; border: 1px solid var(--accent); border-radius: var(--radius); background: var(--card); overflow-wrap: anywhere; }
+.publish-result p { margin: 2px 0; }
+.publish-result a { color: var(--accent); }
+.publish-advanced { margin-top: 10px; font-size: .9rem; }
+.publish-advanced summary { cursor: pointer; color: var(--muted); padding: 4px 0; }
+.publish-advanced .field { margin-top: 8px; }
