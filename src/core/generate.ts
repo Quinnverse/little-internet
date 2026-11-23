@@ -206,20 +206,26 @@ ${ringNav}<p><a href="${prefix}feed.xml">RSS</a> · Made with Little Internet</p
 
 type GuideItem = { label: string; href: string }
 
+/** Public-only data for ghost.js (ghost spec, Requirement 2.2). */
 function ghostData(pub: Project, prefix: string) {
   const guide: GuideItem[] = []
   const latest = pub.posts[0]
-  if (latest) guide.push({ label: `Read “${latest.title}”`, href: `${prefix}posts/${latest.slug}.html` })
+  const latestTitle = latest ? latest.title || latest.createdAt.slice(0, 10) : ''
+  if (latest) guide.push({ label: `Read “${latestTitle}”`, href: `${prefix}posts/${latest.slug}.html` })
   if (pub.blocks.some((b) => b.content.kind === 'links')) {
     guide.push({ label: 'Meet my friends', href: `${prefix}index.html#links` })
   }
   if (pub.webring.random) guide.push({ label: 'Visit a random site', href: pub.webring.random })
+  guide.push({ label: 'Follow with RSS', href: `${prefix}feed.xml` })
   return {
     enabled: pub.ghost.enabled,
     name: pub.ghost.name,
     color: pub.ghost.color,
-    greeting: `Hi, I’m ${pub.ghost.name}. Welcome to ${pub.site.title}!`,
-    guide,
+    greeting: `Hi, I’m ${pub.ghost.name || 'the ghost'}. Welcome to ${pub.site.title}!`,
+    guide: guide.slice(0, 4),
+    ...(latest
+      ? { latest: { title: latestTitle, href: `${prefix}posts/${latest.slug}.html`, createdAt: latest.createdAt } }
+      : {}),
   }
 }
 
@@ -251,12 +257,34 @@ a{color:var(--accent)}
 .video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:8px}
 .site-footer{margin-top:24px;color:var(--muted);font-size:.9rem;text-align:center}
 .webring a{margin:0 6px}
-.ghost{position:relative;width:56px;height:64px;border:0;border-radius:28px 28px 10px 10px;cursor:pointer;animation:ghost-bob 3s ease-in-out infinite}
-.ghost-white{background:#fbfbff}.ghost-mint{background:#c9f2df}.ghost-peach{background:#ffd9c4}.ghost-lilac{background:#e3d6ff}
-.ghost-bubble{background:var(--card);border:1px solid var(--border);border-radius:12px;padding:8px 12px;margin-top:8px;font-size:.9rem}
-.ghost-bubble p{margin:0 0 4px}
-@keyframes ghost-bob{0%,100%{transform:translateY(0)}50%{transform:translateY(-6px)}}
-@media (prefers-reduced-motion:reduce){.ghost{animation:none}}
+.k-ghost-home{display:grid;place-items:center;overflow:visible;z-index:3}
+.ghost-wrap{position:relative;display:inline-block}
+.ghost-floating{position:fixed;right:16px;bottom:16px;z-index:20}
+.ghost{display:block;width:60px;height:68px;padding:0;border:0;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
+.ghost:focus-visible{outline:3px solid var(--accent);outline-offset:4px;border-radius:30px}
+.ghost svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
+.g-body{stroke:#2b2140;stroke-width:2}
+.ghost-white .g-body{fill:#fbfbff}.ghost-mint .g-body{fill:#c9f2df}.ghost-peach .g-body{fill:#ffd9c4}.ghost-lilac .g-body{fill:#e3d6ff}
+.g-eyes-open,.g-mouth{fill:#2b2140}
+.g-eyes-closed{display:none;fill:none;stroke:#2b2140;stroke-width:2.4;stroke-linecap:round}
+.g-z{opacity:0;fill:var(--fg);font:700 14px/1 system-ui,sans-serif}
+[data-state=idle] .ghost{animation:ghost-float 4s ease-in-out infinite}
+[data-state=sleep] .ghost{animation:ghost-float 7s ease-in-out infinite}
+[data-state=sleep] .g-eyes-open,[data-state=sleep] .g-mouth{display:none}
+[data-state=sleep] .g-eyes-closed{display:inline}
+[data-state=sleep] .g-z{animation:ghost-z 2.4s ease-in-out infinite}
+[data-state=react] .ghost{animation:ghost-jump .7s ease-out 2}
+[data-state=guide] .ghost{transform:scale(1.06)}
+.ghost-bubble{position:absolute;bottom:calc(100% + 10px);left:50%;margin-left:-110px;width:220px;background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:14px;padding:10px 12px;font-size:.9rem;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:30}
+.ghost-floating .ghost-bubble{left:auto;right:0;margin-left:0}
+.ghost-bubble p{margin:0 0 6px}
+.ghost-bubble ul{margin:0;padding-left:1.1em}
+.ghost-bubble li{margin:4px 0}
+.ghost-bubble a{display:inline-block;padding:2px 0}
+@keyframes ghost-float{0%,100%{transform:translate(0,0)}25%{transform:translate(3px,-5px)}50%{transform:translate(0,-8px)}75%{transform:translate(-3px,-4px)}}
+@keyframes ghost-jump{0%,100%{transform:translateY(0)}40%{transform:translateY(-18px)}}
+@keyframes ghost-z{0%{opacity:0;transform:translate(0,4px)}50%{opacity:1}100%{opacity:0;transform:translate(6px,-8px)}}
+@media (prefers-reduced-motion:reduce){.ghost,.g-z{animation:none!important}[data-state=sleep] .g-z{opacity:1}}
 `
 
 function renderCss(pub: Project): string {

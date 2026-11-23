@@ -28,8 +28,11 @@ owner's real voice stays in it.
 
 ## Product form (decided)
 
-- The **creator** is a mobile-first Web App, installable as a PWA. Installing is a
-  convenience for creators, never a requirement for visitors.
+- The **creator** is a Web App, installable as a PWA, that works on **phone, tablet and
+  desktop**. Phone is designed first; tablet and desktop get a layout of their own
+  (side navigation, centred dialogs, mouse and keyboard), not a stretched phone UI.
+  Installing is a convenience for creators, never a requirement for visitors.
+- Every published/exported site also works on phone, tablet and desktop (the grid scales).
 - What users publish is an **independent static website**, not an app. Visitors open it
   in any browser, on phone or desktop, with no account and no install.
 - Online publishing and ZIP export use **the same static site generator**. There is no

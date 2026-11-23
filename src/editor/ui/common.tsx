@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 import { useEffect } from 'preact/hooks'
 import type { Asset, Project, Result } from '../../core/schema.ts'
 import type { Command } from '../commands.ts'
+import { Icon } from './icons.tsx'
 
 export type Ctx = {
   project: Project
@@ -41,7 +42,7 @@ export function Sheet(props: { title: string; onClose: () => void; children: Com
         <div class="sheet-head">
           <h2>{props.title}</h2>
           <button type="button" class="icon-btn" aria-label="Close" onClick={props.onClose}>
-            ✕
+            <Icon name="close" />
           </button>
         </div>
         <div class="sheet-body">{props.children}</div>
@@ -62,9 +63,9 @@ export function Field(props: { label: string; hint?: string; children: Component
 
 export function Lock(props: { private: boolean }) {
   return props.private ? (
-    <span class="badge badge-private" title="Only you can see this">🔒 Private</span>
+    <span class="badge badge-private" title="Only you can see this"><Icon name="lock" size={13} /> Private</span>
   ) : (
-    <span class="badge badge-public" title="Visitors can see this">🚪 Public</span>
+    <span class="badge badge-public" title="Visitors can see this"><Icon name="open" size={13} /> Public</span>
   )
 }
 

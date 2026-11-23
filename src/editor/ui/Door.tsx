@@ -8,6 +8,7 @@ import { saveBytes } from '../download.ts'
 import { randomId } from '../ids.ts'
 import { Field, run, type Ctx } from './common.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
+import { Icon } from './icons.tsx'
 
 export function Door(props: { ctx: Ctx }) {
   const { ctx } = props
@@ -46,11 +47,11 @@ export function Door(props: { ctx: Ctx }) {
 
       <div class="card door-summary">
         <p>
-          <strong>🚪 Visitors can see</strong> {pub.posts.length} {pub.posts.length === 1 ? 'entry' : 'entries'} and{' '}
+          <strong><Icon name="open" size={16} /> Visitors can see</strong> {pub.posts.length} {pub.posts.length === 1 ? 'entry' : 'entries'} and{' '}
           {pub.assets.length} {pub.assets.length === 1 ? 'photo' : 'photos'}.
         </p>
         <p>
-          <strong>🔒 Only you can see</strong> {privEntries} {privEntries === 1 ? 'entry' : 'entries'} and {privPhotos}{' '}
+          <strong><Icon name="lock" size={16} /> Only you can see</strong> {privEntries} {privEntries === 1 ? 'entry' : 'entries'} and {privPhotos}{' '}
           {privPhotos === 1 ? 'photo' : 'photos'}.
         </p>
       </div>
@@ -113,9 +114,9 @@ function Links(props: { ctx: Ctx }) {
               <strong>{l.title}</strong>
               <span class="muted small">{l.url}</span>
             </span>
-            <button type="button" class="icon-btn" aria-label="Move up" disabled={i === 0} onClick={() => run(ctx, moveLink(l.id, -1))}>↑</button>
-            <button type="button" class="icon-btn" aria-label="Move down" disabled={i === ctx.project.links.length - 1} onClick={() => run(ctx, moveLink(l.id, 1))}>↓</button>
-            <button type="button" class="icon-btn" aria-label={`Remove ${l.title}`} onClick={() => run(ctx, deleteLink(l.id))}>✕</button>
+            <button type="button" class="icon-btn" aria-label="Move up" disabled={i === 0} onClick={() => run(ctx, moveLink(l.id, -1))}><Icon name="up" /></button>
+            <button type="button" class="icon-btn" aria-label="Move down" disabled={i === ctx.project.links.length - 1} onClick={() => run(ctx, moveLink(l.id, 1))}><Icon name="down" /></button>
+            <button type="button" class="icon-btn" aria-label={`Remove ${l.title}`} onClick={() => run(ctx, deleteLink(l.id))}><Icon name="close" /></button>
           </li>
         ))}
       </ul>

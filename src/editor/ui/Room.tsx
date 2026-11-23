@@ -16,6 +16,8 @@ import { randomId } from '../ids.ts'
 import { processPhoto } from '../images.ts'
 import { assetUrl, Field, formatDate, GhostIcon, Lock, run, Sheet, type Ctx } from './common.tsx'
 import { EntrySheet } from './EntrySheet.tsx'
+import { OwnerGhost } from './OwnerGhost.tsx'
+import { Icon } from './icons.tsx'
 
 const SIZES: Array<BlockSize & { label: string }> = [
   { w: 1, h: 1, label: 'Small square' },
@@ -34,7 +36,7 @@ const KIND_LABEL: Record<BlockContent['kind'], string> = {
   'ghost-home': 'Ghost’s spot',
 }
 
-type Sheets = null | 'add' | 'pick-entry' | 'size' | { note: Block } | { entry: Post }
+type Sheets = null | 'add' | 'pick-entry' | 'size' | 'ghost' | { note: Block } | { entry: Post }
 
 export function Room(props: { ctx: Ctx }) {
   const { ctx } = props
@@ -118,9 +120,14 @@ export function Room(props: { ctx: Ctx }) {
     >
       <div class="screen-head">
         <h1>Room</h1>
-        <button type="button" class="btn btn-primary" onClick={() => setSheet('add')}>
-          + Add
+        <span class="head-actions">
+        <button type="button" class="btn" onClick={() => setSheet('ghost')} aria-label={`Talk to ${project.ghost.name || 'your ghost'}`}>
+          <GhostIcon color={project.ghost.color} size={22} /> {project.ghost.name || 'Ghost'}
         </button>
+        <button type="button" class="btn btn-primary" onClick={() => setSheet('add')}>
+          <Icon name="plus" size={18} /> Add
+        </button>
+        </span>
       </div>
       {moving && <p class="hint-bar">Tap where the top-left corner should go.</p>}
 
@@ -148,12 +155,17 @@ export function Room(props: { ctx: Ctx }) {
 
       {sel && (
         <div class="block-toolbar" role="toolbar" aria-label={`${KIND_LABEL[sel.content.kind]} actions`}>
+          {sel.content.kind === 'ghost-home' && (
+            <button type="button" onClick={() => setSheet('ghost')}>
+              <Icon name="ghost" /> Talk
+            </button>
+          )}
           <button type="button" class={moving ? 'selected' : ''} onClick={() => setMoving(!moving)}>
-            ✥ Move
+            <Icon name="move" /> Move
           </button>
-          <button type="button" onClick={() => setSheet('size')}>⤢ Size</button>
+          <button type="button" onClick={() => setSheet('size')}><Icon name="resize" /> Size</button>
           {(sel.content.kind === 'text' || sel.content.kind === 'post') && (
-            <button type="button" onClick={editSelected}>✎ Edit</button>
+            <button type="button" onClick={editSelected}><Icon name="edit" /> Edit</button>
           )}
           <button
             type="button"
@@ -161,7 +173,7 @@ export function Room(props: { ctx: Ctx }) {
               if (run(ctx, deleteBlock(sel.id))) setSelected(null)
             }}
           >
-            🗑 Remove
+            <Icon name="trash" /> Remove
           </button>
         </div>
       )}
@@ -170,9 +182,9 @@ export function Room(props: { ctx: Ctx }) {
         <Sheet title="Add to your room" onClose={() => setSheet(null)}>
           <div class="add-grid">
             <button type="button" onClick={() => setSheet('pick-entry')} disabled={project.posts.length === 0}>
-              📔<span>Diary entry</span>
+              <Icon name="book" size={28} /><span>Diary entry</span>
             </button>
-            <button type="button" onClick={addPhoto}>🖼<span>Photo frame</span></button>
+            <button type="button" onClick={addPhoto}><Icon name="photo" size={28} /><span>Photo frame</span></button>
             <button
               type="button"
               onClick={() => {
@@ -180,11 +192,11 @@ export function Room(props: { ctx: Ctx }) {
                 add({ kind: 'text', text: '' }, { w: 2, h: 1 })
               }}
             >
-              🗒<span>Note</span>
+              <Icon name="note" size={28} /><span>Note</span>
             </button>
-            <button type="button" onClick={() => add({ kind: 'latest' }, { w: 2, h: 2 })}>📰<span>Latest entries</span></button>
-            <button type="button" onClick={() => add({ kind: 'links' }, { w: 2, h: 1 })}>📚<span>Friends shelf</span></button>
-            <button type="button" onClick={() => add({ kind: 'ghost-home' }, { w: 1, h: 1 })}>👻<span>Ghost’s spot</span></button>
+            <button type="button" onClick={() => add({ kind: 'latest' }, { w: 2, h: 2 })}><Icon name="list" size={28} /><span>Latest entries</span></button>
+            <button type="button" onClick={() => add({ kind: 'links' }, { w: 2, h: 1 })}><Icon name="shelf" size={28} /><span>Friends shelf</span></button>
+            <button type="button" onClick={() => add({ kind: 'ghost-home' }, { w: 1, h: 1 })}><Icon name="ghost" size={28} /><span>Ghost’s spot</span></button>
           </div>
           {project.posts.length === 0 && <p class="muted">Write a diary entry first to pin it here.</p>}
         </Sheet>
@@ -244,6 +256,8 @@ export function Room(props: { ctx: Ctx }) {
         </Sheet>
       )}
 
+      {sheet === 'ghost' && <OwnerGhost ctx={ctx} onClose={() => setSheet(null)} />}
+
       {sheet && typeof sheet === 'object' && 'entry' in sheet && (
         <EntrySheet ctx={ctx} post={sheet.entry} onClose={() => setSheet(null)} />
       )}
@@ -274,7 +288,7 @@ function Tile(props: { ctx: Ctx; block: Block }) {
         <>
           {cover && <img src={assetUrl(cover)} alt="" class="tile-cover" />}
           <strong class="tile-title">{post.title || formatDate(post.createdAt)}</strong>
-          {post.visibility === 'private' && <span class="tile-hidden">🔒 Hidden from visitors</span>}
+          {post.visibility === 'private' && <span class="tile-hidden"><Icon name="lock" size={12} /> Hidden from visitors</span>}
         </>
       )
     }

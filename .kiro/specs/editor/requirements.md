@@ -103,10 +103,14 @@ account.
 1. THE owner SHALL be able to change home name, tagline, address, theme, ghost name,
    ghost colour, and turn the ghost off.
 
-### Requirement 9: Mobile quality
+### Requirement 9: Every device
 
 1. Every interactive control SHALL have a touch target of at least 44×44 CSS px and an
    accessible name.
-2. THE editor SHALL work in current mobile Safari and Chrome, portrait, from 360 px wide.
-3. THE editor SHALL be installable as a PWA (manifest + icons) and SHALL load offline
+2. THE editor SHALL work in current Safari, Chrome, Edge and Firefox on phones (from 360 px
+   wide), tablets, and desktops, with no horizontal scrolling at any width.
+3. FROM 900 px wide, THE editor SHALL use a side navigation instead of the bottom tab bar
+   and SHALL show sheets as centred dialogs; Escape SHALL close them.
+4. Icons SHALL be inline SVG, not emoji, so they render the same on every system.
+5. THE editor SHALL be installable as a PWA (manifest + icons) and SHALL load offline
    after the first visit.

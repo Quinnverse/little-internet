@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'preact/hooks'
 import type { Project } from '../../core/schema.ts'
 import { previewSupported, updatePreview } from '../preview.ts'
+import { Icon } from './icons.tsx'
 
 export function Preview(props: { project: Project; onClose: () => void }) {
   const [src, setSrc] = useState<string | null>(null)
@@ -21,7 +22,7 @@ export function Preview(props: { project: Project; onClose: () => void }) {
   return (
     <div class="preview" role="dialog" aria-modal="true" aria-label="Visitor preview">
       <div class="preview-bar">
-        <span>👀 What visitors see — public content only</span>
+        <span><Icon name="eye" size={18} /> What visitors see — public content only</span>
         <button type="button" class="btn" onClick={props.onClose}>Done</button>
       </div>
       {error && <p class="error" role="alert">{error}</p>}

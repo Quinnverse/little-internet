@@ -219,3 +219,81 @@ input[aria-invalid='true'] { border-color: var(--danger); }
 @media (prefers-reduced-motion: reduce) {
   .sheet, .toast { animation: none; }
 }
+
+/* ---------- icons ---------- */
+.icon { flex: none; vertical-align: -0.2em; }
+.btn, .block-toolbar button, .door-toggle button, .badge, .tile-hidden, .preview-bar span, .door-summary strong {
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+}
+.badge, .tile-hidden { gap: 4px; }
+.photo-add { display: grid; place-items: center; }
+.add-grid button { color: var(--accent); }
+.add-grid button span { color: var(--ink); }
+
+/* ---------- pointer devices ---------- */
+@media (hover: hover) and (pointer: fine) {
+  .btn:hover:not(:disabled) { filter: brightness(0.97); box-shadow: 0 1px 0 var(--line); }
+  .btn-primary:hover:not(:disabled) { filter: brightness(1.08); }
+  .entry-main:hover, .pick-list button:hover, .add-grid button:hover { background: color-mix(in srgb, var(--accent) 7%, var(--card)); }
+  .tile:hover:not(.selected) { box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent) 50%, transparent); }
+  .tabbar button:hover { color: var(--ink); }
+}
+
+/* ---------- tablet ---------- */
+@media (min-width: 600px) {
+  .screen { padding: 24px; }
+  .sheet { border-radius: 20px 20px 0 0; }
+}
+
+/* ---------- desktop / landscape tablet: side navigation, centred dialogs ---------- */
+@media (min-width: 900px) {
+  .app {
+    display: grid;
+    grid-template-columns: 220px minmax(0, 1fr);
+    grid-template-areas: 'nav top' 'nav main';
+    grid-template-rows: auto 1fr;
+    padding-bottom: 0;
+  }
+  .topbar { grid-area: top; }
+  .content { grid-area: main; width: 100%; max-width: 760px; padding-bottom: 96px; }
+  .tabbar {
+    grid-area: nav;
+    position: sticky; top: 0; bottom: auto;
+    height: 100dvh; padding: 20px 12px;
+    display: flex; flex-direction: column; gap: 4px;
+    border-top: 0; border-right: 1px solid var(--line);
+  }
+  .tabbar::before {
+    content: 'Little Internet';
+    font-weight: 800; color: var(--ink); padding: 4px 12px 20px;
+  }
+  .tabbar button {
+    flex-direction: row; justify-content: flex-start; gap: 12px;
+    min-height: 44px; padding: 10px 12px; border-radius: 12px;
+    font-size: 0.95rem;
+  }
+  .tabbar button.active { background: color-mix(in srgb, var(--accent) 12%, transparent); }
+  .sheet-backdrop { align-items: center; padding: 24px; }
+  .sheet { border-radius: 20px; max-height: 86dvh; padding-bottom: 20px; }
+  .toast { bottom: 24px; left: calc(50% + 110px); }
+  .block-toolbar { bottom: 24px; left: calc(50% + 110px); }
+  .room { border-radius: 20px; margin: 16px; min-height: auto; }
+}
+
+/* ---------- owner ghost ---------- */
+.head-actions { display: inline-flex; gap: 8px; }
+.owner-ghost-head { display: flex; gap: 14px; align-items: center; background: #2b2140; color: #f7f3ff; border-radius: 16px; padding: 14px; margin-bottom: 8px; }
+.owner-ghost-head .muted { color: #c9bfe6; }
+.owner-ghost-head p { margin: 0 0 4px; }
+.owner-ghost-h { font-size: 1rem; margin: 20px 0 8px; }
+.memory-list { list-style: none; margin: 0; padding: 0; }
+.memory-list button { width: 100%; text-align: left; display: flex; flex-direction: column; gap: 2px; padding: 12px; margin-bottom: 8px; border: 1px solid var(--line); border-radius: 12px; background: var(--card); min-height: 44px; }
+.memory-date { font-size: 0.8rem; color: var(--accent); font-weight: 600; }
+.memory-excerpt { color: var(--muted); font-size: 0.9rem; white-space: normal; overflow: hidden; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; }
+/* Buttons keep editor colours inside the themed room (dark themes made text invisible). */
+.room .btn:not(.btn-primary) { color: var(--ink); }
+/* Sheets opened from the themed room use editor colours and fonts, not the room theme. */
+.room .sheet-backdrop { color: var(--ink); font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif; }
+.room .sheet h1, .room .sheet h2, .room .sheet h3 { color: var(--ink); }
+.room .sheet .muted { color: var(--muted); }
+.room .sheet .owner-ghost-head .muted { color: #c9bfe6; }

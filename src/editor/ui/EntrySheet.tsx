@@ -6,6 +6,7 @@ import { pickFiles } from '../download.ts'
 import { randomId } from '../ids.ts'
 import { processPhoto } from '../images.ts'
 import { assetUrl, Field, run, Sheet, type Ctx } from './common.tsx'
+import { Icon } from './icons.tsx'
 
 const MAX_PHOTOS = 12
 
@@ -115,13 +116,13 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
                 aria-label="Remove photo"
                 onClick={() => setPhotos((cur) => cur.filter((x) => x.id !== a.id))}
               >
-                ✕
+                <Icon name="close" size={16} />
               </button>
             </div>
           ))}
           {photos.length < MAX_PHOTOS && (
             <button type="button" class="photo-add" disabled={busy} onClick={addPhotos} aria-label="Add photos">
-              {busy ? '…' : '+'}
+              {busy ? '…' : <Icon name="plus" size={26} />}
             </button>
           )}
         </div>
@@ -133,10 +134,10 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
 
       <div class="door-toggle" role="group" aria-label="Who can see this">
         <button type="button" class={!isPublic ? 'selected' : ''} aria-pressed={!isPublic} onClick={() => setIsPublic(false)}>
-          🔒 Just for me
+          <Icon name="lock" size={18} /> Just for me
         </button>
         <button type="button" class={isPublic ? 'selected' : ''} aria-pressed={isPublic} onClick={() => setIsPublic(true)}>
-          🚪 Open to visitors
+          <Icon name="open" size={18} /> Open to visitors
         </button>
       </div>
 

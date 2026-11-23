@@ -69,3 +69,25 @@ reach the sandbox network, so Playwright was installed locally.
 Test-harness fixes on the way: ambiguous accessible names (which also led to better
 `aria-label`s on room tiles), and the bobbing ghost animation never being "stable" for
 clicks (visitor context now uses reduced motion — and the site honours it).
+
+## 2026-11-23 — Day 1, evening: multi-device + ghost spec
+
+**Scope change from the owner:** not phone-only; tablet and desktop too. Updated steering
+(`product.md`) and editor Requirement 9 before touching code, so the next tasks inherit it.
+Desktop gets a side navigation and centred dialogs; icons moved from emoji to inline SVG
+(headless Chromium had shown blank emoji, which is also what users without emoji fonts see).
+
+**Spec: `ghost`.** Visitor ghost (4 states in `ghost.js`, public data only) and owner ghost
+(on-device memories: *on this day* and *ask*). 4 properties G1–G4.
+
+**First real bug found by property-based testing.** G1 generated the href
+`" JAVASCRIPT:x"`. `ghost.js` checked for a scheme at position 0 only; browsers strip the
+leading space, so the link would execute script. Fixed with an allow-list; the test now
+resolves hrefs exactly like a browser. (Defence in depth: the core schema never produces
+such data, but `ghost.js` runs in other people's hosting too.)
+
+**Screenshots caught what tests did not.** Sheets opened from the dark "Midnight" room
+inherited light text on a light sheet. Fixed, and added e2e assertions on computed colours
+so it can't regress silently.
+
+**e2e now 33 checks** across phone (390×844), tablet (820×1180) and desktop (1280×800).

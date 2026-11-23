@@ -3,6 +3,7 @@ import type { Post } from '../../core/schema.ts'
 import { setVisibility } from '../commands.ts'
 import { assetUrl, formatDate, Lock, run, type Ctx } from './common.tsx'
 import { EntrySheet } from './EntrySheet.tsx'
+import { Icon } from './icons.tsx'
 
 export function Diary(props: { ctx: Ctx }) {
   const { ctx } = props
@@ -14,7 +15,7 @@ export function Diary(props: { ctx: Ctx }) {
       <div class="screen-head">
         <h1>Diary</h1>
         <button type="button" class="btn btn-primary" onClick={() => setEditing('new')}>
-          + New entry
+          <Icon name="plus" size={18} /> New entry
         </button>
       </div>
 

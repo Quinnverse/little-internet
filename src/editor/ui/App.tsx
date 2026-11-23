@@ -8,14 +8,15 @@ import { Preview } from './Preview.tsx'
 import { Room } from './Room.tsx'
 import { Settings } from './Settings.tsx'
 import { Setup } from './Setup.tsx'
+import { Icon, type IconName } from './icons.tsx'
 
 type Tab = 'room' | 'diary' | 'door' | 'settings'
 
-const TABS: Array<[Tab, string, string]> = [
-  ['room', '🏠', 'Room'],
-  ['diary', '📔', 'Diary'],
-  ['door', '🚪', 'Door'],
-  ['settings', '⚙️', 'Settings'],
+const TABS: Array<[Tab, IconName, string]> = [
+  ['room', 'home', 'Room'],
+  ['diary', 'book', 'Diary'],
+  ['door', 'door', 'Door'],
+  ['settings', 'gear', 'Settings'],
 ]
 
 type Toast = { msg: string; kind: 'ok' | 'error'; n: number }
@@ -69,7 +70,7 @@ export function App() {
       <header class="topbar">
         <span class="topbar-title">{state.project.site.title}</span>
         <button type="button" class="btn btn-small" onClick={() => setPreviewing(true)}>
-          👀 Preview
+          <Icon name="eye" size={18} /> Preview
         </button>
       </header>
 
@@ -83,7 +84,7 @@ export function App() {
       <nav class="tabbar" aria-label="Main">
         {TABS.map(([id, icon, label]) => (
           <button type="button" key={id} class={tab === id ? 'active' : ''} aria-current={tab === id ? 'page' : undefined} onClick={() => setTab(id)}>
-            <span aria-hidden="true">{icon}</span>
+            <Icon name={icon} size={22} />
             <span>{label}</span>
           </button>
         ))}
