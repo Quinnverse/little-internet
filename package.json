@@ -9,18 +9,23 @@
     "preview": "vite preview",
     "test": "vitest --run",
     "typecheck": "tsc",
-    "check:export": "vitest --run tests/export-independence.test.ts"
+    "check:export": "vitest --run tests/export-independence.test.ts",
+    "e2e": "bash scripts/e2e.sh",
+    "icons": "node scripts/make-icons.mjs"
   },
   "devDependencies": {
+    "@preact/preset-vite": "^2.10.6",
     "@types/jsdom": "^30.0.0",
     "fast-check": "^4.11.0",
     "jsdom": "^31.0.1",
+    "playwright": "^1.65.1",
     "typescript": "~7.0.2",
     "vite": "^8.3.6",
     "vitest": "^5.1.1"
   },
   "dependencies": {
     "fflate": "^0.8.3",
+    "preact": "^11.2.0",
     "zod": "^4.6.7"
   }
 }

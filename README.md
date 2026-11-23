@@ -20,3 +20,11 @@ npm run build
 ## License
 
 MIT — see [LICENSE](./LICENSE).
+
+## Checks
+
+```bash
+npm test         # unit + property-based tests
+npm run e2e      # builds, serves, and drives the full chain in headless Chromium
+                 # (first time: npx playwright install chromium-headless-shell)
+```

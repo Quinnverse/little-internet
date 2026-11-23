@@ -46,3 +46,26 @@ this build: cloud LLM memory (contradicts private-by-default), voice cloning, me
 modes. Steering `product.md` updated so every later Kiro session inherits these limits.
 
 **Repo pushed** to https://github.com/Quinnverse/little-internet (MIT detected, `.kiro/` visible).
+
+## 2026-11-23 — Day 1, later: editor spec
+
+**Spec: `editor`.** 9 requirement groups, 4 properties (E1–E4), 10 tasks, all done.
+Design choice worth noting: every UI change goes through a pure command and is validated by
+the same zod schema as import, so the UI cannot save an invalid home.
+
+**PBT found a weak generator, not a bug.** First run of E1–E4 passed suspiciously fast. A
+probe showed fast-check's default size kept command sequences at 0–6 steps; raised to
+10–40 steps (`size: 'max'`). Still passing. Lesson: check what generators actually produce.
+
+**Preview = the real site.** The preview iframe is served by the editor's service worker
+from Cache Storage filled with `generateSite` output, so there is no second renderer.
+
+**End-to-end check.** `npm run e2e` drives headless Chromium on a 390×844 phone viewport
+through setup → private + public entries → pin → move → preview → download → serve the ZIP
+from a different origin → ghost guides visitor → re-import → reload. 19/19 pass.
+Sandbox quirks hit: each shell command runs in its own isolated namespace, so the static
+servers have to start in the same command as the test; the remote browser tool could not
+reach the sandbox network, so Playwright was installed locally.
+Test-harness fixes on the way: ambiguous accessible names (which also led to better
+`aria-label`s on room tiles), and the bobbing ghost animation never being "stable" for
+clicks (visitor context now uses reduced motion — and the site honours it).
