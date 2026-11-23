@@ -4,16 +4,27 @@ inclusion: always
 
 # Product: Little Internet
 
-**Tagline:** Your corner of the internet. Yours to keep.
+**Tagline:** A quiet corner of the internet, just for you.
+**Principle:** Private by default. Personal by design. Portable by nature.
 
-A mobile-first personal website creator. A user arranges a homepage on a snap grid,
-records life (text, photos, links, video embeds), adopts a small website ghost, links
-to other personal sites, publishes, and can export the whole site as static files that
-run on any static host without our platform.
+A private little home on the internet. The owner writes a diary, keeps photos, decorates
+the room, and lives alongside a small ghost. Nothing needs to perform for anyone. When the
+owner chooses to open the door, the public part becomes an independent personal website
+that can be exported and kept running without our platform. The owner can leave recordings
+of their own voice in the house (voice time capsule) for whoever visits, now or after
+they are gone.
 
-Hackathon category: **Resurrection** — reviving the GeoCities-era personal homepage
-(guestbook-era web, webrings, friend links, a little life inside the page) with today's
-tools: mobile-first editing, static generation, portable formats.
+Hackathon category: **Resurrection** — reviving the GeoCities-era personal homepage and
+the answering machine, reimagined as a private home rather than a profile to impress.
+Death is part of the theme, not a contradiction: the ghost keeps the house warm, and the
+owner's real voice stays in it.
+
+## Privacy defaults
+
+- Every new post and recording is **private** by default. Making something public is an
+  explicit owner action, every time.
+- Private content lives only on the device (IndexedDB) and in the private backup. It is
+  never sent to any server or API.
 
 ## Product form (decided)
 
@@ -49,17 +60,39 @@ Any change that risks this chain is lower priority than keeping it working.
 ## Priority order (when time runs short, cut from the bottom)
 
 1. Site ownership and export (static HTML/CSS/RSS/site.json, fully self-contained)
-2. Mobile creation (snap-grid editor, posts, photos)
-3. Ghost (website companion component)
-4. Themes (exactly 3)
-5. Webring / friend links (static links only)
-6. Guestbook (optional; may be skipped entirely)
+2. Mobile creation (snap-grid editor, private-by-default posts, photos)
+3. Ghost (website companion component, including local "memories")
+4. Voice time capsule (answering-machine block)
+5. Themes (exactly 3; one is the "room" skin)
+6. Friend links / webring (static links only; already in the generator)
+
+The guestbook is removed; the voice time capsule took its slot.
+Rule: a new feature may only enter by **replacing** one of equal cost.
+
+## Voice time capsule
+
+- An answering-machine block in the room. The owner records their own voice in the
+  browser (MediaRecorder), up to 60 seconds per recording, a few recordings total.
+- Each recording is public or private like a post. Public recordings ship in the export as
+  plain audio files and play with a native `<audio>` element; private ones exist only in
+  the private backup.
+- Real recordings only. No voice synthesis or cloning, ever.
+- No accounts, verification, or "memorial mode". The owner simply leaves recordings.
+- An optional "open on" date may only be shown as a label. A static site cannot really
+  lock a file, so the UI must not claim it is locked.
+
+## Room skin
+
+The "room" is a visual theme over the same grid, not a new system: post blocks look like
+a diary on a desk, image blocks like picture frames, link blocks like a bookshelf, the
+voice block like an answering machine. Same data, same export.
 
 ## Frozen scope — do NOT add
 
 Garden, pet growth stats, economies, follows, comments, notifications, visitor counters,
-custom domains (roadmap only), AI/LLM features, free-form (non-grid) layout, video upload,
-user-authored HTML/CSS/JS.
+guestbook, custom domains (roadmap only), LLM/cloud AI features, voice synthesis/cloning,
+memorial/inheritance modes, inactivity-triggered behaviour, avatar characters,
+multiple rooms, free-form (non-grid) layout, video upload, user-authored HTML/CSS/JS.
 
 ## The ghost is a component, not a system
 
@@ -67,7 +100,14 @@ Exactly four states, driven by local rules only (no LLM, no backend):
 - **Idle** — wanders on the homepage
 - **Sleep** — after inactivity
 - **React** — to newly published content
-- **Guide** — points visitors to posts, photos, friend links
+- **Guide** — points visitors to posts, photos, friend links, voice recordings
+
+The ghost has two audiences with strictly separated data:
+- **Owner view (editor):** may use private posts for local "memories": *on this day*
+  (an entry from a past year) and *last time you wrote about X* (local keyword search),
+  always showing which entry it came from. Never invents content. No network.
+- **Visitor view (exported site):** uses public content only. Private data never reaches
+  `ghost.js` or the ghost JSON in a generated page.
 
 ## Mobile editing interaction
 

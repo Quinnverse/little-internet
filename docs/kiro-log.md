@@ -38,3 +38,11 @@ correctness properties (P1–P7), and 8 tasks. All 8 tasks implemented the same 
 `/@moon/` with a bare static server and crawls every link.
 
 **Blocked:** creating the GitHub repo from the sandbox returned 403.
+
+**Product decision (later on day 1).** Repositioned from "build your own website" to
+"a quiet, private-by-default home that can open its door". Added the voice time capsule
+(real recordings in an answering-machine block), replacing the guestbook. Rejected for
+this build: cloud LLM memory (contradicts private-by-default), voice cloning, memorial
+modes. Steering `product.md` updated so every later Kiro session inherits these limits.
+
+**Repo pushed** to https://github.com/Quinnverse/little-internet (MIT detected, `.kiro/` visible).
