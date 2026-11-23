@@ -160,9 +160,17 @@ Docker Compose + Caddy, DNS notes, backup/restore, rollback, and the owner-only
 steps. The default Compose binds only host `8080` and does **not** touch an
 existing site's 80/443.
 
-**Status:** `PRODUCTION_DEPLOYED = NO` — no production server was accessed, no
-DNS changed, no ports opened. `LOCAL_RELEASE_READY = YES` — all local checks,
-build, deployment package and tests pass.
+**Status:** `PRODUCTION_DEPLOYED = YES` — live at
+**https://resurrection.quinnverse.tech/** (editor) and
+`https://resurrection.quinnverse.tech/@<username>/` (published sites), on the
+existing Tencent Cloud Shanghai host. HTTPS uses the pre-existing Certbot
+certificate; nginx serves the editor statically and reverse-proxies `/api/*`,
+`/healthz` and `/@*` to the publish service on `127.0.0.1:18081`. The previous
+site on this subdomain was backed up before replacement (see
+[`docs/production-deployment.md`](docs/production-deployment.md)). No DNS change
+was needed (the subdomain already pointed at the host); no other Quinnverse site
+or the main site config was touched. `LOCAL_RELEASE_READY = YES` — all local
+checks, build, deployment package and tests pass.
 
 ## What to submit to Kiroween
 

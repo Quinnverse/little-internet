@@ -32,7 +32,7 @@ These cannot be done by the build agent (need owner accounts/credentials):
 
 | # | Action | Why |
 |---|--------|-----|
-| 1 | Deploy to a public host and get a working app URL | Devpost requires "URL to your working app"; production deploy not performed (`PRODUCTION_DEPLOYED = NO`) |
+| 1 | ~~Deploy to a public host and get a working app URL~~ **DONE** | Live at https://resurrection.quinnverse.tech/ (`PRODUCTION_DEPLOYED = YES`); confirm overseas judge latency, see `docs/production-deployment.md` |
 | 2 | Record and publish a <3 min YouTube demo | Required; script + shot list below |
 | 3 | Create the Devpost account/team and submit before the deadline | Owner account |
 | 4 | (Optional) LinkedIn + startup site for Best Startup; student proof for Best Student | Bonus prize requirements |
@@ -50,7 +50,7 @@ These cannot be done by the build agent (need owner accounts/credentials):
 - [x] 3-minute demo script + shot list (below)
 - [x] Privacy audit (`docs/privacy-audit.md`)
 - [x] Trial materials (`docs/user-testing/`)
-- [x] Deployment package (`compose.yaml`, `deploy/`), `PRODUCTION_DEPLOYED = NO`
+- [x] Deployment package (`compose.yaml`, `deploy/`), `PRODUCTION_DEPLOYED = YES` (live URL above)
 - [x] Tests re-run: 102 unit/PBT + 49 + 12 E2E, all passing
 
 ## 4. Devpost text drafts (copy/edit into the form)
@@ -110,7 +110,7 @@ These cannot be done by the build agent (need owner accounts/credentials):
 
 ### Working app URL
 
-`[OWNER: paste deployed URL, e.g. https://little.quinnverse.tech/]`
+https://resurrection.quinnverse.tech/
 
 ## 5. Three-minute demo script (timed)
 

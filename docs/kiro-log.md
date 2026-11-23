@@ -174,3 +174,28 @@ Playwright's browser download stalled in this environment; tests were driven
 through the locally installed Google Chrome channel instead (no functional
 difference for these checks). No physical iPhone/Android device was available:
 the device checklist is explicitly NOT TESTED.
+
+## 2026-11-23 — Production deploy + UI/UX polish
+
+**UI/UX (owner: "UI/UX 都要优化，提高获奖概率").** After reviewing real E2E
+screenshots: the published Room site was cramped into the left of a 1440px
+screen and the ghost bubble covered the Friends block on 375px. Changed only
+the shared CSS in `generate.ts` / `themes.ts` (no data, schema, or CSP changes):
+responsive centred wrap, a framed wall-panel for Room on wide screens, footer
+sinks to the bottom, refined typography, bounded ghost bubble. Re-ran 102 unit/PBT,
+49 original E2E and 12 publish E2E — all green. Compared screenshots before/after.
+
+**Same-origin publish API.** Editor default API base was hard-coded to
+`little.quinnverse.tech` (no DNS), which would break publishing on any other
+host. Default is now `location.origin`; overridable at build time or in-app.
+
+**Production deployment (owner explicitly confirmed replacing the old site).**
+The subdomain already resolved to the Tencent Cloud Shanghai host and had a
+valid Certbot certificate, so no DNS change was needed. Backed up the previous
+project (a narrative game) — nginx conf, image tar, data-volume tar — then
+stopped/removed only its container. Little Internet now runs as a Node 22 Docker
+container on `127.0.0.1:18081`; the existing nginx serves the editor statically
+and reverse-proxies `/api/*`, `/healthz`, `/@*` to it. Only the one vhost changed;
+all other Quinnverse sites untouched. Verified over public HTTPS: editor renders
+in real Chrome with zero JS errors, publish → visit → privacy isolation →
+unpublish → 410 all work. See `docs/production-deployment.md`.
