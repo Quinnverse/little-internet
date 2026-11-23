@@ -15,6 +15,10 @@ const TYPES: Record<string, string> = {
   png: 'image/png',
   webp: 'image/webp',
   gif: 'image/gif',
+  webm: 'audio/webm',
+  m4a: 'audio/mp4',
+  ogg: 'audio/ogg',
+  mp3: 'audio/mpeg',
 }
 
 export function contentType(path: string): string {

@@ -4,13 +4,14 @@ import { createBackup, restoreBackup } from '../src/core/backup.ts'
 import { escapeHtml, jsonForScript } from '../src/core/escape.ts'
 import { exportSite, importSite } from '../src/core/exportZip.ts'
 import { generateSite } from '../src/core/generate.ts'
+import { defaultRoom } from '../src/core/room.ts'
 import { parseProject, type Project } from '../src/core/schema.ts'
 import { parseVideoUrl } from '../src/core/video.ts'
 
 function sample(): Project {
   return {
     schemaVersion: 1,
-    site: { slug: 'moon', title: 'Moon’s corner', tagline: 'Notes from the night shift', theme: 'midnight' },
+    site: { slug: 'moon', title: 'Moon’s corner', tagline: 'Notes from the night shift', theme: 'midnight', lang: 'en' },
     ghost: { enabled: true, name: 'Boo', color: 'lilac' },
     assets: [
       { id: 'sea', mime: 'image/png', data: new Uint8Array([137, 80, 78, 71]) },
@@ -45,6 +46,7 @@ function sample(): Project {
     ],
     links: [{ id: 'l1', title: 'A friend', url: 'https://friend.example/' }],
     webring: { prev: 'https://ring.example/prev', next: 'https://ring.example/next' },
+    room: defaultRoom(),
     recordings: [],
   }
 }
@@ -145,6 +147,7 @@ describe('generated site', () => {
       'ghost.js',
       'index.html',
       'posts/first-day-at-the-sea.html',
+      'room.js',
       'site.json',
       'style.css',
     ])

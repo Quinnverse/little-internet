@@ -21,6 +21,7 @@ export function toStored(p: Project): { stored: StoredProject; files: Map<string
     posts: p.posts,
     links: p.links,
     webring: p.webring,
+    room: p.room,
     assets,
     recordings,
   }

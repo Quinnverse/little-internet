@@ -25,3 +25,9 @@ dist-ssr
 
 # local end-to-end check output
 .e2e/
+
+# server data
+/data
+.e2e
+/assets/raw
+/assets/refs

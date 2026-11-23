@@ -1,5 +1,6 @@
 export * from './schema.ts'
 export * from './layout.ts'
+export * from './room.ts'
 export { normalize } from './normalize.ts'
 export { publicProjection } from './privacy.ts'
 export { escapeHtml, escapeXml, jsonForScript } from './escape.ts'

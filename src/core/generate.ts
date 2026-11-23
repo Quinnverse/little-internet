@@ -1,4 +1,5 @@
 import ghostRuntime from '../runtime/ghost.js?raw'
+import roomRuntime from '../runtime/room.bundle.js?raw'
 import { escapeHtml, jsonForScript } from './escape.ts'
 import { normalize } from './normalize.ts'
 import { publicProjection } from './privacy.ts'
@@ -6,6 +7,9 @@ import { generateFeed } from './rss.ts'
 import { toStored } from './storage.ts'
 import { assetPath, isCanonicalHttpUrl, recordingPath, type Block, type Post, type Project } from './schema.ts'
 import { themeCss, themeExtraCss } from './themes.ts'
+import { ROOM_CSS } from './roomCss.ts'
+import { roomData } from './roomData.ts'
+import { fmt, htmlLang, siteStrings } from './strings.ts'
 import { embedSrc, VIDEO_FRAME_HOSTS } from './video.ts'
 
 export type GenerateOptions = {
@@ -21,6 +25,7 @@ export const CSP = [
   "media-src 'self'",
   "style-src 'self'",
   "script-src 'self'",
+  "connect-src 'self'",
   `frame-src ${VIDEO_FRAME_HOSTS.join(' ')}`,
   "base-uri 'none'",
   "form-action 'none'",
@@ -28,6 +33,7 @@ export const CSP = [
 
 const enc = new TextEncoder()
 const h = escapeHtml
+const T = (pub: Project) => siteStrings(pub.site.lang)
 
 /**
  * The single code path that turns a Project into website files.
@@ -42,6 +48,7 @@ export function generateSite(project: Project, opts: GenerateOptions = {}): Site
   for (const post of pub.posts) out.set(`posts/${post.slug}.html`, renderPost(pub, post))
   out.set('style.css', renderCss(pub))
   out.set('ghost.js', ghostRuntime)
+  out.set('room.js', roomRuntime)
   out.set('feed.xml', generateFeed(pub, baseUrl))
   for (const a of pub.assets) out.set(assetPath(a.id, a.mime), a.data)
   for (const r of pub.recordings) out.set(recordingPath(r.id, r.mime), r.data)
@@ -65,15 +72,19 @@ function normalizeBaseUrl(baseUrl: string | undefined): string | undefined {
 
 // ---------------------------------------------------------------------------- pages
 
-type PageParts = { pub: Project; title: string; prefix: string; main: string; bodyClass: string }
+type PageParts = { pub: Project; title: string; prefix: string; main: string; bodyClass: string; room?: boolean }
 
-function page({ pub, title, prefix, main, bodyClass }: PageParts): string {
+function page({ pub, title, prefix, main, bodyClass, room }: PageParts): string {
+  const roomScripts = room
+    ? `<script type="application/json" id="room-data">${jsonForScript(roomData(pub))}</script>\n` +
+      `<script src="${prefix}room.js" defer></script>\n`
+    : ''
   const ghost = pub.ghost.enabled
     ? `<script type="application/json" id="ghost-data">${jsonForScript(ghostData(pub, prefix))}</script>\n` +
       `<script src="${prefix}ghost.js" defer></script>\n`
     : ''
   return `<!doctype html>
-<html>
+<html lang="${htmlLang(pub.site.lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
@@ -82,7 +93,7 @@ function page({ pub, title, prefix, main, bodyClass }: PageParts): string {
 <title>${h(title)}</title>
 <link rel="stylesheet" href="${prefix}style.css">
 <link rel="alternate" type="application/rss+xml" title="${h(pub.site.title)}" href="${prefix}feed.xml">
-${ghost}</head>
+${ghost}${roomScripts}</head>
 <body class="${bodyClass} theme-${pub.site.theme}">
 <div class="wrap">
 <header class="site-header">
@@ -108,6 +119,7 @@ function renderIndex(pub: Project): string {
     title: pub.site.title,
     prefix: '',
     bodyClass: 'home',
+    room: true,
     main: `<main class="grid">\n${blocks}\n</main>`,
   })
 }
@@ -130,16 +142,16 @@ function renderBlock(pub: Project, b: Block, anchor: boolean): string {
       inner = `<p>${lines(c.text)}</p>`
       break
     case 'links':
-      inner = `<h2>Friends</h2>\n${linkList(pub)}`
+      inner = `<h2>${h(T(pub).friends)}</h2>\n${linkList(pub)}`
       break
     case 'latest':
-      inner = `<h2>Latest</h2>\n${latestList(pub, '')}`
+      inner = `<h2>${h(T(pub).latest)}</h2>\n${latestList(pub, '')}`
       break
     case 'ghost-home':
       inner = '<div class="ghost-home" data-ghost-home></div>'
       break
     case 'voice':
-      inner = `<h2>Answering machine</h2>\n${voiceList(pub)}`
+      inner = `<h2>${h(T(pub).answering)}</h2>\n${voiceList(pub)}`
       break
   }
   const id = anchor && (c.kind === 'links' || c.kind === 'voice') ? ` id="${c.kind}"` : ''
@@ -157,7 +169,7 @@ function postCard(pub: Project, post: Post, prefix: string): string {
 }
 
 function linkList(pub: Project): string {
-  if (pub.links.length === 0) return '<p class="muted">No friends linked yet.</p>'
+  if (pub.links.length === 0) return `<p class="muted">${h(T(pub).noFriends)}</p>`
   const items = pub.links
     .map((l) => `<li><a href="${h(l.url)}" rel="noopener">${h(l.title)}</a></li>`)
     .join('')
@@ -165,13 +177,13 @@ function linkList(pub: Project): string {
 }
 
 function voiceList(pub: Project): string {
-  if (pub.recordings.length === 0) return '<p class="muted">No messages yet.</p>'
+  if (pub.recordings.length === 0) return `<p class="muted">${h(T(pub).noMessages)}</p>`
   const items = pub.recordings
     .map((r) => {
-      const label = r.openOn ? ` · <span class="open-on">for ${r.openOn}</span>` : ''
+      const label = r.openOn ? ` · <span class="open-on">${h(fmt(T(pub).forDate, { date: r.openOn }))}</span>` : ''
       const secs = Math.max(1, Math.round(r.durationMs / 1000))
       return (
-        `<li><p class="rec-title">${h(r.title || 'A message')}</p>` +
+        `<li><p class="rec-title">${h(r.title || T(pub).aMessage)}</p>` +
         `<p class="rec-meta"><time datetime="${r.createdAt}">${r.createdAt.slice(0, 10)}</time> · ${secs}s${label}</p>` +
         `<audio controls preload="none" src="${recordingPath(r.id, r.mime)}"></audio></li>`
       )
@@ -181,7 +193,7 @@ function voiceList(pub: Project): string {
 }
 
 function latestList(pub: Project, prefix: string): string {
-  if (pub.posts.length === 0) return '<p class="muted">Nothing here yet.</p>'
+  if (pub.posts.length === 0) return `<p class="muted">${h(T(pub).nothing)}</p>`
   const items = pub.posts
     .slice(0, 5)
     .map((p) => `<li><a href="${prefix}posts/${p.slug}.html">${h(p.title)}</a></li>`)
@@ -197,11 +209,11 @@ function renderPost(pub: Project, post: Post): string {
     .map((a) => `<figure><img src="${prefix}${assetPath(a.id, a.mime)}" alt="" loading="lazy"></figure>`)
     .join('\n')
   const video = post.video
-    ? `<div class="video"><iframe src="${embedSrc(post.video)}" title="Video" loading="lazy" ` +
+    ? `<div class="video"><iframe src="${embedSrc(post.video)}" title="${h(T(pub).video)}" loading="lazy" ` +
       `allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
     : ''
   const main = `<main class="post">
-<p class="back"><a href="${prefix}index.html">← Home</a></p>
+<p class="back"><a href="${prefix}index.html">← ${h(T(pub).home)}</a></p>
 <article>
 <h1>${h(post.title)}</h1>
 <p class="date"><time datetime="${post.createdAt}">${post.createdAt.slice(0, 10)}</time></p>
@@ -216,14 +228,14 @@ ${video}
 function renderFooter(pub: Project, prefix: string): string {
   const w = pub.webring
   const ring = [
-    w.prev && `<a href="${h(w.prev)}" rel="noopener">← Prev</a>`,
-    w.hub && `<a href="${h(w.hub)}" rel="noopener">Webring</a>`,
-    w.random && `<a href="${h(w.random)}" rel="noopener">Random</a>`,
-    w.next && `<a href="${h(w.next)}" rel="noopener">Next →</a>`,
+    w.prev && `<a href="${h(w.prev)}" rel="noopener">${h(T(pub).prev)}</a>`,
+    w.hub && `<a href="${h(w.hub)}" rel="noopener">${h(T(pub).webring)}</a>`,
+    w.random && `<a href="${h(w.random)}" rel="noopener">${h(T(pub).random)}</a>`,
+    w.next && `<a href="${h(w.next)}" rel="noopener">${h(T(pub).next)}</a>`,
   ].filter(Boolean)
-  const ringNav = ring.length ? `<nav class="webring" aria-label="Webring">${ring.join(' ')}</nav>\n` : ''
+  const ringNav = ring.length ? `<nav class="webring" aria-label="${h(T(pub).webring)}">${ring.join(' ')}</nav>\n` : ''
   return `<footer class="site-footer">
-${ringNav}<p><a href="${prefix}feed.xml">RSS</a> · Made with Little Internet</p>
+${ringNav}<p><a href="${prefix}feed.xml">${h(T(pub).rss)}</a> · ${h(T(pub).madeWith)}</p>
 </footer>`
 }
 
@@ -236,20 +248,21 @@ function ghostData(pub: Project, prefix: string) {
   const guide: GuideItem[] = []
   const latest = pub.posts[0]
   const latestTitle = latest ? latest.title || latest.createdAt.slice(0, 10) : ''
-  if (latest) guide.push({ label: `Read “${latestTitle}”`, href: `${prefix}posts/${latest.slug}.html` })
+  if (latest) guide.push({ label: fmt(T(pub).readTitle, { title: latestTitle }), href: `${prefix}posts/${latest.slug}.html` })
   if (pub.recordings.length && pub.blocks.some((b) => b.content.kind === 'voice')) {
-    guide.push({ label: 'Listen to my voice', href: `${prefix}index.html#voice` })
+    guide.push({ label: T(pub).listen, href: `${prefix}index.html#voice` })
   }
   if (pub.blocks.some((b) => b.content.kind === 'links')) {
-    guide.push({ label: 'Meet my friends', href: `${prefix}index.html#links` })
+    guide.push({ label: T(pub).meet, href: `${prefix}index.html#links` })
   }
-  if (pub.webring.random) guide.push({ label: 'Visit a random site', href: pub.webring.random })
-  guide.push({ label: 'Follow with RSS', href: `${prefix}feed.xml` })
+  if (pub.webring.random) guide.push({ label: T(pub).randomSite, href: pub.webring.random })
+  guide.push({ label: T(pub).followRss, href: `${prefix}feed.xml` })
   return {
     enabled: pub.ghost.enabled,
     name: pub.ghost.name,
     color: pub.ghost.color,
-    greeting: `Hi, I’m ${pub.ghost.name || 'the ghost'}. Welcome to ${pub.site.title}!`,
+    greeting: fmt(T(pub).greeting, { name: pub.ghost.name || T(pub).fallbackName, site: pub.site.title }),
+    ...(pub.site.lang === 'zh' ? { aria: `${pub.ghost.name || T(pub).fallbackName} · 带你逛这个家`, newText: '有新内容：' } : {}),
     guide: guide.slice(0, 4),
     ...(latest
       ? { latest: { title: latestTitle, href: `${prefix}posts/${latest.slug}.html`, createdAt: latest.createdAt } }
@@ -327,7 +340,7 @@ function renderCss(pub: Project): string {
   const rules = pub.blocks
     .map((b) => `.b-${b.id}{grid-column:${b.x + 1} / span ${b.w};grid-row:${b.y + 1} / span ${b.h}}`)
     .join('\n')
-  return `${themeCss(pub.site.theme)}\n${BASE_CSS}${themeExtraCss(pub.site.theme)}${rules}\n`
+  return `${themeCss(pub.site.theme)}\n${BASE_CSS}${ROOM_CSS}${themeExtraCss(pub.site.theme)}${rules}\n`
 }
 
 // ---------------------------------------------------------------------------- text

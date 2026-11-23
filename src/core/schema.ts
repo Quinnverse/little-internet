@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { isValidLayout, SIZE_PRESETS } from './layout.ts'
+import { defaultRoom, RoomSchema, roomIssues, type Room } from './room.ts'
 
 /** Ids are safe in file names, CSS class names and selectors without escaping. */
 export const ID_PATTERN = /^[a-z0-9_-]{1,40}$/
@@ -10,6 +11,8 @@ export const VIMEO_ID_PATTERN = /^[0-9]{1,12}$/
 export const ISO_UTC_PATTERN = /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}\.\d{3}Z$/
 
 export const THEMES = ['paper', 'midnight', 'room'] as const
+export const LANGS = ['en', 'zh'] as const
+export type Lang = (typeof LANGS)[number]
 export const GHOST_COLORS = ['white', 'mint', 'peach', 'lilac'] as const
 export const IMAGE_MIMES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'] as const
 export type ImageMime = (typeof IMAGE_MIMES)[number]
@@ -125,6 +128,8 @@ const SiteSettingsSchema = z.object({
   tagline: line(200),
   // 'meadow' was replaced by the room skin; old saves keep working.
   theme: z.preprocess((v) => (v === 'meadow' ? 'room' : v), z.enum(THEMES)),
+  // Added with the 3D home: older saves have no language and load as English.
+  lang: z.enum(LANGS).default('en'),
 })
 
 const GhostSettingsSchema = z.object({
@@ -178,9 +183,12 @@ const ProjectShape = {
   posts: z.array(PostSchema).max(2000),
   links: z.array(LinkSchema).max(100),
   webring: WebringSchema,
+  // Added with the 3D home: older saves have no room and load with the default one.
+  room: RoomSchema.default(() => defaultRoom()),
 }
 
 type Refinable = {
+  room: Room
   recordings: { id: string }[]
   blocks: z.infer<typeof BlockSchema>[]
   posts: z.infer<typeof PostSchema>[]
@@ -217,6 +225,16 @@ function checkReferences(p: Refinable, ctx: z.RefinementCtx): void {
         ctx.addIssue({ code: 'custom', message: `post ${post.id} points to a missing image` })
       }
     }
+  }
+  for (const issue of roomIssues(p.room)) ctx.addIssue({ code: 'custom', message: issue })
+  for (const m of p.room.memory) {
+    if (!postIds.has(m.postId)) {
+      ctx.addIssue({ code: 'custom', message: `memory object ${m.id} points to a missing post` })
+    }
+  }
+  const welcome = p.room.welcomeRecordingId
+  if (welcome !== undefined && !p.recordings.some((r) => r.id === welcome)) {
+    ctx.addIssue({ code: 'custom', message: 'welcome recording is missing' })
   }
   if (!isValidLayout(p.blocks)) {
     ctx.addIssue({ code: 'custom', message: 'blocks overlap or are outside the grid' })

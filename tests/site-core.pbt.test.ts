@@ -21,7 +21,7 @@ const ALLOWED_TAGS = new Set([
   'audio', 'span',
 ])
 const ALLOWED_ATTRS = new Set([
-  'charset', 'name', 'content', 'http-equiv', 'rel', 'href', 'type', 'title', 'class', 'id', 'src',
+  'lang', 'charset', 'name', 'content', 'http-equiv', 'rel', 'href', 'type', 'title', 'class', 'id', 'src',
   'alt', 'loading', 'datetime', 'aria-label', 'allow', 'referrerpolicy', 'data-ghost-home', 'defer',
   'controls', 'preload',
 ])
@@ -85,16 +85,22 @@ describe('site core properties', () => {
 
           for (const s of doc.querySelectorAll('script')) {
             if (s.getAttribute('type') === 'application/json') {
-              expect(s.id).toBe('ghost-data')
+              expect(['ghost-data', 'room-data']).toContain(s.id)
               const data = JSON.parse(s.textContent!)
-              expect(data.name).toBe(p.ghost.name)
-              expect(data.greeting).toContain(p.site.title)
+              if (s.id === 'ghost-data') {
+                expect(data.name).toBe(p.ghost.name)
+                expect(data.greeting).toContain(p.site.title)
+              } else {
+                // Only the home page carries the room, and it is the same escaped title text.
+                expect(path).toBe('index.html')
+                expect(data.title).toBe(p.site.title)
+              }
             } else {
-              expect(['ghost.js', '../ghost.js']).toContain(s.getAttribute('src'))
+              expect(['ghost.js', '../ghost.js', 'room.js']).toContain(s.getAttribute('src'))
               expect(s.textContent).toBe('')
             }
           }
-          expect(doc.querySelectorAll('script').length).toBe(p.ghost.enabled ? 2 : 0)
+          expect(doc.querySelectorAll('script').length).toBe((p.ghost.enabled ? 2 : 0) + (path === 'index.html' ? 2 : 0))
           // Escaping is exact: the title round-trips as text, not as markup.
           expect(doc.querySelector('.site-title a')!.textContent).toBe(p.site.title)
         }

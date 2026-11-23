@@ -1,0 +1,30 @@
+{
+  "shell": {
+    "prompt": "a single scallop seashell, pastel pink, cute miniature toy style",
+    "seed": 11
+  },
+  "plant": {
+    "prompt": "a small potted houseplant with broad leaves in a terracotta pot, cute miniature toy style",
+    "seed": 21
+  },
+  "armchair": {
+    "prompt": "a cozy armchair with rounded cushions, cute miniature toy style",
+    "seed": 31
+  },
+  "cactus": {
+    "prompt": "a small round cactus in a little clay pot, cute miniature toy style",
+    "seed": 41
+  },
+  "flower": {
+    "prompt": "a small glass vase with three flowers, cute miniature toy style",
+    "seed": 51
+  },
+  "cassette": {
+    "prompt": "a single retro audio cassette tape, cute miniature toy style",
+    "seed": 61
+  },
+  "bookcase": {
+    "prompt": "a cute miniature wooden bookshelf with colorful books",
+    "seed": 7
+  }
+}

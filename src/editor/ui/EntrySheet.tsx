@@ -1,11 +1,14 @@
 import { useState } from 'preact/hooks'
 import type { Asset, Post } from '../../core/schema.ts'
 import { parseVideoUrl } from '../../core/video.ts'
-import { addAsset, addPost, compose, deletePost, setVisibility, updatePost, type Command } from '../commands.ts'
+import { MEMORY_KINDS, type MemoryKind } from '../../core/room.ts'
+import { addAsset, addPost, compose, deletePost, setPostObject, setVisibility, updatePost, type Command } from '../commands.ts'
 import { pickFiles } from '../download.ts'
+import { t, useLang, type Key } from '../i18n.ts'
 import { randomId } from '../ids.ts'
 import { processPhoto } from '../images.ts'
 import { assetUrl, Field, run, Sheet, type Ctx } from './common.tsx'
+import { KIND_ICON } from './Decorate.tsx'
 import { Icon } from './icons.tsx'
 
 const MAX_PHOTOS = 12
@@ -18,7 +21,10 @@ function videoText(post?: Post): string {
 }
 
 export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }) {
+  useLang()
   const { ctx, post } = props
+  const existingObject = post ? ctx.project.room.memory.find((m) => m.postId === post.id) : undefined
+  const [keepsake, setKeepsake] = useState<MemoryKind | null>(existingObject?.kind ?? null)
   const [title, setTitle] = useState(post?.title ?? '')
   const [body, setBody] = useState(post?.body ?? '')
   const [photos, setPhotos] = useState<Asset[]>(() =>
@@ -42,7 +48,7 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
         added.push({ id: randomId(), ...img })
       }
       setPhotos((cur) => [...cur, ...added])
-      if (files.length > room) setError(`An entry can hold ${MAX_PHOTOS} photos; the rest were skipped.`)
+      if (files.length > room) setError(t('entry.tooMany', { n: MAX_PHOTOS }))
     } catch (e) {
       setError(e instanceof Error ? e.message : String(e))
     } finally {
@@ -53,8 +59,8 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
   const save = () => {
     const trimmedVideo = video.trim()
     const embed = trimmedVideo ? parseVideoUrl(trimmedVideo) : null
-    if (trimmedVideo && !embed) return setError('Only YouTube and Vimeo links can be embedded.')
-    if (!title.trim() && !body.trim() && photos.length === 0) return setError('Write something or add a photo first.')
+    if (trimmedVideo && !embed) return setError(t('entry.videoBad'))
+    if (!title.trim() && !body.trim() && photos.length === 0) return setError(t('entry.empty'))
 
     const existing = new Set(ctx.project.assets.map((a) => a.id))
     const cmds: Command[] = photos.filter((a) => !existing.has(a.id)).map(addAsset)
@@ -78,34 +84,37 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
     const wantPublic = isPublic ? 'public' : 'private'
     if ((post?.visibility ?? 'private') !== wantPublic) cmds.push(setVisibility(id!, wantPublic))
 
+    // The owner's choice of keepsake. Nothing is ever generated from the text.
+    if (keepsake !== (existingObject?.kind ?? null)) cmds.push(setPostObject(id!, keepsake, randomId()))
+
     const r = ctx.apply(compose(...cmds))
     if (!r.ok) return setError(r.reason)
-    ctx.toast(isPublic ? 'Saved. Visitors can see this entry.' : 'Saved. Only you can see this entry.')
+    ctx.toast(isPublic ? t('entry.savedPublic') : t('entry.savedPrivate'))
     props.onClose()
   }
 
   const remove = () => {
-    if (!post || !confirm('Delete this entry? This cannot be undone.')) return
-    if (run(ctx, deletePost(post.id), 'Entry deleted.')) props.onClose()
+    if (!post || !confirm(t('entry.confirmDelete'))) return
+    if (run(ctx, deletePost(post.id), t('entry.deleted'))) props.onClose()
   }
 
   return (
-    <Sheet title={post ? 'Edit entry' : 'New entry'} onClose={props.onClose}>
-      <Field label="Title">
-        <input value={title} maxLength={120} placeholder="Today" onInput={(e) => setTitle(e.currentTarget.value)} />
+    <Sheet title={post ? t('entry.edit') : t('entry.new')} onClose={props.onClose}>
+      <Field label={t('entry.title')}>
+        <input value={title} maxLength={120} placeholder={t('entry.titlePh')} onInput={(e) => setTitle(e.currentTarget.value)} />
       </Field>
-      <Field label="Entry">
+      <Field label={t('entry.body')}>
         <textarea
           value={body}
           rows={8}
           maxLength={20000}
-          placeholder="Nobody is watching. Write whatever you like."
+          placeholder={t('entry.bodyPh')}
           onInput={(e) => setBody(e.currentTarget.value)}
         />
       </Field>
 
       <div class="field">
-        <span class="field-label">Photos</span>
+        <span class="field-label">{t('entry.photos')}</span>
         <div class="photo-row">
           {photos.map((a) => (
             <div class="photo-thumb" key={a.id}>
@@ -113,7 +122,7 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
               <button
                 type="button"
                 class="icon-btn thumb-remove"
-                aria-label="Remove photo"
+                aria-label={t('entry.removePhoto')}
                 onClick={() => setPhotos((cur) => cur.filter((x) => x.id !== a.id))}
               >
                 <Icon name="close" size={16} />
@@ -121,23 +130,40 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
             </div>
           ))}
           {photos.length < MAX_PHOTOS && (
-            <button type="button" class="photo-add" disabled={busy} onClick={addPhotos} aria-label="Add photos">
+            <button type="button" class="photo-add" disabled={busy} onClick={addPhotos} aria-label={t('entry.addPhotos')}>
               {busy ? '…' : <Icon name="plus" size={26} />}
             </button>
           )}
         </div>
       </div>
 
-      <Field label="Video link (optional)" hint="YouTube or Vimeo. Embedded videos stay hosted by them.">
+      <Field label={t('entry.video')} hint={t('entry.videoHint')}>
         <input value={video} inputMode="url" placeholder="https://youtu.be/…" onInput={(e) => setVideo(e.currentTarget.value)} />
       </Field>
 
-      <div class="door-toggle" role="group" aria-label="Who can see this">
+      <div class="field">
+        <span class="field-label">{t('entry.keepsake')}</span>
+        <div class="keep-row" role="group" aria-label={t('entry.keepsake')}>
+          <button type="button" class={`keep-btn ${keepsake === null ? 'selected' : ''}`} aria-pressed={keepsake === null} onClick={() => setKeepsake(null)}>
+            <Icon name="none" size={20} />
+            <span>{t('entry.keepNone')}</span>
+          </button>
+          {MEMORY_KINDS.map((k) => (
+            <button type="button" key={k} class={`keep-btn ${keepsake === k ? 'selected' : ''}`} aria-pressed={keepsake === k} onClick={() => setKeepsake(k)}>
+              <Icon name={KIND_ICON[k]!} size={20} />
+              <span>{t(`kind.${k}` as Key)}</span>
+            </button>
+          ))}
+        </div>
+        <span class="field-hint">{t('entry.keepsakeHint')}</span>
+      </div>
+
+      <div class="door-toggle" role="group" aria-label={t('entry.who')}>
         <button type="button" class={!isPublic ? 'selected' : ''} aria-pressed={!isPublic} onClick={() => setIsPublic(false)}>
-          <Icon name="lock" size={18} /> Just for me
+          <Icon name="lock" size={18} /> {t('entry.private')}
         </button>
         <button type="button" class={isPublic ? 'selected' : ''} aria-pressed={isPublic} onClick={() => setIsPublic(true)}>
-          <Icon name="open" size={18} /> Open to visitors
+          <Icon name="open" size={18} /> {t('entry.public')}
         </button>
       </div>
 
@@ -146,11 +172,11 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; onClose: () => void }
       <div class="sheet-actions">
         {post && (
           <button type="button" class="btn btn-danger" onClick={remove}>
-            Delete
+            {t('common.delete')}
           </button>
         )}
         <button type="button" class="btn btn-primary" disabled={busy} onClick={save}>
-          Save
+          {t('common.save')}
         </button>
       </div>
     </Sheet>

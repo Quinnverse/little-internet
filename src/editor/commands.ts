@@ -12,6 +12,7 @@ import type {
   Block,
   BlockContent,
   GHOST_COLORS,
+  Lang,
   Link,
   Post,
   Project,
@@ -19,6 +20,17 @@ import type {
   Theme,
   VideoEmbed,
 } from '../core/schema.ts'
+import {
+  autoSlot,
+  canPlaceDecor,
+  defaultRoom,
+  firstFreeCell,
+  freeSlotsFor,
+  MAX_DECOR,
+  type DecorKind,
+  type MemoryKind,
+  type Room,
+} from '../core/room.ts'
 import { uniquePostSlug } from './ids.ts'
 
 export type Command = (p: Project) => Project
@@ -31,6 +43,7 @@ export const compose =
 // ------------------------------------------------------------------ project
 
 export type NewProjectInput = {
+  lang?: Lang
   title: string
   slug: string
   theme: Theme
@@ -42,7 +55,7 @@ export type NewProjectInput = {
 export function createProject(input: NewProjectInput, blockIds: [string, string, string]): Project {
   return {
     schemaVersion: 1,
-    site: { slug: input.slug, title: input.title, tagline: '', theme: input.theme },
+    site: { slug: input.slug, title: input.title, tagline: '', theme: input.theme, lang: input.lang ?? 'en' },
     ghost: { enabled: true, name: input.ghostName, color: input.ghostColor },
     blocks: [
       { id: blockIds[0], x: 0, y: 0, w: 2, h: 2, content: { kind: 'latest' } },
@@ -52,6 +65,7 @@ export function createProject(input: NewProjectInput, blockIds: [string, string,
     posts: [],
     links: [],
     webring: {},
+    room: defaultRoom(),
     assets: [],
     recordings: [],
   }
@@ -146,6 +160,8 @@ export const deletePost =
       ...p,
       posts: p.posts.filter((post) => post.id !== id),
       blocks: p.blocks.filter((b) => !(b.content.kind === 'post' && b.content.postId === id)),
+      // A memory object lives and dies with its entry.
+      room: { ...p.room, memory: p.room.memory.filter((m) => m.postId !== id) },
     })
 
 // ------------------------------------------------------------------ blocks
@@ -253,4 +269,88 @@ export const setRecordingVisibility =
 
 export const deleteRecording =
   (id: string): Command =>
-  (p) => ({ ...p, recordings: p.recordings.filter((r) => r.id !== id) })
+  (p) => {
+    const { welcomeRecordingId, ...room } = p.room
+    return {
+      ...p,
+      recordings: p.recordings.filter((r) => r.id !== id),
+      room: welcomeRecordingId === id ? room : p.room,
+    }
+  }
+
+// ------------------------------------------------------------------ room
+
+export const updateRoomSkin =
+  (patch: Partial<Pick<Room, 'house' | 'wall' | 'floor' | 'light'>>): Command =>
+  (p) => ({ ...p, room: { ...p.room, ...patch } })
+
+/** Puts a new decor item on the first free floor cell. Throws when the room is full. */
+export const addDecor =
+  (id: string, kind: DecorKind): Command =>
+  (p) => {
+    if (p.room.decor.length >= MAX_DECOR) throw new Error('The room is full')
+    if (p.room.decor.some((d) => d.id === id)) throw new Error('Duplicate id')
+    const spot = firstFreeCell(p.room)
+    if (!spot) throw new Error('No free floor space')
+    const decor = [...p.room.decor, { id, kind, x: spot[0], z: spot[1], rot: 0 }]
+    return { ...p, room: { ...p.room, decor } }
+  }
+
+export const moveDecor =
+  (id: string, x: number, z: number): Command =>
+  (p) => {
+    const why = canPlaceDecor(p.room, id, x, z)
+    if (why) throw new Error(`Cannot place here (${why})`)
+    return { ...p, room: { ...p.room, decor: p.room.decor.map((d) => (d.id === id ? { ...d, x, z } : d)) } }
+  }
+
+export const rotateDecor =
+  (id: string): Command =>
+  (p) => ({
+    ...p,
+    room: { ...p.room, decor: p.room.decor.map((d) => (d.id === id ? { ...d, rot: (d.rot + 1) % 4 } : d)) },
+  })
+
+export const removeDecor =
+  (id: string): Command =>
+  (p) => ({ ...p, room: { ...p.room, decor: p.room.decor.filter((d) => d.id !== id) } })
+
+/**
+ * The owner's choice of object for an entry (or none). Replaces any earlier object of the entry,
+ * keeping its slot when the new kind may sit there. Throws when no slot is free.
+ */
+export const setPostObject =
+  (postId: string, kind: MemoryKind | null, objectId: string): Command =>
+  (p) => {
+    if (!p.posts.some((x) => x.id === postId)) throw new Error('No such entry')
+    const old = p.room.memory.find((m) => m.postId === postId)
+    const rest = p.room.memory.filter((m) => m.postId !== postId)
+    if (kind === null) return { ...p, room: { ...p.room, memory: rest } }
+    if (old?.kind === kind) return p
+    const base = { ...p.room, memory: rest }
+    const keep = old && freeSlotsFor(base, kind).includes(old.slot) ? old.slot : undefined
+    const slot = keep ?? autoSlot(base, kind)
+    if (!slot) throw new Error('There is no free spot for that object')
+    const newId = old?.id ?? objectId
+    if (rest.some((m) => m.id === newId)) throw new Error('Duplicate id')
+    return { ...p, room: { ...base, memory: [...rest, { id: newId, kind, postId, slot }] } }
+  }
+
+export const moveMemoryObject =
+  (id: string, slot: string): Command =>
+  (p) => {
+    const m = p.room.memory.find((x) => x.id === id)
+    if (!m) return p
+    if (!freeSlotsFor(p.room, m.kind, id).includes(slot)) throw new Error('That spot is not free')
+    return { ...p, room: { ...p.room, memory: p.room.memory.map((x) => (x.id === id ? { ...x, slot } : x)) } }
+  }
+
+export const setWelcome =
+  (recordingId: string | null): Command =>
+  (p) => {
+    if (recordingId !== null && !p.recordings.some((r) => r.id === recordingId)) {
+      throw new Error('No such recording')
+    }
+    const { welcomeRecordingId: _w, ...room } = p.room
+    return { ...p, room: recordingId === null ? room : { ...room, welcomeRecordingId: recordingId } }
+  }

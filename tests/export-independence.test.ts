@@ -8,11 +8,12 @@ import { dirname, join, normalize as normPath } from 'node:path'
 import { JSDOM } from 'jsdom'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { exportSite } from '../src/core/exportZip.ts'
+import { defaultRoom } from '../src/core/room.ts'
 import type { Project } from '../src/core/schema.ts'
 
 const project: Project = {
   schemaVersion: 1,
-  site: { slug: 'moon', title: 'Moon’s corner', tagline: 'Notes from the night shift', theme: 'midnight' },
+  site: { slug: 'moon', title: 'Moon’s corner', tagline: 'Notes from the night shift', theme: 'midnight', lang: 'en' },
   ghost: { enabled: true, name: 'Boo', color: 'lilac' },
   assets: [{ id: 'sea', mime: 'image/png', data: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) }],
   posts: [
@@ -39,6 +40,7 @@ const project: Project = {
   ],
   links: [{ id: 'l1', title: 'A friend', url: 'https://friend.example/' }],
   webring: { next: 'https://ring.example/next' },
+  room: defaultRoom(),
 }
 
 let root: string
@@ -110,6 +112,7 @@ describe('exported site runs on a plain static host', () => {
       'ghost.js',
       'index.html',
       'posts/first-day-at-the-sea.html',
+      'room.js',
       'style.css',
     ])
     expect([...new Set(external)].sort()).toEqual(['https://friend.example/', 'https://ring.example/next'])

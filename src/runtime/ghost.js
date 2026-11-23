@@ -31,6 +31,8 @@
   var name = str(data.name, '') || 'the ghost'
   var color = COLORS[data.color] ? data.color : 'white'
   var greeting = str(data.greeting, 'Hi!')
+  var ariaText = str(data.aria, name + ' — your guide to this home')
+  var newText = str(data.newText, 'Something new: ')
   var guide = []
   if (Array.isArray(data.guide)) {
     for (var gi = 0; gi < data.guide.length && guide.length < 4; gi++) {
@@ -69,7 +71,7 @@
   var button = document.createElement('button')
   button.type = 'button'
   button.className = 'ghost ghost-' + color
-  button.setAttribute('aria-label', name + ' — your guide to this home')
+  button.setAttribute('aria-label', ariaText)
   button.setAttribute('aria-expanded', 'false')
   button.setAttribute('aria-controls', 'ghost-bubble')
 
@@ -215,7 +217,7 @@
     var age = clock.now() - Date.parse(latest.createdAt)
     if (age >= -24 * 3600 * 1000 && age <= NEW_WITHIN) {
       setState('react')
-      var p = para('Something new: ')
+      var p = para(newText)
       p.appendChild(link(latest.title || 'a new entry', latest.href))
       showBubble([p])
       reactTimer = clock.setTimeout(function () {

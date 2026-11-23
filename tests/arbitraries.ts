@@ -1,11 +1,24 @@
 import fc from 'fast-check'
 import { placeBlock } from '../src/core/layout.ts'
 import {
+  autoSlot,
+  DECOR_KINDS,
+  FLOOR_SIZE,
+  FLOORS,
+  HOUSES,
+  isReservedCell,
+  LIGHTS,
+  MEMORY_KINDS,
+  WALLS,
+  type Room,
+} from '../src/core/room.ts'
+import {
   GHOST_COLORS,
   IMAGE_MIMES,
   isCanonicalHttpUrl,
   isSafeLine,
   isSafeText,
+  LANGS,
   THEMES,
   AUDIO_MIMES,
   type Asset,
@@ -154,6 +167,47 @@ function uniqueBy<T>(xs: T[], key: (x: T) => string): T[] {
   return xs.filter((x) => (seen.has(key(x)) ? false : (seen.add(key(x)), true)))
 }
 
+/** A valid room whose memory objects point at some of the given posts. */
+function roomArb(postIds: string[], recordingIds: string[]): fc.Arbitrary<Room> {
+  const cells = fc
+    .uniqueArray(fc.tuple(fc.nat(FLOOR_SIZE - 1), fc.nat(FLOOR_SIZE - 1)), {
+      selector: ([x, z]) => `${x},${z}`,
+      maxLength: 8,
+    })
+    .map((cs) => cs.filter(([x, z]) => !isReservedCell(x, z)))
+  return fc
+    .record({
+      house: fc.constantFrom(...HOUSES),
+      wall: fc.constantFrom(...WALLS),
+      floor: fc.constantFrom(...FLOORS),
+      light: fc.constantFrom(...LIGHTS),
+      cells,
+      kinds: fc.array(fc.constantFrom(...DECOR_KINDS), { minLength: 8, maxLength: 8 }),
+      rots: fc.array(fc.nat(3), { minLength: 8, maxLength: 8 }),
+      memoryKinds: fc.array(fc.constantFrom(...MEMORY_KINDS), { minLength: postIds.length, maxLength: postIds.length }),
+      memoryOn: fc.array(fc.boolean(), { minLength: postIds.length, maxLength: postIds.length }),
+      welcome: recordingIds.length ? fc.option(fc.constantFrom(...recordingIds), { nil: undefined }) : fc.constant(undefined),
+    })
+    .map((r) => {
+      const room: Room = {
+        house: r.house,
+        wall: r.wall,
+        floor: r.floor,
+        light: r.light,
+        decor: r.cells.map(([x, z], i) => ({ id: `d${i}`, kind: r.kinds[i]!, x, z, rot: r.rots[i]! })),
+        memory: [],
+      }
+      postIds.forEach((postId, i) => {
+        if (!r.memoryOn[i]) return
+        const kind = r.memoryKinds[i]!
+        const slot = autoSlot(room, kind)
+        if (slot) room.memory.push({ id: `m${i}`, kind, postId, slot })
+      })
+      if (r.welcome !== undefined) room.welcomeRecordingId = r.welcome
+      return room
+    })
+}
+
 export const projectArb: fc.Arbitrary<Project> = fc
   .record({
     site: fc.record({
@@ -161,6 +215,7 @@ export const projectArb: fc.Arbitrary<Project> = fc
       title: lineArb(80),
       tagline: lineArb(200),
       theme: fc.constantFrom(...THEMES),
+      lang: fc.constantFrom(...LANGS),
     }),
     ghost: fc.record({ enabled: fc.boolean(), name: lineArb(24), color: fc.constantFrom(...GHOST_COLORS) }),
     assets: fc.uniqueArray(assetArb, { selector: (a) => a.id, maxLength: 4 }),
@@ -179,12 +234,14 @@ export const projectArb: fc.Arbitrary<Project> = fc
       .tuple(
         fc.array(imagesArb, { minLength: bases.length, maxLength: bases.length }),
         blocksArb(bases.map((p) => p.id), assetIds),
+        roomArb(bases.map((p) => p.id), rest.recordings.map((r) => r.id)),
       )
-      .map(([images, blocks]) => ({
+      .map(([images, blocks, room]) => ({
         schemaVersion: 1 as const,
         ...rest,
         assets,
         blocks,
+        room,
         posts: bases.map((p, i) => ({ ...p, imageIds: images[i]! })),
       }))
   })
