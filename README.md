@@ -69,6 +69,13 @@ A slug is claimed by the first publisher's key (created in the browser, never in
 its SHA-256). Uploads are validated (paths, extensions, sizes, matching `site.json`). Guestbook notes are plain text,
 length limited, rate limited, and **pending until the owner approves them**.
 
+## 3D models made in Blender (in review)
+
+`assets/blender/build_props.py` builds 59 low-poly models (furniture, props, keepsakes, the pet with three
+animation clips, house shells and exteriors) with Blender's Python API and renders previews with Cycles.
+Look at `assets/review/` (`README.md`, `scenes/`, `sheets/`, `renders/`, `glb/`). They are **not wired into the app yet**;
+the app still draws the same objects from code until the models are approved. See `assets/blender/README.md`.
+
 ## 3D and the AI-made prop
 
 The room is built in Three.js from code: rounded boxes, canvas textures, one sun with soft shadows, warm lamps at

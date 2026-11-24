@@ -1,0 +1,628 @@
+[
+  {
+    "name": "desk",
+    "category": "furniture",
+    "triangles": 916,
+    "meshes": 10,
+    "glb_bytes": 46104,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "office_chair",
+    "category": "furniture",
+    "triangles": 1308,
+    "meshes": 14,
+    "glb_bytes": 56244,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "bookshelf",
+    "category": "furniture",
+    "triangles": 2064,
+    "meshes": 82,
+    "glb_bytes": 134440,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "dresser",
+    "category": "furniture",
+    "triangles": 1388,
+    "meshes": 16,
+    "glb_bytes": 48652,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "side_table",
+    "category": "furniture",
+    "triangles": 476,
+    "meshes": 6,
+    "glb_bytes": 14844,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "coffee_table",
+    "category": "furniture",
+    "triangles": 844,
+    "meshes": 7,
+    "glb_bytes": 17812,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "computer",
+    "category": "functional",
+    "triangles": 496,
+    "meshes": 7,
+    "glb_bytes": 24624,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keyboard_mouse",
+    "category": "functional",
+    "triangles": 868,
+    "meshes": 53,
+    "glb_bytes": 70868,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "diary",
+    "category": "functional",
+    "triangles": 428,
+    "meshes": 6,
+    "glb_bytes": 22896,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "typewriter",
+    "category": "functional",
+    "triangles": 1452,
+    "meshes": 30,
+    "glb_bytes": 55952,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "pen_cup",
+    "category": "functional",
+    "triangles": 552,
+    "meshes": 7,
+    "glb_bytes": 12536,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "record_player",
+    "category": "functional",
+    "triangles": 864,
+    "meshes": 10,
+    "glb_bytes": 32220,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "microphone",
+    "category": "functional",
+    "triangles": 956,
+    "meshes": 8,
+    "glb_bytes": 19080,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "rotary_phone",
+    "category": "functional",
+    "triangles": 1136,
+    "meshes": 19,
+    "glb_bytes": 44524,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "answering_machine",
+    "category": "functional",
+    "triangles": 708,
+    "meshes": 9,
+    "glb_bytes": 33332,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "polaroid_camera",
+    "category": "functional",
+    "triangles": 648,
+    "meshes": 12,
+    "glb_bytes": 33172,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "photo_wall",
+    "category": "functional",
+    "triangles": 1644,
+    "meshes": 22,
+    "glb_bytes": 87356,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "photo_album_open",
+    "category": "functional",
+    "triangles": 1400,
+    "meshes": 17,
+    "glb_bytes": 48156,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "books_row",
+    "category": "functional",
+    "triangles": 972,
+    "meshes": 10,
+    "glb_bytes": 55552,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "books_stack",
+    "category": "functional",
+    "triangles": 864,
+    "meshes": 9,
+    "glb_bytes": 50580,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "cd_disc",
+    "category": "functional",
+    "triangles": 396,
+    "meshes": 6,
+    "glb_bytes": 15060,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "desk_lamp",
+    "category": "functional",
+    "triangles": 312,
+    "meshes": 5,
+    "glb_bytes": 9452,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "mailbox",
+    "category": "functional",
+    "triangles": 416,
+    "meshes": 6,
+    "glb_bytes": 22788,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "doorbell",
+    "category": "functional",
+    "triangles": 292,
+    "meshes": 5,
+    "glb_bytes": 13800,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "nameplate",
+    "category": "functional",
+    "triangles": 352,
+    "meshes": 9,
+    "glb_bytes": 17372,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "house_door",
+    "category": "functional",
+    "triangles": 484,
+    "meshes": 6,
+    "glb_bytes": 22864,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "storage_box",
+    "category": "functional",
+    "triangles": 772,
+    "meshes": 7,
+    "glb_bytes": 27036,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "calendar",
+    "category": "functional",
+    "triangles": 836,
+    "meshes": 40,
+    "glb_bytes": 59520,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "lava_lamp",
+    "category": "ambient",
+    "triangles": 596,
+    "meshes": 8,
+    "glb_bytes": 14016,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "mug",
+    "category": "ambient",
+    "triangles": 708,
+    "meshes": 6,
+    "glb_bytes": 16420,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "plant_small",
+    "category": "ambient",
+    "triangles": 744,
+    "meshes": 10,
+    "glb_bytes": 16936,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "wall_clock",
+    "category": "ambient",
+    "triangles": 736,
+    "meshes": 18,
+    "glb_bytes": 29948,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "radio",
+    "category": "ambient",
+    "triangles": 504,
+    "meshes": 15,
+    "glb_bytes": 26252,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "printer",
+    "category": "ambient",
+    "triangles": 412,
+    "meshes": 8,
+    "glb_bytes": 21960,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "cake",
+    "category": "ambient",
+    "triangles": 1324,
+    "meshes": 13,
+    "glb_bytes": 28888,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "stickers",
+    "category": "ambient",
+    "triangles": 492,
+    "meshes": 10,
+    "glb_bytes": 23832,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "floor_cushion",
+    "category": "ambient",
+    "triangles": 172,
+    "meshes": 3,
+    "glb_bytes": 5212,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "pet_bed",
+    "category": "ambient",
+    "triangles": 476,
+    "meshes": 3,
+    "glb_bytes": 10636,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "rug",
+    "category": "ambient",
+    "triangles": 276,
+    "meshes": 4,
+    "glb_bytes": 6500,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "floor_lamp",
+    "category": "ambient",
+    "triangles": 312,
+    "meshes": 5,
+    "glb_bytes": 9456,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "plant",
+    "category": "decor",
+    "triangles": 984,
+    "meshes": 13,
+    "glb_bytes": 22160,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "cactus",
+    "category": "decor",
+    "triangles": 872,
+    "meshes": 11,
+    "glb_bytes": 18964,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "armchair",
+    "category": "decor",
+    "triangles": 908,
+    "meshes": 10,
+    "glb_bytes": 38240,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "stool",
+    "category": "decor",
+    "triangles": 368,
+    "meshes": 5,
+    "glb_bytes": 8100,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "basket",
+    "category": "decor",
+    "triangles": 556,
+    "meshes": 4,
+    "glb_bytes": 13012,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "mini_bookcase",
+    "category": "decor",
+    "triangles": 840,
+    "meshes": 23,
+    "glb_bytes": 55956,
+    "budget": 5000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_shell",
+    "category": "keepsake",
+    "triangles": 944,
+    "meshes": 10,
+    "glb_bytes": 54964,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_candle",
+    "category": "keepsake",
+    "triangles": 264,
+    "meshes": 4,
+    "glb_bytes": 7288,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_book",
+    "category": "keepsake",
+    "triangles": 324,
+    "meshes": 4,
+    "glb_bytes": 20464,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_flower_vase",
+    "category": "keepsake",
+    "triangles": 608,
+    "meshes": 8,
+    "glb_bytes": 14224,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_cassette",
+    "category": "keepsake",
+    "triangles": 316,
+    "meshes": 6,
+    "glb_bytes": 14016,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_postcard",
+    "category": "keepsake",
+    "triangles": 156,
+    "meshes": 6,
+    "glb_bytes": 12812,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_photo_frame",
+    "category": "keepsake",
+    "triangles": 120,
+    "meshes": 3,
+    "glb_bytes": 8472,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "keepsake_ticket",
+    "category": "keepsake",
+    "triangles": 168,
+    "meshes": 7,
+    "glb_bytes": 13420,
+    "budget": 2000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "pet_ghost",
+    "category": "pet",
+    "triangles": 1088,
+    "meshes": 6,
+    "glb_bytes": 30188,
+    "budget": 3000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "cabin_room_shell",
+    "category": "house",
+    "triangles": 2892,
+    "meshes": 17,
+    "glb_bytes": 160144,
+    "budget": 15000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "villa_room_shell",
+    "category": "house",
+    "triangles": 2692,
+    "meshes": 17,
+    "glb_bytes": 151212,
+    "budget": 15000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "cabin_exterior",
+    "category": "house",
+    "triangles": 6280,
+    "meshes": 63,
+    "glb_bytes": 219516,
+    "budget": 15000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "villa_exterior",
+    "category": "house",
+    "triangles": 6516,
+    "meshes": 64,
+    "glb_bytes": 234388,
+    "budget": 15000,
+    "within_budget": true,
+    "ok": true
+  },
+  {
+    "name": "room_cabin_day",
+    "triangles": 30552,
+    "ok": true,
+    "category": "scene"
+  },
+  {
+    "name": "room_cabin_night",
+    "triangles": 30552,
+    "ok": true,
+    "category": "scene"
+  },
+  {
+    "name": "room_villa_day",
+    "triangles": 30352,
+    "ok": true,
+    "category": "scene"
+  },
+  {
+    "name": "exterior_cabin_day",
+    "triangles": 6280,
+    "ok": true,
+    "category": "scene"
+  },
+  {
+    "name": "exterior_villa_night",
+    "triangles": 6516,
+    "ok": true,
+    "category": "scene"
+  },
+  {
+    "name": "desk_corner",
+    "triangles": 16860,
+    "ok": true,
+    "category": "scene"
+  }
+]
