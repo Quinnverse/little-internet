@@ -38,6 +38,14 @@ SPACE = "tencent/Hunyuan3D-2"
 
 
 TOKEN = os.environ.get("HF_TOKEN")  # a free Hugging Face token raises the ZeroGPU quota a lot
+
+
+def make_client(space: str) -> Client:
+    """gradio_client renamed `hf_token` to `token`; support both."""
+    try:
+        return Client(space, token=TOKEN, verbose=False)
+    except TypeError:
+        return Client(space, hf_token=TOKEN, verbose=False)
 STYLE = ", isometric 3d render, soft lighting, single object, centered, plain white background"
 
 
@@ -51,7 +59,7 @@ def draw_reference(prompt: str, seed: int, out: Path) -> None:
         return
     except Exception as e:
         print(f"  pollinations unavailable ({type(e).__name__}); trying FLUX.1-schnell")
-    flux = Client("black-forest-labs/FLUX.1-schnell", hf_token=TOKEN, verbose=False)
+    flux = make_client("black-forest-labs/FLUX.1-schnell")
     img, _ = flux.predict(prompt=prompt + STYLE, seed=seed, randomize_seed=False, width=768, height=768, num_inference_steps=4, api_name="/infer")
     Image.open(img).convert("RGB").save(out, quality=92)
 
@@ -91,7 +99,7 @@ def main() -> None:
     REFS.mkdir(parents=True, exist_ok=True)
     props = json.loads((Path(__file__).parent / "props.json").read_text())
     wanted = sys.argv[1:] or list(props)
-    client = Client(SPACE, hf_token=TOKEN, verbose=False)
+    client = make_client(SPACE)
     for kind in wanted:
         spec = props[kind]
         dest = RAW / f"{kind}.glb"

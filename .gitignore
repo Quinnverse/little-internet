@@ -31,3 +31,4 @@ dist-ssr
 .e2e
 /assets/raw
 /assets/refs
+/assets/blender/__pycache__
