@@ -73,6 +73,8 @@ const SiteSettingsSchema = z.object({
   tagline: line(200),
   // Added with the 3D home: older saves have no language and load as English.
   lang: z.enum(LANGS).default('en'),
+  /** Marks a sample home made by the Little Internet team. Shown to every visitor. */
+  demo: z.boolean().optional(),
 })
 
 const GhostSettingsSchema = z.object({

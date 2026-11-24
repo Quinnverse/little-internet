@@ -368,7 +368,8 @@ function start(c: Clean) {
   // ---- guestbook (only on the platform copy; elsewhere the button never appears)
   async function probeGuestbook() {
     if (!c.slug || !location.pathname.startsWith(`/@${c.slug}/`)) return
-    const api = `${location.origin}/api/sites/${c.slug}/messages`
+    // Published pages are served with a CSP sandbox (opaque origin), so location.origin is "null".
+    const api = `${location.protocol}//${location.host}/api/sites/${c.slug}/messages`
     let approved: { name: string; text: string; createdAt: string }[]
     try {
       const r = await fetch(`${api}/approved`, { credentials: 'omit' })

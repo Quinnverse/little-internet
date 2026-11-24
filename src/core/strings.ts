@@ -76,6 +76,7 @@ const en = {
   by: 'by {author}',
   keepsake: 'Keepsake',
   backHome: 'Back to my home',
+  demoBanner: 'Demo home: a sample made with Little Internet. The owner is fictional.',
 } as const
 
 export type SiteKey = keyof typeof en
@@ -153,6 +154,7 @@ const zh: Record<SiteKey, string> = {
   by: '{author} 著',
   keepsake: '纪念物',
   backHome: '回到我的家',
+  demoBanner: '示范家园：用 Little Internet 制作的样例，主人是虚构的。',
 }
 
 const DICT = { en, zh } as const

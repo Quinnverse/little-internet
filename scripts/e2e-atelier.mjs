@@ -1,0 +1,224 @@
+// Web Atelier end-to-end check in headless Chromium against the real server (scripts/e2e-atelier.sh).
+// Walks the acceptance chain: CRT → Web Atelier → restyle → add components → reorder → phone
+// preview → save → publish → another device → privacy change → export offline → restore backup.
+import { mkdirSync, writeFileSync } from 'node:fs'
+import { dirname, join } from 'node:path'
+import { unzipSync } from 'fflate'
+import { chromium } from 'playwright'
+
+const APP = process.env.APP ?? 'http://127.0.0.1:4173/'
+const STATIC = process.env.STATIC ?? 'http://127.0.0.1:4174/'
+const SITE_DIR = process.env.SITE_DIR
+const SHOTS = process.env.SHOTS ?? '.e2e/shots'
+mkdirSync(SHOTS, { recursive: true })
+
+const results = []
+const check = (name, ok, extra = '') => {
+  results.push({ name, ok: !!ok })
+  console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? `  (${extra})` : ''}`)
+}
+const shot = (page, name) => page.screenshot({ path: join(SHOTS, `${name}.png`) })
+
+const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+const owner = await browser.newContext({ viewport: { width: 1440, height: 900 }, acceptDownloads: true })
+const page = await owner.newPage()
+page.on('pageerror', (e) => console.log('pageerror', e.message))
+
+// ---- set up a home (Retro style) and two entries
+await page.goto(APP)
+await page.locator('.setup').waitFor()
+await page.getByLabel('What is your home called?').fill('Pixel Harbor')
+await page.getByRole('button', { name: 'Retro Internet' }).click()
+await page.getByRole('button', { name: 'Move in' }).click()
+await page.locator('.home').waitFor()
+
+async function write(title, body, open) {
+  await page.getByRole('button', { name: 'Write', exact: true }).click()
+  await page.getByLabel('Title', { exact: true }).fill(title)
+  await page.getByLabel('Entry', { exact: true }).fill(body)
+  if (open) await page.locator('.door-toggle').getByRole('button', { name: 'Open to visitors' }).click()
+  await page.getByRole('button', { name: 'Save', exact: true }).click()
+  await page.locator('.sheet').waitFor({ state: 'detached' }).catch(() => {})
+  const done = page.getByRole('button', { name: 'Done', exact: true })
+  if (await done.count()) await done.first().click()
+}
+await write('Harbor lights', 'PUBLICBODY the lighthouse blinked twice.', true)
+await write('Unsent letter', 'TOPSECRETBODY not for anyone.', false)
+
+// ---- 1-3: CRT → Decorate my website
+await page.locator('button.hotspot[data-id="computer"]').click({ force: true })
+await page.locator('.crt-item', { hasText: 'Decorate my website' }).click()
+await page.locator('.atelier').waitFor()
+const frame = () => page.frameLocator('.at-frame')
+await frame().locator('[data-w]').first().waitFor()
+check('Web Atelier opens from the CRT with a live preview', (await frame().locator('[data-w]').count()) > 3)
+await shot(page, 'atelier-desktop-start')
+
+// ---- 4: background and font
+await page.getByRole('tab', { name: 'Style' }).click()
+await page.locator('.color-pick', { hasText: 'Colour' }).first().locator('input').evaluate((el) => {
+  el.value = '#3a0b4a'
+  el.dispatchEvent(new Event('input', { bubbles: true }))
+})
+await page.getByRole('button', { name: 'Hearts' }).click()
+await page.getByLabel('Headings').selectOption('impact')
+await page.waitForTimeout(300)
+const bg = await frame().locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
+const hfont = await frame().locator('.site-title').evaluate((el) => getComputedStyle(el).fontFamily)
+check('background colour changes in the preview', bg === 'rgb(58, 11, 74)', bg)
+check('heading font changes in the preview', /Impact/i.test(hfont), hfont)
+
+// ---- 5-6: add guestbook, diary, Boo
+await page.getByRole('tab', { name: 'Add' }).click()
+const before = await frame().locator('[data-w]').count()
+for (const name of ['Guestbook', 'Diary', 'Boo']) await page.locator('.lib-item', { hasText: new RegExp(`^${name}$`) }).click()
+await page.waitForTimeout(300)
+check('three components added', (await frame().locator('[data-w]').count()) === before + 3)
+check('diary component shows the public entry, not the private one', (await frame().locator('.t-diary').last().textContent()).includes('Harbor lights') && !(await frame().locator('body').textContent()).includes('Unsent letter'))
+
+// ---- 7: move a component (select Boo in the preview, move it up twice)
+await frame().locator('.t-boo').last().click()
+await page.locator('.inspector').waitFor()
+const orderBefore = await frame().locator('[data-w]').evaluateAll((els) => els.map((e) => e.getAttribute('data-w')))
+await page.locator('.inspector').getByRole('button', { name: 'Move up' }).click()
+await page.locator('.inspector').getByRole('button', { name: 'Move up' }).click()
+await page.waitForTimeout(300)
+const orderAfter = await frame().locator('[data-w]').evaluateAll((els) => els.map((e) => e.getAttribute('data-w')))
+const moved = orderBefore.at(-1)
+check('component moved up two places', orderAfter.indexOf(moved) === orderBefore.indexOf(moved) - 2)
+await page.locator('.inspector').getByRole('button', { name: 'Half' }).first().click().catch(() => {})
+// undo / redo
+await page.getByRole('button', { name: 'Undo' }).click()
+await page.getByRole('button', { name: 'Redo' }).click()
+check('undo and redo are available', await page.getByRole('button', { name: 'Undo' }).isEnabled())
+await shot(page, 'atelier-desktop-edited')
+
+// ---- 8: phone preview
+await page.getByRole('button', { name: 'Phone' }).click()
+await page.waitForTimeout(300)
+const phoneWidth = await page.locator('.at-frame').evaluate((f) => f.getBoundingClientRect().width)
+const overflow = await frame().locator('html').evaluate((h) => h.scrollWidth - h.clientWidth)
+check('phone preview is phone-sized', phoneWidth <= 390 && phoneWidth > 300, String(phoneWidth))
+check('no horizontal overflow on the phone preview', overflow <= 0, String(overflow))
+await shot(page, 'atelier-phone-preview')
+
+// ---- 9-10: save draft, publish
+await page.getByRole('button', { name: 'Save draft' }).click()
+await page.getByRole('button', { name: 'Publish', exact: true }).click()
+await page.getByRole('button', { name: 'Publish now' }).click()
+const link = page.getByRole('link', { name: 'Open my website' })
+await link.waitFor({ timeout: 20000 })
+const url = await link.getAttribute('href')
+check('published to its own address', /\/@pixel-harbor\/$/.test(url), url)
+await page.getByRole('button', { name: 'Not now' }).click().catch(() => {})
+await page.locator('.atelier .sheet-backdrop').click({ position: { x: 5, y: 5 } }).catch(() => {})
+
+// ---- 11-12: another device opens the address
+const visitor = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+const vp = await visitor.newPage()
+await vp.goto(url)
+await vp.getByRole('button', { name: /Skip to website/ }).click({ timeout: 8000 }).catch(() => {})
+await vp.locator('.site-title').waitFor()
+const vbg = await vp.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
+const vtext = await vp.locator('body').textContent()
+check('visitor sees the same decoration (background)', vbg === 'rgb(58, 11, 74)', vbg)
+check('visitor sees the public entry and never the private one', vtext.includes('Harbor lights') && !vtext.includes('Unsent letter') && !vtext.includes('TOPSECRET'))
+await vp.locator('form[data-gb]').first().waitFor({ state: 'visible', timeout: 8000 }).catch(() => {})
+check('live guestbook form is enabled on the published site', await vp.locator('form[data-gb]').first().isVisible())
+const vOverflow = await vp.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)
+check('published site has no horizontal overflow at 390px', vOverflow <= 0, String(vOverflow))
+await vp.screenshot({ path: join(SHOTS, 'published-phone.png'), fullPage: true })
+const csp = (await (await fetch(url)).headers.get('content-security-policy')) ?? ''
+check('published pages are served in a CSP sandbox', csp.startsWith('sandbox'))
+// a guestbook note, then the owner approves it
+await vp.locator('form[data-gb]').first().locator('input[name="name"]').fill('A neighbour')
+await vp.locator('form[data-gb]').first().locator('textarea').fill('Lovely lighthouse!')
+await vp.locator('form[data-gb]').first().locator('button').click()
+await vp.getByText('Thank you').waitFor({ timeout: 8000 })
+check('visitor can sign the guestbook', true)
+
+// ---- 13: privacy change updates the live site
+await page.locator('.atelier').getByRole('button', { name: /Back home/ }).click()
+await page.getByRole('button', { name: 'Journal', exact: true }).click()
+await page.locator('.entry', { hasText: 'Harbor lights' }).locator('.entry-door').click()
+await page.getByText('Your public website was updated to match.').waitFor({ timeout: 20000 })
+const after = await (await fetch(url)).text()
+const feed = await (await fetch(`${url}feed.xml`)).text()
+check('entry made private disappears from the live page', !after.includes('Harbor lights'))
+check('…and from RSS', !feed.includes('Harbor lights'))
+const postGone = (await fetch(`${url}posts/harbor-lights.html`)).status
+check('…and its old page URL is gone', postGone === 404, String(postGone))
+await page.keyboard.press('Escape')
+
+// ---- 14-15: export the website and open it offline on another host
+await page.locator('button.hotspot[data-id="computer"]').click({ force: true })
+await page.locator('.crt-item', { hasText: 'Move my home' }).click()
+await page.getByRole('button', { name: 'Skip' }).click().catch(() => {})
+const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download website ZIP' }).click()])
+const zipPath = join(SHOTS, 'site.zip')
+await dl.saveAs(zipPath)
+const files = unzipSync(new Uint8Array(await (await import('node:fs/promises')).readFile(zipPath)))
+check('export has HTML, CSS, JS, RSS and site.json', ['index.html', 'style.css', 'site.js', 'room.js', 'feed.xml', 'site.json'].every((f) => f in files))
+const all = Object.entries(files).filter(([n]) => !n.startsWith('assets/')).map(([, b]) => new TextDecoder().decode(b)).join('\n')
+check('export contains no private text', !all.includes('TOPSECRET') && !all.includes('Unsent letter'))
+if (SITE_DIR) {
+  for (const [name, data] of Object.entries(files)) {
+    mkdirSync(dirname(join(SITE_DIR, name)), { recursive: true })
+    writeFileSync(join(SITE_DIR, name), data)
+  }
+  const offline = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const platformHits = []
+  await offline.route(`${APP}**`, (r) => {
+    platformHits.push(r.request().url())
+    r.abort()
+  })
+  const op = await offline.newPage()
+  await op.goto(`${STATIC}index.html`)
+  await op.getByRole('button', { name: /Skip to website/ }).click({ timeout: 8000 }).catch(() => {})
+  const obg = await op.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
+  check('exported site keeps the decoration on another static host', obg === 'rgb(58, 11, 74)', obg)
+  check('guestbook in the export is read-only with a clear note', (await op.locator('[data-gb-status]').first().textContent()).includes('saved copy'))
+  check('exported site makes no request to the platform', platformHits.length === 0, platformHits.join(','))
+  await op.screenshot({ path: join(SHOTS, 'export-static-host.png'), fullPage: true })
+  await offline.close()
+}
+
+// ---- 16: private backup → restore in a fresh browser
+const [bk] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download private backup' }).click()])
+const bkPath = join(SHOTS, 'backup.zip')
+await bk.saveAs(bkPath)
+const widgetCount = await page.evaluate(async () => {
+  const req = indexedDB.open('little-internet')
+  return await new Promise((res) => {
+    req.onsuccess = () => {
+      try {
+        const db = req.result
+        const name = db.objectStoreNames[0]
+        const g = db.transaction(name).objectStore(name).get('project')
+        g.onsuccess = () => res(g.result?.web?.draft?.widgets?.length ?? -1)
+        g.onerror = () => res(-1)
+      } catch {
+        res(-1)
+      }
+    }
+    req.onerror = () => res(-1)
+  })
+})
+const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+const fp = await fresh.newPage()
+await fp.goto(APP)
+await fp.locator('.setup').waitFor()
+const [chooser] = await Promise.all([fp.waitForEvent('filechooser'), fp.getByRole('button', { name: 'Restore private backup' }).click()])
+fp.once('dialog', (d) => d.accept())
+await chooser.setFiles(bkPath)
+await fp.locator('.home').waitFor()
+await fp.getByRole('button', { name: 'Decorate my website' }).click()
+await fp.locator('.atelier').waitFor()
+const restored = await fp.frameLocator('.at-frame').locator('[data-w]').count()
+check('backup restores the website layout in a fresh browser', restored > 0 && (widgetCount < 0 || restored <= widgetCount), `${restored}/${widgetCount}`)
+await fp.getByRole('button', { name: 'Journal', exact: true }).count()
+
+await browser.close()
+const failed = results.filter((r) => !r.ok)
+console.log(`\n${results.length - failed.length}/${results.length} checks passed`)
+process.exit(failed.length ? 1 : 0)

@@ -15,7 +15,8 @@
     "build:runtime": "vite build --config vite.runtime.config.ts",
     "server": "node server/index.ts",
     "assets:pack": "node scripts/assets/optimize.mjs",
-    "assets:kit": "node scripts/assets/export-kit.mjs && node scripts/pack-models.mjs"
+    "assets:kit": "node scripts/assets/export-kit.mjs && node scripts/pack-models.mjs",
+    "e2e:atelier": "bash scripts/e2e-atelier.sh"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",

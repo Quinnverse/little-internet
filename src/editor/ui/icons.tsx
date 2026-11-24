@@ -55,6 +55,15 @@ const PATHS = {
   stool: 'M5 8h14M7 8l-1 12M17 8l1 12M12 8v12',
   basket: 'M4 10h16l-2 10H6zM8 10a4 4 0 0 1 8 0',
   none: 'M5 5l14 14M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+  redo: 'M16 6l4.5 4.5L16 15M20 10.5h-9a5.5 5.5 0 0 0 0 11h3',
+  grip: 'M9 6v.01M15 6v.01M9 12v.01M15 12v.01M9 18v.01M15 18v.01',
+  mobile: 'M8 3h8v18H8zM11 18h2',
+  copy: 'M8 8h11v12H8zM5 16V4h11',
+  layers: 'M12 4l9 5-9 5-9-5zM3 14l9 5 9-5',
+  palette: 'M12 21a9 9 0 1 1 9-9c0 2-1.5 3-3.5 3H16a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 21zM7.5 11v.01M10 7.5v.01M14.5 7.5v.01',
+  suitcase: 'M4 8h16v12H4zM9 8V5h6v3M4 13h16',
+  badge: 'M3 8h18v8H3zM6 12h5M14 11h4v2h-4z',
+  pages: 'M7 3h9l4 4v14H7zM16 3v4h4M4 7v14h3',
 } as const
 
 export type IconName = keyof typeof PATHS

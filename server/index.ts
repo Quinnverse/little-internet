@@ -12,6 +12,7 @@ import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
 import { unzipSync } from 'fflate'
+import { StoredProjectSchema } from '../src/core/schema.ts'
 
 export type AppOptions = {
   dataDir: string
@@ -19,7 +20,12 @@ export type AppOptions = {
   appDir?: string
   maxZipBytes?: number
   trustProxy?: boolean
+  /** Public origin used in webring links, e.g. https://little.example (defaults to the request host). */
+  publicBase?: string
 }
+
+/** What the server learned from a validated site.json. */
+export type SiteMeta = { title: string; tagline: string; demo: boolean; guestbook: boolean; button: string | null }
 
 const SLUG = /^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/
 const KEY = /^[0-9a-f]{64}$/
@@ -60,6 +66,12 @@ const SITE_EXT = new Set([
   '.ogg',
   '.mp3',
 ])
+const MAGIC: Record<string, (b: Uint8Array) => boolean> = {
+  '.png': (b) => b[0] === 0x89 && b[1] === 0x50 && b[2] === 0x4e && b[3] === 0x47,
+  '.jpg': (b) => b[0] === 0xff && b[1] === 0xd8 && b[2] === 0xff,
+  '.gif': (b) => b[0] === 0x47 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x38,
+  '.webp': (b) => b[0] === 0x52 && b[1] === 0x49 && b[2] === 0x46 && b[3] === 0x46 && b[8] === 0x57 && b[9] === 0x45 && b[10] === 0x42 && b[11] === 0x50,
+}
 const MAX_ENTRIES = 2000
 const MAX_FILE = 15 * 1024 * 1024
 const MAX_TOTAL = 200 * 1024 * 1024
@@ -98,7 +110,7 @@ async function readBody(req: IncomingMessage, limit: number): Promise<Buffer> {
 }
 
 /** Checks a ZIP's entry names and sizes, and returns its files. Throws HttpError(400/413). */
-export function readSiteZip(zip: Uint8Array, slug: string): Map<string, Uint8Array> {
+export function readSiteZip(zip: Uint8Array, slug: string): { files: Map<string, Uint8Array>; meta: SiteMeta } {
   let total = 0
   let count = 0
   let tooBig = false
@@ -132,17 +144,48 @@ export function readSiteZip(zip: Uint8Array, slug: string): Map<string, Uint8Arr
     ) {
       throw new HttpError(400, `File not allowed: ${name.slice(0, 60)}`)
     }
+    const magic = MAGIC[extname(name).toLowerCase()]
+    if (magic && !magic(data)) throw new HttpError(400, `Not a real image: ${name.slice(0, 60)}`)
     out.set(name, data)
   }
   if (!out.has('index.html') || !out.has('site.json')) throw new HttpError(400, 'Not a Little Internet site export')
-  let meta: { site?: { slug?: string } }
+  let raw: unknown
   try {
-    meta = JSON.parse(new TextDecoder().decode(out.get('site.json')))
+    raw = JSON.parse(new TextDecoder().decode(out.get('site.json')))
   } catch {
     throw new HttpError(400, 'site.json is not valid')
   }
-  if (meta.site?.slug !== slug) throw new HttpError(400, 'The site address does not match')
-  return out
+  // The public snapshot must be a valid project AND public-only: a published site may not carry
+  // a private entry or recording, whatever the client sends.
+  const parsed = StoredProjectSchema.safeParse(raw)
+  if (!parsed.success) throw new HttpError(400, 'site.json is not a valid Little Internet site')
+  const p = parsed.data
+  if (p.site.slug !== slug) throw new HttpError(400, 'The site address does not match')
+  if (p.posts.some((x) => x.visibility !== 'public') || p.recordings.some((r) => r.visibility !== 'public'))
+    throw new HttpError(400, 'A published site may only contain public entries')
+  for (const a of p.assets) if (!out.has(a.path)) throw new HttpError(400, `Missing file ${a.path.slice(0, 60)}`)
+  const design = p.web.published?.design ?? p.web.draft
+  const button = [...out.keys()].find((n) => /^button\.(png|gif|jpg|webp)$/.test(n)) ?? null
+  const meta: SiteMeta = {
+    title: p.site.title,
+    tagline: p.site.tagline,
+    demo: p.site.demo === true,
+    guestbook: design.widgets.some((w) => w.content.type === 'guestbook' && w.content.open),
+    button,
+  }
+  return { files: out, meta }
+}
+
+const esc = (s: string) =>
+  s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!)
+
+/** Response headers for user-published pages: no script can reach the editor's origin or storage. */
+const SITE_HEADERS: Record<string, string> = {
+  'Content-Security-Policy':
+    "sandbox allow-scripts allow-forms allow-popups allow-popups-to-escape-sandbox allow-top-navigation-by-user-activation; " +
+    "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; " +
+    "frame-src https://www.youtube-nocookie.com https://player.vimeo.com; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
+  'Cross-Origin-Opener-Policy': 'same-origin',
 }
 
 function clean(s: unknown, max: number): string {
@@ -170,9 +213,37 @@ export function createApp(opts: AppOptions): {
     );
     CREATE INDEX IF NOT EXISTS messages_slug ON messages(slug, created_at);
   `)
-  const getSite = db.prepare('SELECT key_hash FROM sites WHERE slug = ?')
-  const claim = db.prepare('INSERT INTO sites (slug, key_hash, updated_at) VALUES (?, ?, ?)')
-  const touch = db.prepare('UPDATE sites SET updated_at = ? WHERE slug = ?')
+  // Columns added with Web Atelier (door, webring, directory). Older databases gain them here.
+  const cols = new Set((db.prepare('PRAGMA table_info(sites)').all() as { name: string }[]).map((c) => c.name))
+  const addCol = (name: string, def: string) => {
+    if (!cols.has(name)) db.exec(`ALTER TABLE sites ADD COLUMN ${name} ${def}`)
+  }
+  addCol('open', 'INTEGER NOT NULL DEFAULT 1')
+  addCol('ring_at', 'TEXT')
+  addCol('title', "TEXT NOT NULL DEFAULT ''")
+  addCol('tagline', "TEXT NOT NULL DEFAULT ''")
+  addCol('demo', 'INTEGER NOT NULL DEFAULT 0')
+  addCol('guestbook', 'INTEGER NOT NULL DEFAULT 1')
+  addCol('button', 'TEXT')
+  type SiteRow = { key_hash: Uint8Array; open: number; ring_at: string | null; title: string; tagline: string; demo: number; guestbook: number; button: string | null; updated_at: string }
+  const getSite = db.prepare('SELECT key_hash, open, ring_at, title, tagline, demo, guestbook, button, updated_at FROM sites WHERE slug = ?')
+  const claim = db.prepare(
+    'INSERT INTO sites (slug, key_hash, updated_at, open, title, tagline, demo, guestbook, button) VALUES (?, ?, ?, 1, ?, ?, ?, ?, ?)',
+  )
+  const touch = db.prepare(
+    'UPDATE sites SET updated_at = ?, open = 1, title = ?, tagline = ?, demo = ?, guestbook = ?, button = ? WHERE slug = ?',
+  )
+  const setOpen = db.prepare('UPDATE sites SET open = ? WHERE slug = ?')
+  const setRing = db.prepare('UPDATE sites SET ring_at = ? WHERE slug = ?')
+  const ringRows = db.prepare(
+    'SELECT slug, title, tagline, demo, button FROM sites WHERE ring_at IS NOT NULL AND open = 1 ORDER BY ring_at, slug',
+  )
+  const site = (slug: string) => getSite.get(slug) as SiteRow | undefined
+  /** Visitors may reach a site only when it exists and its door is open. */
+  const visitable = (slug: string) => {
+    const row = site(slug)
+    return row && row.open === 1 ? row : undefined
+  }
   const insertMsg = db.prepare(
     'INSERT INTO messages (id, slug, name, text, created_at, approved) VALUES (?, ?, ?, ?, ?, 0)',
   )
@@ -214,7 +285,7 @@ export function createApp(opts: AppOptions): {
 
   const owner = (req: IncomingMessage, slug: string): void => {
     const m = /^Bearer ([0-9a-f]{64})$/.exec(String(req.headers.authorization ?? ''))
-    const row = getSite.get(slug) as { key_hash: Uint8Array } | undefined
+    const row = site(slug)
     if (!m || !row) throw new HttpError(403, 'Not allowed')
     const a = sha(m[1]!)
     const b = Buffer.from(row.key_hash)
@@ -225,7 +296,7 @@ export function createApp(opts: AppOptions): {
     // Bearer tokens, not cookies: no ambient authority, so any origin may call the API.
     res.setHeader('Access-Control-Allow-Origin', '*')
     res.setHeader('Access-Control-Allow-Headers', 'Authorization, Content-Type')
-    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, OPTIONS')
+    res.setHeader('Access-Control-Allow-Methods', 'GET, POST, PUT, DELETE, OPTIONS')
     res.setHeader('Access-Control-Max-Age', '600')
   }
 
@@ -275,6 +346,57 @@ export function createApp(opts: AppOptions): {
     createReadStream(file).pipe(res)
   }
 
+  type RingHome = { slug: string; title: string; tagline: string; demo: boolean; button: string | null }
+
+  function ringList(): RingHome[] {
+    return (ringRows.all() as { slug: string; title: string; tagline: string; demo: number; button: string | null }[])
+      .filter((r) => existsSync(join(sitesDir, r.slug, 'index.html')))
+      .map((r) => ({ slug: r.slug, title: r.title, tagline: r.tagline, demo: r.demo === 1, button: r.button ? `/@${r.slug}/${r.button}` : null }))
+  }
+
+  function publicOrigin(req: IncomingMessage): string {
+    if (opts.publicBase) return opts.publicBase.replace(/\/+$/, '')
+    const proto = opts.trustProxy && req.headers['x-forwarded-proto'] === 'https' ? 'https' : 'http'
+    const host = String(req.headers.host ?? 'localhost').replace(/[^a-zA-Z0-9.:[\]-]/g, '')
+    return `${proto}://${host}`
+  }
+
+  const PAGE_CSP = "default-src 'none'; img-src 'self'; style-src 'unsafe-inline'; base-uri 'none'; form-action 'none'"
+
+  function html(res: ServerResponse, status: number, title: string, body: string) {
+    res.writeHead(status, {
+      'Content-Type': 'text/html; charset=utf-8',
+      'Content-Security-Policy': PAGE_CSP,
+      'Cache-Control': 'no-cache',
+      'Referrer-Policy': 'no-referrer',
+    })
+    res.end(`<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>${esc(title)}</title>
+<style>body{margin:0;font:16px/1.5 Georgia,serif;background:#0b0b3b;color:#f2f2f2}main{max-width:760px;margin:0 auto;padding:24px 16px}a{color:#7dff6b}h1{font:700 32px/1.1 "Comic Sans MS","Chalkboard SE",cursive;color:#fff27a}ul{list-style:none;padding:0}li{display:flex;gap:12px;align-items:center;padding:12px;margin:10px 0;background:#c0c0c0;color:#111;border:3px outset #f4f4f4}li a{color:#0000ee;font-weight:700}img{width:88px;height:31px;image-rendering:pixelated;flex:none}.b{display:inline-flex;align-items:center;justify-content:center;width:88px;height:31px;flex:none;background:linear-gradient(#3b3bb0,#121260);color:#fff;font:700 9px Verdana,sans-serif;text-transform:uppercase;text-align:center;border:2px outset #bbb}.demo{font:600 11px system-ui,sans-serif;background:#fff6c2;border:1px solid #c9a93a;border-radius:9px;padding:1px 6px;margin-left:6px}.t{display:block;font-size:.9em;color:#333}.nav{display:flex;gap:10px;flex-wrap:wrap}.nav a{background:#efefef;color:#111;border:2px outset #ddd;padding:8px 14px;text-decoration:none;font-weight:700}</style></head><body><main>${body}</main></body></html>`)
+  }
+
+  function ringPage(res: ServerResponse) {
+    const homes = ringList()
+    const items = homes
+      .map(
+        (h) =>
+          `<li>${h.button ? `<img src="${esc(h.button)}" alt="">` : `<span class="b">${esc(h.title.slice(0, 18))}</span>`}<span><a href="/@${h.slug}/">${esc(h.title || h.slug)}</a>${h.demo ? '<span class="demo">demo</span>' : ''}<span class="t">${esc(h.tagline)}</span></span></li>`,
+      )
+      .join('')
+    const first = homes[0]
+    html(
+      res,
+      200,
+      'Little Internet webring',
+      `<h1>The Little Internet webring</h1><p>Homes that chose to join. No ranking, no recommendations. Walk from one to the next, or jump at random.</p>` +
+        (first ? `<p class="nav"><a href="/@${first.slug}/">Start walking</a><a href="/ring/${first.slug}/random">Random home</a></p>` : '') +
+        (items ? `<ul>${items}</ul>` : '<p>Nobody has joined yet.</p>'),
+    )
+  }
+
+  function closedPage(res: ServerResponse) {
+    html(res, 404, 'The door is closed', '<h1>The door is closed</h1><p>The owner of this home has closed the door for now. Nothing here is public at the moment.</p><p><a href="/ring/">Walk the webring</a></p>')
+  }
+
   async function handle(req: IncomingMessage, res: ServerResponse) {
     const url = new URL(req.url ?? '/', 'http://x')
     const path = decodeURIComponent(url.pathname)
@@ -287,6 +409,10 @@ export function createApp(opts: AppOptions): {
         return void res.end()
       }
       const parts = path.split('/').filter(Boolean) // api, sites, slug, ...
+      // GET /api/ring — the public webring directory (only open homes that joined)
+      if (parts[1] === 'ring' && parts.length === 2 && req.method === 'GET') {
+        return json(res, 200, { homes: ringList() }, { 'Cache-Control': 'no-cache' })
+      }
       if (parts[1] !== 'sites' || !parts[2] || !SLUG.test(parts[2])) throw new HttpError(404, 'Not found')
       const slug = parts[2]
       const ip = ipOf(req)
@@ -296,10 +422,10 @@ export function createApp(opts: AppOptions): {
         if (!allow(`pub:${ip}`, 30, 3600_000)) throw new HttpError(429, 'Too many requests')
         const m = /^Bearer (.+)$/.exec(String(req.headers.authorization ?? ''))
         if (!m || !KEY.test(m[1]!)) throw new HttpError(401, 'Missing or malformed key')
-        const row = getSite.get(slug) as { key_hash: Uint8Array } | undefined
+        const row = site(slug)
         if (row) owner(req, slug)
         const body = await readBody(req, maxZip)
-        const files = readSiteZip(new Uint8Array(body), slug)
+        const { files, meta } = readSiteZip(new Uint8Array(body), slug)
         const tmp = join(opts.dataDir, `tmp-${randomUUID()}`)
         try {
           for (const [name, data] of files) {
@@ -318,20 +444,70 @@ export function createApp(opts: AppOptions): {
           throw e
         }
         const now = new Date().toISOString()
-        if (row) touch.run(now, slug)
-        else claim.run(slug, sha(m[1]!), now)
+        const metaArgs = [meta.title, meta.tagline, meta.demo ? 1 : 0, meta.guestbook ? 1 : 0, meta.button] as const
+        if (row) touch.run(now, ...metaArgs, slug)
+        else claim.run(slug, sha(m[1]!), now, ...metaArgs)
         return json(res, 200, { path: `/@${slug}/`, files: files.size })
+      }
+
+      // GET /api/sites/:slug/status — owner: door, webring, last publish
+      if (parts[3] === 'status' && parts.length === 4 && req.method === 'GET') {
+        owner(req, slug)
+        const row = site(slug)!
+        return json(res, 200, { open: row.open === 1, ring: row.ring_at !== null, updatedAt: row.updated_at })
+      }
+
+      // POST /api/sites/:slug/door {open:false} — owner closes the door: the snapshot is deleted
+      // from disk, so nothing (pages, media, RSS, guestbook, webring entry) is served any more.
+      // Opening again is a fresh publish, which the editor does after a visitor preview.
+      if (parts[3] === 'door' && parts.length === 4 && req.method === 'POST') {
+        owner(req, slug)
+        let b: { open?: unknown }
+        try {
+          b = JSON.parse((await readBody(req, 256)).toString('utf8'))
+        } catch {
+          throw new HttpError(400, 'Invalid JSON')
+        }
+        if (b.open !== false) throw new HttpError(409, 'Publish your website to open the door again')
+        rmSync(join(sitesDir, slug), { recursive: true, force: true })
+        setOpen.run(0, slug)
+        return json(res, 200, { open: false })
+      }
+
+      // PUT / DELETE /api/sites/:slug/ring — owner joins or leaves the webring
+      if (parts[3] === 'ring' && parts.length === 4 && (req.method === 'PUT' || req.method === 'DELETE')) {
+        owner(req, slug)
+        const row = site(slug)!
+        if (req.method === 'DELETE') {
+          setRing.run(null, slug)
+          return json(res, 200, { ring: false })
+        }
+        if (row.open !== 1) throw new HttpError(409, 'Open your door before joining the webring')
+        if (!row.ring_at) setRing.run(new Date().toISOString(), slug)
+        const origin = publicOrigin(req)
+        return json(res, 200, {
+          ring: true,
+          links: {
+            prev: `${origin}/ring/${slug}/prev`,
+            next: `${origin}/ring/${slug}/next`,
+            random: `${origin}/ring/${slug}/random`,
+            hub: `${origin}/ring/`,
+          },
+        })
       }
 
       // GET /api/sites/:slug/messages/approved — public
       if (parts[3] === 'messages' && parts[4] === 'approved' && req.method === 'GET') {
-        if (!getSite.get(slug)) throw new HttpError(404, 'Not found')
+        const row = visitable(slug)
+        if (!row || !row.guestbook) throw new HttpError(404, 'Not found')
         return json(res, 200, { messages: okMsgs.all(slug) }, { 'Cache-Control': 'public, max-age=30' })
       }
 
       // POST /api/sites/:slug/messages — public, pending until approved
       if (parts[3] === 'messages' && parts.length === 4 && req.method === 'POST') {
-        if (!getSite.get(slug)) throw new HttpError(404, 'Not found')
+        const row = visitable(slug)
+        if (!row) throw new HttpError(404, 'Not found')
+        if (!row.guestbook) throw new HttpError(403, 'The guestbook is closed')
         if (!/^application\/json\b/.test(String(req.headers['content-type'] ?? '')))
           throw new HttpError(415, 'Send JSON')
         if (!allow(`msg:${slug}:${ip}`, 3, 3600_000) || !allow(`msg:${ip}`, 20, 3600_000))
@@ -378,16 +554,46 @@ export function createApp(opts: AppOptions): {
 
     if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'Method not allowed')
 
+    // Webring: /ring/ (directory) and /ring/:slug/prev|next|random (redirects, like the old CGI rings)
+    if (path === '/ring' || path === '/ring/') {
+      if (path === '/ring') {
+        res.writeHead(301, { Location: '/ring/' })
+        return void res.end()
+      }
+      return ringPage(res)
+    }
+    const hop = /^\/ring\/([a-z0-9-]+)\/(prev|next|random)$/.exec(path)
+    if (hop) {
+      const homes = ringList()
+      const from = homes.findIndex((h) => h.slug === hop[1])
+      let target: string | undefined
+      if (homes.length) {
+        if (hop[2] === 'random') {
+          const others = homes.filter((h) => h.slug !== hop[1])
+          target = (others.length ? others : homes)[Math.floor(Math.random() * (others.length || homes.length))]!.slug
+        } else {
+          const step = hop[2] === 'next' ? 1 : -1
+          const i = from < 0 ? 0 : (from + step + homes.length) % homes.length
+          target = homes[i]!.slug
+        }
+      }
+      res.writeHead(302, { Location: target ? `/@${target}/` : '/ring/', 'Cache-Control': 'no-store' })
+      return void res.end()
+    }
+
     // Published sites: /@slug/...
-    const site = /^\/@([a-z0-9-]+)(\/.*)?$/.exec(path)
-    if (site) {
-      const slug = site[1]!
+    const pub = /^\/@([a-z0-9-]+)(\/.*)?$/.exec(path)
+    if (pub) {
+      const slug = pub[1]!
       if (!SLUG.test(slug)) throw new HttpError(404, 'Not found')
-      if (!site[2]) {
+      const row = site(slug)
+      if (row && row.open !== 1) return closedPage(res)
+      if (!pub[2]) {
         res.writeHead(301, { Location: `/@${slug}/` })
         return void res.end()
       }
-      return serveFile(req, res, join(sitesDir, slug), site[2])
+      for (const [k, v] of Object.entries(SITE_HEADERS)) res.setHeader(k, v)
+      return serveFile(req, res, join(sitesDir, slug), pub[2])
     }
 
     // The editor app.
@@ -434,6 +640,7 @@ if (process.argv[1] && fileURLToPath(import.meta.url) === resolve(process.argv[1
     dataDir,
     ...(existsSync(appDir) ? { appDir } : {}),
     trustProxy: process.env.TRUST_PROXY === '1',
+    ...(process.env.PUBLIC_BASE_URL ? { publicBase: process.env.PUBLIC_BASE_URL } : {}),
   })
   server.listen(port, process.env.HOST ?? '0.0.0.0', () =>
     console.log(`Little Internet on http://localhost:${port}  (data: ${dataDir})`),

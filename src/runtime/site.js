@@ -62,7 +62,8 @@
   var slug = typeof data.slug === 'string' && /^[a-z0-9-]{1,32}$/.test(data.slug) ? data.slug : ''
   if (!forms.length || !slug) return
   if (location.pathname.indexOf('/@' + slug + '/') !== 0) return
-  var api = location.origin + '/api/sites/' + slug + '/messages'
+  // Published pages are served with a CSP sandbox (opaque origin), so location.origin is "null".
+  var api = location.protocol + '//' + location.host + '/api/sites/' + slug + '/messages'
 
   var render = function (list, notes) {
     while (list.firstChild) list.removeChild(list.firstChild)

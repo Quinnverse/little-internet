@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
+import { publicProjection } from '../../core/privacy.ts'
 import type { Post, Project } from '../../core/schema.ts'
 import type { RoomView } from '../../room3d/view.ts'
 import { moveDecor, updateRoomSkin, updateSite, type Command } from '../commands.ts'
@@ -14,6 +15,10 @@ import { PRIMARY_HOTSPOTS, Scene, sceneFailed, toHomeData } from './Scene.tsx'
 import { Settings } from './Settings.tsx'
 import { VoiceSheet } from './VoiceSheet.tsx'
 import { Website } from './Website.tsx'
+import { WebAtelier } from './atelier/WebAtelier.tsx'
+import { ComputerSheet, DoorSheet, MoveSheet, republish, WalkSheet, type ComputerChoice } from './Neighbourhood.tsx'
+import { ta } from '../i18nAtelier.ts'
+import { hasKey, savedServer, siteStatus, siteUrl } from '../publish.ts'
 import { LIGHTS } from '../../core/room.ts'
 import { Sheet } from './common.tsx'
 
@@ -24,6 +29,10 @@ type Panel =
   | { kind: 'voice' }
   | { kind: 'pet' }
   | { kind: 'computer' }
+  | { kind: 'publishing' }
+  | { kind: 'door' }
+  | { kind: 'walk' }
+  | { kind: 'move' }
   | { kind: 'settings' }
   | { kind: 'light' }
 
@@ -40,7 +49,8 @@ export function Home(props: { ctx: Ctx }) {
   const { ctx } = props
   const lang = useLang()
   const [panel, setPanel] = useState<Panel>(null)
-  const [previewing, setPreviewing] = useState(false)
+  const [previewing, setPreviewing] = useState<false | 'published' | 'draft'>(false)
+  const [atelier, setAtelier] = useState(() => typeof location !== 'undefined' && location.hash === '#atelier')
   const [decorating, setDecorating] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<RoomView | null>(null)
@@ -106,7 +116,7 @@ export function Home(props: { ctx: Ctx }) {
       case 'computer':
         return open({ kind: 'computer' }, 'computer')
       case 'export':
-        return open({ kind: 'computer' }, 'export')
+        return open({ kind: 'move' }, 'export')
       case 'voice':
         return open({ kind: 'voice' }, 'voice')
       case 'pet':
@@ -117,12 +127,60 @@ export function Home(props: { ctx: Ctx }) {
         return open({ kind: 'light' })
       case 'door':
         view?.setDoorOpen(true)
-        window.setTimeout(() => {
-          setPreviewing(true)
-          view?.setDoorOpen(false)
-        }, 450)
+        window.setTimeout(() => view?.setDoorOpen(false), 900)
+        return open({ kind: 'door' }, 'door')
     }
   }
+
+  const onComputer = async (c: ComputerChoice) => {
+    switch (c) {
+      case 'decorate':
+        setPanel(null)
+        return setAtelier(true)
+      case 'walk':
+        return setPanel({ kind: 'walk' })
+      case 'move':
+        return setPanel({ kind: 'move' })
+      case 'publish':
+        return setPanel({ kind: 'publishing' })
+      case 'visit': {
+        const slug = ctx.project.site.slug
+        const live = ctx.project.web.published ? await siteStatus(slug, savedServer()).catch(() => null) : null
+        if (live?.open) window.open(siteUrl(slug, savedServer()), '_blank', 'noopener')
+        else setPreviewing(ctx.project.web.published ? 'published' : 'draft')
+      }
+    }
+  }
+
+  // Privacy sync (Task A): when what visitors may see changes (an entry made private, a keepsake
+  // removed, a recording hidden…) and this browser published the site, publish the same design
+  // again so the live website, RSS, room and search data follow at once.
+  const publicSig = useMemo(() => {
+    const pub = publicProjection(ctx.project)
+    return JSON.stringify({ ...pub, web: null, assets: pub.assets.map((a) => [a.id, a.data.byteLength]), recordings: pub.recordings.map((r) => [r.id, r.title, r.openOn]) })
+  }, [ctx.project])
+  const lastSig = useRef(publicSig)
+  useEffect(() => {
+    if (publicSig === lastSig.current) return
+    if (!ctx.project.web.published) {
+      lastSig.current = publicSig
+      return
+    }
+    const id = window.setTimeout(async () => {
+      lastSig.current = publicSig
+      const slug = ctx.project.site.slug
+      if (!(await hasKey(slug))) return
+      const st = await siteStatus(slug, savedServer()).catch(() => null)
+      if (!st?.open) return
+      try {
+        await republish(ctx, ctx.project, savedServer())
+        ctx.toast(ta('sync.done'))
+      } catch (e) {
+        ctx.toast(ta('sync.fail', { why: (e as Error).message }), 'error')
+      }
+    }, 1200)
+    return () => window.clearTimeout(id)
+  }, [publicSig])
 
   const toggleLang = () => {
     const next = lang === 'en' ? 'zh' : 'en'
@@ -191,6 +249,7 @@ export function Home(props: { ctx: Ctx }) {
           </button>
           <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} text />
           <DockBtn icon="sofa" label={t('hud.decorate')} onClick={startDecorate} text />
+          <DockBtn icon="palette" label={ta('crt.decorate')} onClick={() => setAtelier(true)} />
         </nav>
       )}
 
@@ -202,7 +261,11 @@ export function Home(props: { ctx: Ctx }) {
       )}
       {panel?.kind === 'voice' && <VoiceSheet ctx={ctx} onClose={close} />}
       {panel?.kind === 'pet' && <OwnerGhost ctx={ctx} onClose={close} />}
-      {panel?.kind === 'computer' && <Website ctx={ctx} onClose={close} onPreview={() => setPreviewing(true)} />}
+      {panel?.kind === 'computer' && <ComputerSheet onClose={close} onChoose={onComputer} />}
+      {panel?.kind === 'publishing' && <Website ctx={ctx} onClose={close} onPreview={() => setPreviewing('published')} />}
+      {panel?.kind === 'door' && <DoorSheet ctx={ctx} onClose={close} onPreview={() => setPreviewing('published')} onAtelier={() => { setPanel(null); setAtelier(true) }} />}
+      {panel?.kind === 'walk' && <WalkSheet ctx={ctx} onClose={close} />}
+      {panel?.kind === 'move' && <MoveSheet ctx={ctx} onClose={close} />}
       {panel?.kind === 'settings' && (
         <Settings
           ctx={ctx}
@@ -219,7 +282,16 @@ export function Home(props: { ctx: Ctx }) {
         />
       )}
       {panel?.kind === 'light' && <LightSheet ctx={ctx} onClose={close} />}
-      {previewing && <Preview project={ctx.project} onClose={() => setPreviewing(false)} />}
+      {previewing && <Preview project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
+      {atelier && (
+        <WebAtelier
+          ctx={ctx}
+          onClose={() => {
+            setAtelier(false)
+            if (location.hash === '#atelier') window.history.replaceState(null, '', location.pathname + location.search)
+          }}
+        />
+      )}
     </div>
   )
 }

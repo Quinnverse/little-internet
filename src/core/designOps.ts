@@ -104,7 +104,7 @@ export const setWidgetLayout =
   (d) => ({ ...d, widgets: d.widgets.map((w) => (w.id === id ? { ...w, layout: { ...w.layout, ...patch } } : w)) })
 
 export const setWidgetStyle =
-  (id: string, patch: Partial<SiteWidget['style']> & { bg?: string | null; fg?: string | null }): DesignOp =>
+  (id: string, patch: Partial<Omit<SiteWidget['style'], 'bg' | 'fg'>> & { bg?: string | null; fg?: string | null }): DesignOp =>
   (d) => ({
     ...d,
     widgets: d.widgets.map((w) => {
@@ -120,7 +120,7 @@ export const setWidgetHidden =
   (d) => ({ ...d, widgets: d.widgets.map((w) => (w.id === id ? { ...w, hidden } : w)) })
 
 export const setTokens =
-  (patch: Partial<ThemeTokens> & { bgAssetId?: string | null }): DesignOp =>
+  (patch: Partial<Omit<ThemeTokens, 'bgAssetId'>> & { bgAssetId?: string | null }): DesignOp =>
   (d) => {
     const next: Record<string, unknown> = { ...d.tokens, ...patch }
     if (next.bgAssetId === null || next.bgAssetId === undefined) delete next.bgAssetId

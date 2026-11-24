@@ -172,8 +172,9 @@ ${footer(prefix)}
             .join('')}</nav>\n`
         : ''
     const welcome = d.welcome ? `<p class="welcome-banner"><span>${h(d.welcome)}</span></p>\n` : ''
+    const demo = pub.site.demo ? `<p class="demo-banner">${h(T('demoBanner'))}</p>\n` : ''
     return `<header class="site-header">
-<p class="site-title"><a href="${prefix}index.html">${h(pub.site.title)}</a></p>
+${demo}<p class="site-title"><a href="${prefix}index.html">${h(pub.site.title)}</a></p>
 ${pub.site.tagline ? `<p class="tagline">${h(pub.site.tagline)}</p>\n` : ''}${welcome}${nav}</header>`
   }
 
@@ -306,8 +307,11 @@ ${ringNav}<p><a href="${prefix}feed.xml">${h(T('rss'))}</a> · ${h(T('madeWith')
           `<p class="muted small">${h(T('pressPlay'))}</p>`
         )
       }
-      case 'boo':
-        return `${head(c.heading)}<div class="ghost-home" data-ghost-home>${preview || !pub.ghost.enabled ? spriteSvg('ghost', 'px px-boo') : ''}</div>`
+      case 'boo': {
+        const firstBoo = d.widgets.find((x) => x.content.type === 'boo' && x.pageId === w.pageId)?.id === w.id
+        const live = !preview && pub.ghost.enabled && firstBoo
+        return `${head(c.heading)}<div class="ghost-home"${live ? ' data-ghost-home' : ''}>${live ? '' : spriteSvg('ghost', 'px px-boo')}</div>`
+      }
       case 'guestbook': {
         const notes = pub.web.guestbook
         const list = notes.length
@@ -355,7 +359,7 @@ ${ringNav}<p><a href="${prefix}feed.xml">${h(T('rss'))}</a> · ${h(T('madeWith')
       }
       case 'button': {
         const btn = buttonFile(pub)
-        if (!btn) return head(c.heading)
+        if (!btn) return `${head(c.heading)}<p><span class="badge88 badge-text">${h(pub.site.title)}</span></p>`
         const src = file(prefix, btn.path)
         const home = m.mode === 'site' && m.baseUrl ? m.baseUrl : ''
         const code = `<a href="${home || './'}"><img src="${home}${btn.path}" width="88" height="31" alt="${h(pub.site.title)}"></a>`

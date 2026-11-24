@@ -3,11 +3,11 @@ import { backupFileName, createBackup } from '../../core/backup.ts'
 import { exportSite, siteExportFileName } from '../../core/exportZip.ts'
 import { publicProjection } from '../../core/privacy.ts'
 import type { Project } from '../../core/schema.ts'
-import { addLink, deleteLink, moveLink, normalizeUserUrl, setWebring } from '../commands.ts'
+import { addLink, deleteLink, moveLink, normalizeUserUrl, publishDraft, setWebring } from '../commands.ts'
 import { saveBytes } from '../download.ts'
 import { t, useLang } from '../i18n.ts'
 import { randomId } from '../ids.ts'
-import { hasKey, listMessages, moderate, publishSite, type GuestMessage } from '../publish.ts'
+import { hasKey, listMessages, moderate, publishSite, savedServer, type GuestMessage } from '../publish.ts'
 import { Field, formatDate, run, Sheet, type Ctx } from './common.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
 import { Icon } from './icons.tsx'
@@ -93,7 +93,7 @@ export function Website(props: { ctx: Ctx; onClose: () => void; onPreview: () =>
 function Publish(props: { ctx: Ctx }) {
   const { ctx } = props
   const slug = ctx.project.site.slug
-  const [server, setServer] = useState('')
+  const [server, setServer] = useState(savedServer())
   const [busy, setBusy] = useState(false)
   const [url, setUrl] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -133,7 +133,10 @@ function Publish(props: { ctx: Ctx }) {
     setBusy(true)
     setError(null)
     try {
-      const where = await publishSite(ctx.project, server)
+      // Publishing from here also publishes the current website draft.
+      const next = publishDraft(new Date().toISOString())(ctx.project)
+      const where = await publishSite(next, server)
+      ctx.replace(next)
       setUrl(where)
       setKnown(true)
       ctx.toast(t('pub.done', { url: where }))
