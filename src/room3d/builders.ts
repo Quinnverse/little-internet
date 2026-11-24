@@ -259,7 +259,7 @@ export function buildShell(house: House, wallId: WallId, floorId: FloorId, ctx: 
 
 // ---------------------------------------------------------------- built-in furniture
 
-function screenTexture(): THREE.CanvasTexture {
+export function screenTexture(): THREE.CanvasTexture {
   const c = document.createElement('canvas')
   c.width = 256
   c.height = 192

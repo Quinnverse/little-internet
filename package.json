@@ -14,7 +14,8 @@
     "icons": "node scripts/make-icons.mjs",
     "build:runtime": "vite build --config vite.runtime.config.ts",
     "server": "node server/index.ts",
-    "assets:pack": "node scripts/assets/optimize.mjs && node scripts/pack-models.mjs"
+    "assets:pack": "node scripts/assets/optimize.mjs",
+    "assets:kit": "node scripts/assets/export-kit.mjs && node scripts/pack-models.mjs"
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",
@@ -28,7 +29,8 @@
     "playwright": "^1.65.1",
     "typescript": "~7.0.2",
     "vite": "^8.3.6",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "@gltf-transform/extensions": "^4.5.1"
   },
   "dependencies": {
     "fflate": "^0.8.3",

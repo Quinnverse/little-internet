@@ -54,6 +54,7 @@ const en = {
   hotShelf: 'Shelf',
   hotDoor: 'Front door',
   hotBell: 'Doorbell',
+  hotMailbox: 'Mailbox · guestbook',
   drag: 'Drag to look around. Tap things to explore.',
 } as const
 
@@ -111,6 +112,7 @@ const zh: Record<SiteKey, string> = {
   hotShelf: '书架',
   hotDoor: '大门',
   hotBell: '门铃',
+  hotMailbox: '信箱 · 留言簿',
   drag: '拖动环顾四周，点击物件探索。',
 }
 

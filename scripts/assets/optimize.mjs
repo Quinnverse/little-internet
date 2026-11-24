@@ -7,7 +7,7 @@ import { existsSync, mkdirSync, readdirSync, statSync } from 'node:fs'
 import { join } from 'node:path'
 
 const raw = 'assets/raw'
-const out = 'assets/models'
+const out = 'assets/hunyuan'
 const budget = Number(process.env.TRIS ?? 3000)
 mkdirSync(out, { recursive: true })
 await MeshoptSimplifier.ready

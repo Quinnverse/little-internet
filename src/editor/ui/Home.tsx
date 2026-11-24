@@ -105,6 +105,8 @@ export function Home(props: { ctx: Ctx }) {
         return open({ kind: 'entry' }, 'diary')
       case 'computer':
         return open({ kind: 'computer' }, 'computer')
+      case 'export':
+        return open({ kind: 'computer' }, 'export')
       case 'voice':
         return open({ kind: 'voice' }, 'voice')
       case 'pet':

@@ -1,6 +1,6 @@
 import { z } from 'zod'
 import { isValidLayout, SIZE_PRESETS } from './layout.ts'
-import { defaultRoom, RoomSchema, roomIssues, type Room } from './room.ts'
+import { defaultRoom, migrateRoomInput, RoomSchema, roomIssues, type Room } from './room.ts'
 
 /** Ids are safe in file names, CSS class names and selectors without escaping. */
 export const ID_PATTERN = /^[a-z0-9_-]{1,40}$/
@@ -184,7 +184,7 @@ const ProjectShape = {
   links: z.array(LinkSchema).max(100),
   webring: WebringSchema,
   // Added with the 3D home: older saves have no room and load with the default one.
-  room: RoomSchema.default(() => defaultRoom()),
+  room: z.preprocess(migrateRoomInput, RoomSchema).default(() => defaultRoom()),
 }
 
 type Refinable = {

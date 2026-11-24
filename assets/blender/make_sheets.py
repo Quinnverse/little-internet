@@ -90,7 +90,7 @@ def main():
         "# Little Internet: 3D model review",
         "",
         "Made in Blender 5.0 (bpy) by `assets/blender/build_props.py`, rendered with Cycles (CPU). Models are low-poly,",
-        "rounded, and use one shared palette. Nothing here is wired into the web app yet: it waits for your review.",
+        "rounded, and use one shared palette. 42 of them are the kit the web app uses (`npm run assets:kit`).",
         "",
         "## Where to look",
         "",

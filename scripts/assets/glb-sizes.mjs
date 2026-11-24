@@ -15,7 +15,7 @@ for (const f of readdirSync(dir).filter((f) => f.endsWith('.glb')).sort()) {
   const p = join(dir, f)
   const before = statSync(p).size
   const doc = await io.read(p)
-  await doc.transform(dedup(), prune(), quantize())
+  await doc.transform(dedup(), prune({ keepLeaves: true }), quantize())
   const after = (await io.writeBinary(doc)).byteLength
   raw += before
   packed += after

@@ -6,7 +6,7 @@ import { onLangChange, t, type Key } from '../i18n.ts'
 import { assetUrl } from './common.tsx'
 import { iconSvg, type IconName } from './icons.tsx'
 
-export const PRIMARY_HOTSPOTS = ['diary', 'computer', 'voice', 'pet', 'window', 'door', 'shelf']
+export const PRIMARY_HOTSPOTS = ['diary', 'computer', 'voice', 'pet', 'window', 'door', 'shelf', 'export']
 
 const HOT_ICON: Record<string, IconName> = {
   diary: 'pen',
@@ -16,6 +16,7 @@ const HOT_ICON: Record<string, IconName> = {
   window: 'sun',
   door: 'door',
   shelf: 'book',
+  export: 'download',
 }
 
 /** Turns a project (owner's full view, or a public projection) into what the 3D room needs. */
@@ -78,10 +79,24 @@ export function Scene(props: SceneProps) {
       return
     }
     const titles = () => new Map(latest.current.data.memory.map((m) => [m.id, m.title]))
+    let cancelled = false
+    let cleanup = () => {}
+    // The Blender models are embedded; parsing them takes a moment, then the room is built once.
+    void preloadModels().then(() => {
+      if (cancelled || !host.current) return
+      cleanup = mount(titles)
+    })
+    return () => {
+      cancelled = true
+      cleanup()
+    }
+  }, [])
+
+  function mount(titles: () => Map<string, string>): () => void {
     let view: RoomView
     try {
       view = new RoomView({
-        container: host.current,
+        container: host.current!,
         label: (id) => hotspotLabel(id, titles()),
         icon: (id) => iconSvg(HOT_ICON[id] ?? 'book', id.startsWith('memory:') ? 12 : 18),
         onPick: (id) => latest.current.onPick(id),
@@ -92,11 +107,11 @@ export function Scene(props: SceneProps) {
     } catch {
       setFailed(true)
       props.onView?.(null)
-      return
+      return () => {}
     }
     viewRef.current = view
     view.setData(latest.current.data)
-    void preloadModels().then(() => viewRef.current && viewRef.current.setData(latest.current.data))
+    view.setDecorMode(latest.current.decorate)
     props.onView?.(view)
     const off = onLangChange(() => view.refreshHotspots())
     let drift = 0
@@ -108,7 +123,7 @@ export function Scene(props: SceneProps) {
       viewRef.current = null
       props.onView?.(null)
     }
-  }, [])
+  }
 
   useEffect(() => {
     viewRef.current?.setData(props.data)

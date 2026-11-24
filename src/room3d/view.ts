@@ -23,7 +23,8 @@ import {
   type Shell,
 } from './builders.ts'
 import { buildExterior, type Exterior } from './exterior.ts'
-import { modelFor } from './models.ts'
+import { kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
+import { getAnimations, getModel, kitReady } from './models.ts'
 import { Pet, type PetState } from './pet.ts'
 import { SLOT_POSES } from './slots.ts'
 
@@ -111,6 +112,11 @@ export class RoomView {
   private doorTarget = 0
   private lastHover: string | null = null
   private ext: Exterior | null = null
+  private kitUsed = false
+  /** Hotspot positions read from the models' hs_* empties. */
+  private anchorsKit = new Map<string, THREE.Vector3>()
+  private staticLamps = 0
+  private staticGlows = 0
   private mode: 'home' | 'exterior' = 'home'
   private extDoor = 0
   private extDoorTarget = 0
@@ -163,6 +169,7 @@ export class RoomView {
     this.sun.shadow.radius = 4
 
     this.pet = new Pet('white', opts.reduceMotion)
+    if (kitReady()) this.pet.useModel(getModel('pet_ghost')!, getAnimations('pet_ghost'))
     this.scene.add(this.pet.group)
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.34, 0.42, 36),
@@ -197,7 +204,8 @@ export class RoomView {
     this.data = data
     this.pet.setColor(data.pet.color)
     this.pet.group.visible = data.pet.enabled
-    const skinChanged = !prev || prev.house !== data.house || prev.wall !== data.wall || prev.floor !== data.floor || prev.welcome !== data.welcome
+    const skinChanged =
+      !prev || prev.house !== data.house || prev.wall !== data.wall || prev.floor !== data.floor || prev.welcome !== data.welcome || this.kitUsed !== kitReady()
     if (skinChanged) this.buildStatic(data)
     this.buildDynamic(data)
     this.setNight(isNightNow(data.light), true)
@@ -211,6 +219,29 @@ export class RoomView {
     this.ctx.lamps.length = 0
     this.ctx.glows.length = 0
     this.pickRoots = []
+    this.anchorsKit.clear()
+    this.kitUsed = kitReady()
+    if (this.kitUsed) {
+      // Blender models (assets/blender). The code-drawn version below is the fallback.
+      this.shell = kitShell(data.house, data.wall, data.floor, this.ctx)
+      this.root.add(this.shell.group)
+      const f = kitFurniture(this.ctx, data.welcome)
+      this.led = f.led
+      this.root.add(f.group)
+      this.pickRoots.push(...f.picks, this.shell.doorPivot)
+      const glass = this.shell.walls[0]!.group.getObjectByName('window_glass')
+      if (glass) this.pickRoots.push(glass)
+      this.root.updateMatrixWorld(true)
+      const HS: Record<string, string> = { diary: 'hs_diary', computer: 'hs_computer', voice: 'hs_voice', shelf: 'hs_shelf', window: 'hs_window', door: 'hs_door', export: 'hs_export' }
+      for (const [id, n] of Object.entries(HS)) {
+        const o = this.root.getObjectByName(n)
+        if (o) this.anchorsKit.set(id, o.getWorldPosition(new THREE.Vector3()))
+      }
+      this.doorTarget = this.doorOpen
+      this.staticLamps = this.ctx.lamps.length
+      this.staticGlows = this.ctx.glows.length
+      return
+    }
     this.shell = buildShell(data.house, data.wall, data.floor, this.ctx)
     this.root.add(this.shell.group)
     const desk = buildDesk(this.ctx)
@@ -228,28 +259,21 @@ export class RoomView {
       if (o.userData.pick === 'window') this.pickRoots.push(o)
     })
     this.doorTarget = this.doorOpen
+    this.staticLamps = this.ctx.lamps.length
+    this.staticGlows = this.ctx.glows.length
   }
 
   private buildDynamic(data: HomeData) {
-    // Remove old dynamic content (but keep lamps registered by static parts).
-    for (const o of this.dynamic.children) {
-      const l = (o.userData.lamps as THREE.PointLight[] | undefined) ?? []
-      for (const x of l) this.ctx.lamps.splice(this.ctx.lamps.indexOf(x), 1)
-    }
+    // Remove old dynamic content; lamps and glows registered by static parts stay.
+    this.ctx.lamps.length = this.staticLamps
+    this.ctx.glows.length = this.staticGlows
     this.pickRoots = this.pickRoots.filter((o) => !o.userData.dyn)
     disposeTree(this.dynamic)
     this.dynamic.clear()
     this.objects.clear()
-    const before = this.ctx.lamps.length
-
     for (const d of data.decor) {
       const g = new THREE.Group()
-      const model = modelFor(d.kind)
-      const built = buildDecor(d.kind, this.ctx)
-      if (model) {
-        model.scale.multiplyScalar(1)
-        g.add(model)
-      } else g.add(built)
+      g.add(this.kitUsed ? kitDecor(d.kind, this.ctx) : buildDecor(d.kind, this.ctx))
       g.position.set(d.x + 0.5, 0, d.z + 0.5)
       g.rotation.y = (d.rot * Math.PI) / 2
       g.userData.pick = `decor:${d.id}`
@@ -263,9 +287,7 @@ export class RoomView {
       if (!pose) continue
       const look = { title: m.title }
       const g = new THREE.Group()
-      const model = modelFor(m.kind)
-      const built = buildMemory(m.kind, look, this.ctx)
-      g.add(model ?? built)
+      g.add(this.kitUsed ? kitMemory(m.kind, look, this.ctx) : buildMemory(m.kind, look, this.ctx))
       g.position.set(pose.x, pose.y, pose.z)
       g.rotation.y = pose.rotY
       g.userData.pick = `memory:${m.id}`
@@ -275,7 +297,6 @@ export class RoomView {
       this.objects.set(`memory:${m.id}`, g)
       if (m.thumbUrl) this.loadThumb(g, m.thumbUrl)
     }
-    void before
     this.rebuildGrid()
     this.updateSelection()
   }
@@ -289,8 +310,9 @@ export class RoomView {
         g.traverse((o) => {
           const m = o as THREE.Mesh
           if (!m.userData.face || !m.isMesh) return
-          const p = (m.geometry as THREE.PlaneGeometry).parameters
-          const want = p.width / p.height
+          m.geometry.computeBoundingBox()
+          const size = m.geometry.boundingBox!.getSize(new THREE.Vector3()).multiply(m.scale)
+          const want = size.x / Math.max(size.y, 1e-6)
           const have = img.width / img.height
           if (have > want) {
             tex.repeat.set(want / have, 1)
@@ -341,8 +363,10 @@ export class RoomView {
       else if (id === 'pet') {
         mk(id, () => new THREE.Vector3(this.pet.position.x, (this.mode === 'exterior' ? 0.14 : 0) + 1.05, this.pet.position.z))
       } else {
+        const k = this.anchorsKit.get(id)
         const a = ANCHORS[id]
-        if (a) mk(id, () => new THREE.Vector3(...a), false, id === 'window' ? 0 : id === 'door' ? 1 : undefined)
+        const at = k ?? (a ? new THREE.Vector3(...a) : null)
+        if (at) mk(id, () => at.clone(), false, id === 'window' ? 0 : id === 'door' ? 1 : undefined)
       }
     }
     if (this.mode === 'home') for (const m of this.data?.memory ?? []) {
@@ -459,7 +483,8 @@ export class RoomView {
   /** Shows the front of the house instead of the room, with the pet waiting by the door. */
   showExterior(house: House, wall: WallId) {
     this.ext?.group.removeFromParent()
-    this.ext = buildExterior(house, wall)
+    this.ext = this.kitUsed ? kitExterior(house, wall) : buildExterior(house, wall)
+    if (this.kitUsed) kitExteriorGlows(this.ext, this.ctx)
     this.scene.add(this.ext.group)
     for (const l of this.ext.lamps) {
       l.userData.base = l.intensity
@@ -473,6 +498,7 @@ export class RoomView {
     this.pet.frozen = true
     this.pet.placeXZ(this.ext.petSpot.x, this.ext.petSpot.z, 0.14)
     this.extraAnchors.set('bell', this.ext.bell.clone())
+    if (this.ext.mailbox) this.extraAnchors.set('mailbox', this.ext.mailbox.clone())
     this.hotIds = ['bell', 'pet']
     this.buildHotspots()
     this.extDoor = this.extDoorTarget = 0
@@ -545,9 +571,17 @@ export class RoomView {
   }
 
   /** Moves the camera close to an object (the sheet that opens covers the lower part). */
+  /** Adds a hotspot that has an anchor (used for the mailbox once the guestbook is known to exist). */
+  addHotspot(id: string) {
+    if (this.hotIds.includes(id) || !this.extraAnchors.has(id)) return
+    this.hotIds = [...this.hotIds, id]
+    this.buildHotspots()
+    this.dirty = true
+  }
+
   focus(id: string) {
     const a = ANCHORS[id]
-    let p: THREE.Vector3 | null = a ? new THREE.Vector3(...a) : null
+    let p: THREE.Vector3 | null = this.anchorsKit.get(id)?.clone() ?? (a ? new THREE.Vector3(...a) : null)
     const o = this.objects.get(id)
     if (o) p = o.position.clone()
     if (id === 'pet') p = new THREE.Vector3(this.pet.position.x, 0.6, this.pet.position.z)
@@ -857,6 +891,7 @@ function nearestAz(current: number, target: number) {
 
 export function disposeTree(root: THREE.Object3D) {
   root.traverse((o) => {
+    if (o.userData.kit) return // shared with the model cache
     const m = o as THREE.Mesh
     if (m.geometry) m.geometry.dispose()
     const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []

@@ -49,9 +49,10 @@ the room object and the public page together.
   room runtime for visitors. It must stay readable without JavaScript and without WebGL.
 - Online publishing and ZIP export use **the same generator**. No second rendering path.
 - Publish address: `<host>/@<slug>/`.
-- 3D assets: procedural low-poly furniture (always available) with optional AI-generated
-  props from **Hunyuan3D-2** (open source), generated **at build time**, simplified, and
-  committed. No runtime AI calls. A prop that fails to load falls back to the procedural one.
+- 3D assets: low-poly models built in **Blender from code** (`assets/blender`), reviewed by the
+  owner, quantized and embedded in the app and in `room.js`. The code-drawn Three.js objects stay
+  as the fallback when a model is missing. No runtime AI calls. The Hunyuan3D-2 pipeline is kept
+  (`scripts/assets`, `assets/hunyuan`) but no Hunyuan model ships today.
 
 ## Two files, never confused
 
@@ -114,7 +115,7 @@ house style is a skin), video upload, user-authored HTML/CSS/JS, visitor voice m
 ## Honesty rules for the submission
 
 - Never describe something in the video that is not a running feature.
-- Hunyuan3D-2 is used only in the offline asset pipeline; say so. Its license has regional
-  restrictions (not licensed in the EU, UK, South Korea); state this in the README.
+- The 3D models are made in Blender by script; say so. Do not claim AI-generated 3D in the app:
+  the Hunyuan3D-2 pipeline exists but nothing it made is shipped.
 - External embeds and outbound links are not guaranteed to keep working after export.
 - Sample/demo content must be labelled as sample.

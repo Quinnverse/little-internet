@@ -175,7 +175,7 @@ function start(c: Clean) {
   const closeCard = () => {
     card?.remove()
     card = null
-    view.resetView()
+    if (state === 'inside') view.resetView()
   }
 
   const openCard = (build: (box: HTMLElement) => void, label: string) => {
@@ -211,10 +211,11 @@ function start(c: Clean) {
       shelf: c.t.hotShelf,
       door: c.t.hotDoor,
       bell: c.t.hotBell,
+      mailbox: c.t.hotMailbox,
     }
     return map[id] ?? id
   }
-  const iconFor: Record<string, IconKey> = { diary: 'pen', computer: 'computer', voice: 'phone', pet: 'ghost', window: 'sun', shelf: 'book', door: 'door', bell: 'bell' }
+  const iconFor: Record<string, IconKey> = { diary: 'pen', computer: 'computer', voice: 'phone', pet: 'ghost', window: 'sun', shelf: 'book', door: 'door', bell: 'bell', mailbox: 'mail' }
 
   const view = new RoomView({
     container: stage,
@@ -227,7 +228,6 @@ function start(c: Clean) {
   view.setData(c.home)
   view.setNight(night, true)
   view.showExterior(c.home.house, c.home.wall)
-  void preloadModels().then(() => !disposed && view.setData(c.home))
 
   // ---- panels
   const entriesPanel = () =>
@@ -292,8 +292,11 @@ function start(c: Clean) {
     }, c.t.hotPet)
   }
 
+  let openGuestbook: (() => void) | null = null
+
   function pick(id: string) {
     if (id === 'bell') return ring()
+    if (id === 'mailbox') return openGuestbook?.()
     if (id === 'pet') return state === 'outside' ? view.pet.nudge() : petPanel()
     if (state !== 'inside') return
     if (id === 'voice') return welcomePanel()
@@ -329,6 +332,7 @@ function start(c: Clean) {
   siteBtn.addEventListener('click', close)
   ringBtn.addEventListener('click', ring)
   const hint = el('p', 'li-hint', c.t.drag)
+  void probeGuestbook()
   window.setTimeout(() => root.classList.remove('li-labels'), 8000)
 
   const wait = (ms: number) => new Promise<void>((r) => window.setTimeout(r, reduce ? 0 : ms))
@@ -353,7 +357,6 @@ function start(c: Clean) {
     root.append(hint)
     fade.classList.remove('on')
     state = 'inside'
-    void probeGuestbook()
     if (c.welcome) {
       await wait(1600)
       if (!disposed && !card) welcomePanel()
@@ -377,7 +380,9 @@ function start(c: Clean) {
     if (disposed) return
     const b = iconBtn('li-btn', 'mail', c.t.guestbook)
     actions.prepend(b)
-    b.addEventListener('click', () =>
+    // The mailbox by the path is the same guestbook.
+    view.addHotspot('mailbox')
+    openGuestbook = () =>
       openCard((box) => {
         box.append(el('h3', undefined, c.t.guestbook), el('p', undefined, c.t.guestHint))
         const list = el('div', 'li-msgs')
@@ -419,8 +424,8 @@ function start(c: Clean) {
           send.disabled = false
         })
         box.append(form)
-      }, c.t.guestbook),
-    )
+      }, c.t.guestbook)
+    b.addEventListener('click', () => openGuestbook?.())
   }
 
 }
@@ -437,7 +442,8 @@ function run() {
   const c = clean(raw)
   if (!c) return
   if (!webglAvailable()) return // the page below is already a complete website
-  start(c)
+  // The models are embedded in this file; parse them before the door appears.
+  void preloadModels().then(() => start(c))
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run)

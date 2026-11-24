@@ -69,28 +69,24 @@ A slug is claimed by the first publisher's key (created in the browser, never in
 its SHA-256). Uploads are validated (paths, extensions, sizes, matching `site.json`). Guestbook notes are plain text,
 length limited, rate limited, and **pending until the owner approves them**.
 
-## 3D models made in Blender (in review)
+## 3D models (Blender)
 
-`assets/blender/build_props.py` builds 59 low-poly models (furniture, props, keepsakes, the pet with three
-animation clips, house shells and exteriors) with Blender's Python API and renders previews with Cycles.
-Look at `assets/review/` (`README.md`, `scenes/`, `sheets/`, `renders/`, `glb/`). They are **not wired into the app yet**;
-the app still draws the same objects from code until the models are approved. See `assets/blender/README.md`.
+Every object in the room, the pet and both houses are low-poly models built in **Blender 5 from code**
+(`assets/blender/build_props.py`, 59 models, reviewed in `assets/review/`). 42 of them form the kit the app uses:
+they are quantized (about 950 KB) and embedded in the app and in the exported `room.js`, so a published site still needs
+no CDN. Hotspots come from `hs_*` empties in the models, the computer screen shows a small homepage, lit materials
+(`emissive_*`) follow day and night, and the pet ghost plays its three clips (idle, move, sleep).
 
-## 3D and the AI-made prop
+If a model is missing, the app falls back to the same objects drawn in code (`src/room3d/builders.ts`).
 
-The room is built in Three.js from code: rounded boxes, canvas textures, one sun with soft shadows, warm lamps at
-night. No model files are needed to run it.
+**Cost:** the visitor runtime `room.js` is about 2.1 MB (about 630 KB gzipped): three.js plus the models.
 
-One piece is made with **Hunyuan3D-2** (open source): the *Mini bookcase*. The pipeline is `scripts/assets/`:
-reference picture, Hunyuan3D-2 Space (shape only), simplify with gltf-transform (1.47M triangles to 3,000, 36 KB),
-embed as base64. Colour is applied in the app. Honest notes:
+### Hunyuan3D-2 (experiment, not shipped)
 
-- The public Space's text-to-3D and texture stages are switched off or broken, so only **shape** comes from it.
-- The Space and the free image endpoints are shared services with quotas. During the build the quota ran out after
-  one successful generation, so **one** prop is AI-made today. `props.json` lists five more; set `HF_TOKEN` and run
-  `python scripts/assets/generate.py` then `npm run assets:pack` to make them.
-- Hunyuan3D-2 is under the Tencent Hunyuan 3D 2.0 Community License, which excludes the EU, UK and South Korea.
-  Check it before reusing the generated model.
+`scripts/assets/` can turn a reference picture into a mesh with the public Hunyuan3D-2 Space (shape only; its
+text-to-3D and texture stages are off) and simplify it. It produced a bookcase (`assets/hunyuan/bookcase.glb`), but the
+app now uses the Blender version, so **no AI-generated model ships**. Hunyuan3D-2's license excludes the EU, UK and
+South Korea; check it before reusing that file.
 
 ## Layout
 
@@ -110,6 +106,7 @@ docs/kiro-log.md  what happened while building, including what did not work
 - Phone browsers differ in WebGL speed. "Simple view" (Settings) swaps the 3D room for the same objects as cards.
 - Guestbook works only on the platform copy; exported copies on other hosts hide it by design.
 - Furniture is a small set (7 decor kinds, 8 keepsake kinds, 2 house styles). No shop, no forum, no town.
+- Ambient occlusion is not baked into the models yet, so the live room looks flatter than the Cycles renders.
 - Chinese strings were written without a native review.
 - Embedded videos and friend links point to other sites and can change after export.
 

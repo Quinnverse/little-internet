@@ -68,6 +68,7 @@ export const KIND_GROUPS: Record<MemoryKind, readonly SlotGroup[]> = {
 export const RESERVED_CELLS: readonly (readonly [number, number])[] = [
   [0, 0], [1, 0], // desk
   [1, 1], // chair
+  [2, 0], [3, 0], // dresser under the window
   [4, 0], [5, 0], // shelf
   [0, 2], // answering machine table
   [4, 3], // pet bed
@@ -192,6 +193,33 @@ export function canPlaceDecor(room: Room, itemId: string | undefined, x: number,
   if (RESERVED.has(key(x, zz))) return 'furniture'
   if (room.decor.some((d) => d.id !== itemId && d.x === x && d.z === zz)) return 'occupied'
   return null
+}
+
+/**
+ * Saves made before the dresser existed may have decor on its cells. Moves such items to the first free
+ * cell so the save still loads (only touches data that would otherwise be invalid).
+ */
+export function migrateRoomInput(input: unknown): unknown {
+  if (!input || typeof input !== 'object') return input
+  const room = input as { decor?: unknown }
+  if (!Array.isArray(room.decor)) return input
+  const items = room.decor as { x?: unknown; z?: unknown }[]
+  const bad = (d: { x?: unknown; z?: unknown }) => Number.isInteger(d.x) && Number.isInteger(d.z) && RESERVED.has(key(d.x as number, d.z as number))
+  if (!items.some((d) => d && typeof d === 'object' && bad(d))) return input
+  const taken = new Set(items.filter((d) => d && typeof d === 'object' && !bad(d)).map((d) => key(d.x as number, d.z as number)))
+  const moved = items.map((d) => {
+    if (!d || typeof d !== 'object' || !bad(d)) return d
+    for (let zz = FLOOR_SIZE - 1; zz >= 0; zz--) {
+      for (let x = FLOOR_SIZE - 1; x >= 0; x--) {
+        if (!RESERVED.has(key(x, zz)) && !taken.has(key(x, zz))) {
+          taken.add(key(x, zz))
+          return { ...d, x, z: zz }
+        }
+      }
+    }
+    return d
+  })
+  return { ...(input as object), decor: moved }
 }
 
 /** Canonical ordering so exports are deterministic. */

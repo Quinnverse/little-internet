@@ -2,6 +2,7 @@ import { defaultRoom } from '../src/core/room.ts'
 import { RoomView } from '../src/room3d/view.ts'
 import { preloadModels } from '../src/room3d/models.ts'
 const q = new URLSearchParams(location.search)
+await preloadModels()
 const room = defaultRoom()
 const view = new RoomView({
   container: document.getElementById('stage')!,
@@ -33,7 +34,6 @@ const data = {
 }
 if (q.get('bookcase') === '1') room.decor.push({ id: 'bk', kind: 'bookcase', x: 5, z: 3, rot: Number(q.get('rot') ?? 0) })
 view.setData(data as never)
-void preloadModels().then(() => view.setData(data as never))
 view.jump(Number(q.get('az') ?? Math.PI / 4), Number(q.get('pol') ?? 1.0), view.defaultRadius * Number(q.get('r') ?? 1), (view as any).tgt)
 if (q.get('ext') === '1') {
   view.showExterior((q.get('house') as 'cabin' | 'villa') ?? 'cabin', (q.get('wall') as any) ?? 'cream')

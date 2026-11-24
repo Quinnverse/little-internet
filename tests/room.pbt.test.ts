@@ -142,6 +142,18 @@ describe('home room', () => {
     expect(parseProject(bad2).ok).toBe(false)
   })
 
+  it('moves decor off cells that became furniture, so older saves still load', () => {
+    const p = withPosts(1)
+    const old = { ...p, room: { ...p.room, decor: [...p.room.decor, { id: 'old-1', kind: 'stool', x: 2, z: 0, rot: 0 }] } }
+    const r = parseProject(old)
+    expect(r.ok).toBe(true)
+    if (r.ok) {
+      const moved = r.value.room.decor.find((d) => d.id === 'old-1')!
+      expect([moved.x, moved.z]).not.toEqual([2, 0])
+      expect(roomIssues(r.value.room)).toEqual([])
+    }
+  })
+
   it('puts memory objects on kind-appropriate slots and removes them with the entry', () => {
     let p = withPosts(2)
     p = setPostObject('post0', 'postcard', 'o1')(p)

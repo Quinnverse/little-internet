@@ -218,5 +218,6 @@ describe('site core properties', () => {
       }),
       { numRuns: 50 },
     )
-  })
+    // Every export compresses room.js (three.js + the embedded models, about 2 MB): 100 exports take a while.
+  }, 180_000)
 })

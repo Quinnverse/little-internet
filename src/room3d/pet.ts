@@ -40,6 +40,11 @@ export class Pet {
   private idleFor = 0
   /** True while the pet waits somewhere fixed (outside, for a visitor). */
   frozen = false
+  private model: THREE.Group | null = null
+  private modelMat: THREE.MeshStandardMaterial | null = null
+  private mixer: THREE.AnimationMixer | null = null
+  private actions = new Map<string, THREE.AnimationAction>()
+  private playing = ''
 
   constructor(color: string, reduceMotion: boolean) {
     this.still = reduceMotion
@@ -109,6 +114,53 @@ export class Pet {
     const c = GHOST_TINT[color] ?? '#ffffff'
     this.bodyMat.color.set(c)
     this.bodyMat.emissive.set(c)
+    if (this.modelMat) {
+      this.modelMat.color.set(c)
+      this.modelMat.emissive.set(c)
+    }
+  }
+
+  /**
+   * Swaps the code-drawn body for the Blender ghost. Its clips (idle, move, sleep) play on the model;
+   * walking, hops and the sleepy settle stay in code.
+   */
+  useModel(model: THREE.Group, clips: THREE.AnimationClip[]) {
+    for (const c of [...this.body.children]) {
+      this.body.remove(c)
+      ;(c as THREE.Mesh).geometry?.dispose()
+    }
+    model.scale.setScalar(1.35)
+    model.traverse((o) => {
+      const m = o as THREE.Mesh
+      if (!m.isMesh) return
+      m.castShadow = true
+      const mat = m.material as THREE.MeshStandardMaterial
+      if (mat.name === 'cf1f4f9') {
+        this.modelMat ??= mat.clone()
+        this.modelMat.color.copy(this.bodyMat.color)
+        this.modelMat.emissive.copy(this.bodyMat.emissive)
+        this.modelMat.emissiveIntensity = 0.12
+        m.material = this.modelMat
+      }
+    })
+    this.body.add(model)
+    this.body.position.y = 0
+    this.model = model
+    this.mixer = new THREE.AnimationMixer(model)
+    for (const clip of clips) this.actions.set(clip.name, this.mixer.clipAction(clip))
+    this.play('idle', 0)
+    this.mixer.update(0)
+  }
+
+  private play(name: string, fade = 0.35) {
+    if (name === this.playing) return
+    const next = this.actions.get(name)
+    if (!next) return
+    const prev = this.actions.get(this.playing)
+    next.reset().setEffectiveWeight(1).play()
+    if (prev && fade > 0) prev.crossFadeTo(next, fade, false)
+    else prev?.stop()
+    this.playing = name
   }
 
   get current(): PetState {
@@ -190,9 +242,19 @@ export class Pet {
     }
 
     const sleeping = this.state === 'sleep'
-    const bob = this.still ? 0 : Math.sin(t * (sleeping ? 1.2 : 2.4)) * (sleeping ? 0.015 : 0.04)
     this.hop = Math.max(0, this.hop - dt * 2.2)
     const hopY = Math.sin(this.hop * Math.PI) * 0.35
+    if (this.model && this.mixer) {
+      // the clips carry the float, lean, blink and breathing
+      this.play(sleeping && !moving ? 'sleep' : moving ? 'move' : 'idle')
+      if (!this.still) this.mixer.update(dt)
+      this.body.position.y = 0.02 + hopY
+      this.shadow.scale.setScalar(1.25 - hopY * 0.8)
+      this.zzz.visible = sleeping && !moving
+      if (this.zzz.visible) this.zzz.position.y = -0.2 + (t % 2) * 0.12
+      return
+    }
+    const bob = this.still ? 0 : Math.sin(t * (sleeping ? 1.2 : 2.4)) * (sleeping ? 0.015 : 0.04)
     const settle = sleeping && !moving ? -0.12 : 0
     this.body.position.y = 0.32 + bob + hopY + settle
     this.body.scale.setScalar(sleeping ? 0.92 : 1 + (this.still ? 0 : Math.sin(t * 2.4) * 0.015))

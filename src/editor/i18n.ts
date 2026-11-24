@@ -53,6 +53,7 @@ const en = {
   'hot.window': 'Window',
   'hot.door': 'Front door',
   'hot.shelf': 'Shelf of memories',
+  'hot.export': 'Take your website with you',
 
   'kind.plant': 'Plant',
   'kind.cactus': 'Cactus',
@@ -317,6 +318,7 @@ const zh: Record<Key, string> = {
   'hot.window': '窗户',
   'hot.door': '大门',
   'hot.shelf': '回忆书架',
+  'hot.export': '带走我的网站',
 
   'kind.plant': '绿植',
   'kind.cactus': '仙人掌',

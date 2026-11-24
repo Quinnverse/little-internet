@@ -11,6 +11,8 @@ export type Exterior = {
   petSpot: THREE.Vector3
   doorway: THREE.Vector3
   lamps: THREE.PointLight[]
+  /** Where the mailbox is (world); only the Blender exterior has one. */
+  mailbox?: THREE.Vector3
 }
 
 const DOOR_W = 0.95

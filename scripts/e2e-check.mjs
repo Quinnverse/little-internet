@@ -67,7 +67,7 @@ try {
   await page.locator('.home .scene canvas').waitFor()
   await hot(page, 'diary').waitFor()
   check('home opens on the 3D room with the title', (await page.locator('.home-title h1').textContent()) === 'Moon’s corner')
-  for (const id of ['diary', 'computer', 'voice', 'pet', 'shelf', 'window', 'door']) {
+  for (const id of ['diary', 'computer', 'voice', 'pet', 'shelf', 'window', 'door', 'export']) {
     check(`hotspot: ${id}`, (await hot(page, id).count()) === 1)
   }
   await page.waitForTimeout(1500)
@@ -193,6 +193,23 @@ try {
   check('owner pet remembers public and private entries', true)
   await page.getByRole('button', { name: 'Close' }).click()
 
+  // Night: the window sets the light; lamps, screen and lava lamp glow.
+  await tap(page, 'window')
+  await page.getByRole('button', { name: 'Night' }).click()
+  await page.getByRole('button', { name: 'Close' }).click()
+  await page.waitForTimeout(1500)
+  await page.screenshot({ path: join(SHOTS, '08a-home-night.png') })
+  check('night mode switches the room', (await page.locator('.scene.is-night').count()) === 1)
+  await tap(page, 'window')
+  await page.getByRole('button', { name: 'Follow time' }).click()
+  await page.getByRole('button', { name: 'Close' }).click()
+
+  // The CD on the desk opens the same website panel (download lives there).
+  await tap(page, 'export')
+  await page.getByRole('button', { name: 'Download website (.zip)' }).waitFor()
+  check('CD on the desk opens the website panel', true)
+  await page.getByRole('button', { name: 'Close' }).click()
+
   // ------------------------------------------------------------------ 9. Computer: website, publish
   await tap(page, 'computer')
   await page.getByText('Visitors can see 1 entries and 1 photos.').waitFor()
@@ -223,6 +240,8 @@ try {
   await v.waitForTimeout(1500)
   await v.screenshot({ path: join(SHOTS, '09-visitor-door.png') })
   check('visitor sees the front door first', (await v.getByRole('button', { name: 'Ring the doorbell' }).count()) === 1)
+  await hot(v, 'mailbox').waitFor({ timeout: 10000 })
+  check('mailbox by the path is the guestbook (platform copy)', true)
   const html = await v.content()
   check('no private text on the visitor page', !html.includes('TOPSECRET') && !html.includes('Unsent letter'))
   await v.getByRole('button', { name: 'Ring the doorbell' }).click()
@@ -237,7 +256,7 @@ try {
   check('visitor sees only the public keepsake', (await v.locator('button.hotspot[data-id^="memory:"]').count()) === 1)
 
   // Guestbook: leave a note.
-  await v.getByRole('button', { name: 'Guestbook' }).click()
+  await v.getByRole('button', { name: 'Guestbook', exact: true }).click()
   await v.getByLabel('Your name').fill('Ana')
   await v.getByLabel('Your note').fill('Lovely room! <b>hi</b>')
   await v.getByRole('button', { name: 'Send' }).click()
@@ -263,11 +282,13 @@ try {
   await v.goto(siteUrl)
   await v.getByRole('button', { name: 'Skip to website' }).waitFor()
   await v.getByRole('button', { name: 'Ring the doorbell' }).click()
-  await v.getByRole('button', { name: 'Guestbook' }).waitFor({ timeout: 20000 })
-  await v.getByRole('button', { name: 'Guestbook' }).click()
+  await v.getByRole('button', { name: 'Guestbook', exact: true }).waitFor({ timeout: 20000 })
+  await v.getByRole('button', { name: 'Guestbook', exact: true }).click()
   await v.getByText('Ana: Lovely room!').waitFor()
   check('approved note is public, as text', (await v.locator('.li-msgs b').count()) === 0)
   await v.getByRole('button', { name: 'Close' }).click()
+  // Software WebGL is slow: free this page before opening the next one.
+  await visitor.close()
 
   // ------------------------------------------------------------------ 12. Export, back up, run elsewhere
   const dlBackup = page.waitForEvent('download')
@@ -303,12 +324,13 @@ try {
   watch(o, 'other-host')
   const failed2 = []
   o.on('response', (r) => r.status() >= 400 && failed2.push(`${r.status()} ${r.url()}`))
-  await o.goto(`${SITE}@moon/index.html`)
+  await o.goto(`${SITE}@moon/index.html`, { waitUntil: 'domcontentloaded', timeout: 60000 })
   await o.getByRole('button', { name: 'Ring the doorbell' }).waitFor({ timeout: 15000 })
   await o.getByRole('button', { name: 'Ring the doorbell' }).click()
   await o.locator('.li-card').waitFor({ timeout: 20000 })
   check('independent copy: door, room and welcome work on another host', true)
-  check('independent copy: no guestbook button off the platform', (await o.getByRole('button', { name: 'Guestbook' }).count()) === 0)
+  check('independent copy: no guestbook button off the platform', (await o.getByRole('button', { name: 'Guestbook', exact: true }).count()) === 0)
+  check('independent copy: no mailbox hotspot off the platform', (await hot(o, 'mailbox').count()) === 0)
   await o.screenshot({ path: join(SHOTS, '11-independent-room.png') })
   await o.keyboard.press('Escape')
   await o.keyboard.press('Escape')
@@ -355,8 +377,19 @@ try {
 
   // ------------------------------------------------------------------ 15. Tablet and desktop layouts
   // Software WebGL is slow: close the other scenes first so this page gets frames.
-  await visitor.close()
   await other.close()
+  const phoneVisitor = await browser.newContext({ viewport: { width: 390, height: 844 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true })
+  const pv = await phoneVisitor.newPage()
+  watch(pv, 'phone-visitor')
+  await pv.goto(siteUrl)
+  await pv.getByRole('button', { name: 'Ring the doorbell' }).waitFor({ timeout: 20000 })
+  await pv.waitForTimeout(1500)
+  await pv.screenshot({ path: join(SHOTS, '09b-visitor-door-phone.png') })
+  await pv.getByRole('button', { name: 'Ring the doorbell' }).click()
+  await pv.locator('.li-card').waitFor({ timeout: 25000 })
+  await pv.screenshot({ path: join(SHOTS, '10b-visitor-room-phone.png') })
+  check('phone visitor: door, room and welcome', true)
+  await phoneVisitor.close()
   await page.goto('about:blank')
   for (const [name, w, h] of [['tablet', 820, 1180], ['desktop', 1280, 800]]) {
     const c = await browser.newContext({ viewport: { width: w, height: h }, acceptDownloads: true })

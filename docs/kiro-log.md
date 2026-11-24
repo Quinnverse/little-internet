@@ -168,3 +168,27 @@ others first.
 **Not verified:** real phones (only emulated viewports), real Safari recording and WebGL, Chinese text rendering
 (the sandbox has no CJK font, so the language button looks empty in screenshots), a native-speaker read of the
 Chinese strings, a deployment on a public host.
+
+## 2026-11-24 — The Blender kit goes into the app
+
+**From review to use.** The owner looked at the 59 Blender models and asked to see them in the whole app before
+fine-tuning. 42 of them became the kit (`npm run assets:kit`: quantize with gltf-transform, embed as base64). The view
+builds the room, the exterior and the pet from the kit and keeps the code-drawn objects as the fallback.
+
+**Two bugs found by looking, not by tests.** (1) `prune()` deleted the `hs_*` empties as "unused leaves", so the
+doorbell hotspot fell to the doorstep; the room still looked right only because the old hard-coded anchors filled in.
+Fixed with `prune({ keepLeaves: true })` and a check that the anchors survive. (2) The pet's exported rest pose was its
+*sleep* pose (Blender keeps the last NLA track's first frame); the idle track is now created last.
+
+**Layout change with a migration.** The dresser under the window takes two floor cells, so old saves could have decor
+there. `migrateRoomInput` moves such items to a free cell before validation (unit test), instead of rejecting the save.
+
+**Costs, measured.** `room.js` grew from 0.8 MB to 2.1 MB (630 KB gzipped). P7 (deterministic export) now needs about
+35 s because every export compresses that file; its timeout was raised rather than lowering the number of runs.
+
+**e2e: 62/62.** New checks: the CD on the desk opens the website panel, night mode, the mailbox hotspot exists on the
+platform copy and not on an exported copy, a phone visitor. Two flakes were the test machine, not the app (software
+WebGL in three open pages starves the next page's load), so the test now closes pages it no longer needs.
+
+**Honesty fix.** README and steering said a Hunyuan3D prop ships. It no longer does (the Blender bookcase replaced it).
+Both now say the models are made in Blender by script and the Hunyuan pipeline is an unshipped experiment.
