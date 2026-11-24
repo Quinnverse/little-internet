@@ -1,23 +1,15 @@
 // Pure editor commands. Every data change in the UI goes through one of these and is
 // then validated by `parseProject` in the store (Requirement 3.1).
-import {
-  firstFreeSpot,
-  moveBlock,
-  placeBlock,
-  removeBlock,
-  resizeBlock,
-} from '../core/layout.ts'
+import { designAssetRefs, starterDesign, type GuestNote, type SiteDesign, type StyleId } from '../core/design.ts'
+import type { DesignOp } from '../core/designOps.ts'
 import type {
   Asset,
-  Block,
-  BlockContent,
   GHOST_COLORS,
   Lang,
   Link,
   Post,
   Project,
   Recording,
-  Theme,
   VideoEmbed,
 } from '../core/schema.ts'
 import {
@@ -46,22 +38,19 @@ export type NewProjectInput = {
   lang?: Lang
   title: string
   slug: string
-  theme: Theme
+  style: StyleId
   ghostName: string
   ghostColor: (typeof GHOST_COLORS)[number]
 }
 
-/** A new home is never empty: latest entries, the ghost's spot, and friends. */
-export function createProject(input: NewProjectInput, blockIds: [string, string, string]): Project {
+/** A new home is never empty: its website starts from the chosen style, ready to decorate. */
+export function createProject(input: NewProjectInput): Project {
+  const lang = input.lang ?? 'en'
   return {
-    schemaVersion: 1,
-    site: { slug: input.slug, title: input.title, tagline: '', theme: input.theme, lang: input.lang ?? 'en' },
+    schemaVersion: 2,
+    site: { slug: input.slug, title: input.title, tagline: '', lang },
     ghost: { enabled: true, name: input.ghostName, color: input.ghostColor },
-    blocks: [
-      { id: blockIds[0], x: 0, y: 0, w: 2, h: 2, content: { kind: 'latest' } },
-      { id: blockIds[1], x: 2, y: 0, w: 2, h: 1, content: { kind: 'ghost-home' } },
-      { id: blockIds[2], x: 2, y: 1, w: 2, h: 1, content: { kind: 'links' } },
-    ],
+    web: { draft: starterDesign(input.style, { title: input.title, lang }), guestbook: [] },
     posts: [],
     links: [],
     webring: {},
@@ -85,11 +74,16 @@ export const addAsset =
   (asset: Asset): Command =>
   (p) => ({ ...p, assets: [...p.assets.filter((a) => a.id !== asset.id), asset] })
 
-/** Removes images that no post and no block uses any more. */
+/** Removes images that no post, no website design (draft or published) and no friend badge uses. */
 export const collectGarbage: Command = (p) => {
   const used = new Set<string>()
   for (const post of p.posts) post.imageIds.forEach((id) => used.add(id))
-  for (const b of p.blocks) if (b.content.kind === 'image') used.add(b.content.assetId)
+  for (const d of [p.web.draft, p.web.published?.design]) {
+    if (!d) continue
+    d.assets.forEach((a) => used.add(a.id))
+    designAssetRefs(d).forEach((id) => used.add(id))
+  }
+  for (const l of p.links) if (l.buttonAssetId) used.add(l.buttonAssetId)
   return { ...p, assets: p.assets.filter((a) => used.has(a.id)) }
 }
 
@@ -153,46 +147,59 @@ export const setVisibility =
   (id: string, visibility: Post['visibility']): Command =>
   (p) => ({ ...p, posts: p.posts.map((post) => (post.id === id ? { ...post, visibility } : post)) })
 
+/** Website components keep pointing at content; a deleted entry simply drops out of them. */
+function forgetPost(d: SiteDesign, id: string): SiteDesign {
+  return {
+    ...d,
+    widgets: d.widgets.map((w) =>
+      w.content.type === 'diary' && w.content.postIds.includes(id)
+        ? { ...w, content: { ...w.content, postIds: w.content.postIds.filter((x) => x !== id) } }
+        : w,
+    ),
+  }
+}
+
 export const deletePost =
   (id: string): Command =>
   (p) =>
     collectGarbage({
       ...p,
       posts: p.posts.filter((post) => post.id !== id),
-      blocks: p.blocks.filter((b) => !(b.content.kind === 'post' && b.content.postId === id)),
+      web: {
+        ...p.web,
+        draft: forgetPost(p.web.draft, id),
+        ...(p.web.published ? { published: { ...p.web.published, design: forgetPost(p.web.published.design, id) } } : {}),
+      },
       // A memory object lives and dies with its entry.
       room: { ...p.room, memory: p.room.memory.filter((m) => m.postId !== id) },
     })
 
-// ------------------------------------------------------------------ blocks
+// ------------------------------------------------------------------ website design (Web Atelier)
 
-export type BlockSize = { w: Block['w']; h: Block['h'] }
+/** Runs a design operation on the DRAFT. Visitors keep seeing the published snapshot. */
+export const design =
+  (op: DesignOp): Command =>
+  (p) =>
+    collectGarbage({ ...p, web: { ...p.web, draft: op(p.web.draft) } })
 
-export const addBlock =
-  (id: string, content: BlockContent, size: BlockSize): Command =>
-  (p) => {
-    const { x, y } = firstFreeSpot(p.blocks, size.w, size.h)
-    return { ...p, blocks: placeBlock(p.blocks, { id, x, y, ...size, content }) }
-  }
+/** Replaces the whole draft (undo / redo). */
+export const setDraft =
+  (draft: SiteDesign): Command =>
+  (p) =>
+    collectGarbage({ ...p, web: { ...p.web, draft } })
 
-export const moveBlockTo =
-  (id: string, x: number, y: number): Command =>
-  (p) => ({ ...p, blocks: moveBlock(p.blocks, id, x, y) })
+/** Publishing freezes the current draft as the snapshot that is built for visitors and exports. */
+export const publishDraft =
+  (at: string): Command =>
+  (p) => ({ ...p, web: { ...p.web, published: { design: structuredClone(p.web.draft), at } } })
 
-export const resizeBlockTo =
-  (id: string, size: BlockSize): Command =>
-  (p) => ({ ...p, blocks: resizeBlock(p.blocks, id, size.w, size.h) })
+/** Throws away draft changes and goes back to what is published. */
+export const revertDraft: Command = (p) =>
+  p.web.published ? collectGarbage({ ...p, web: { ...p.web, draft: structuredClone(p.web.published.design) } }) : p
 
-export const deleteBlock =
-  (id: string): Command =>
-  (p) => collectGarbage({ ...p, blocks: removeBlock(p.blocks, id) })
-
-export const setBlockText =
-  (id: string, text: string): Command =>
-  (p) => ({
-    ...p,
-    blocks: p.blocks.map((b) => (b.id === id && b.content.kind === 'text' ? { ...b, content: { kind: 'text', text } } : b)),
-  })
+export const setGuestbookSnapshot =
+  (notes: GuestNote[]): Command =>
+  (p) => ({ ...p, web: { ...p.web, guestbook: notes.slice(0, 100) } })
 
 // ------------------------------------------------------------------ links
 
@@ -218,7 +225,7 @@ export const addLink =
 
 export const deleteLink =
   (id: string): Command =>
-  (p) => ({ ...p, links: p.links.filter((l) => l.id !== id) })
+  (p) => collectGarbage({ ...p, links: p.links.filter((l) => l.id !== id) })
 
 export const moveLink =
   (id: string, delta: -1 | 1): Command =>

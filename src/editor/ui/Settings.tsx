@@ -1,6 +1,5 @@
 import { useState } from 'preact/hooks'
-import { GHOST_COLORS, SITE_SLUG_PATTERN, THEMES } from '../../core/schema.ts'
-import { THEME_VARS } from '../../core/themes.ts'
+import { GHOST_COLORS, SITE_SLUG_PATTERN } from '../../core/schema.ts'
 import { compose, updateGhost, updateSite } from '../commands.ts'
 import { setLang, t, useLang, type Key } from '../i18n.ts'
 import { Field, GhostIcon, run, Sheet, type Ctx } from './common.tsx'
@@ -55,22 +54,6 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
             }}
           >
             {l === 'en' ? 'English' : '中文'}
-          </button>
-        ))}
-      </div>
-
-      <h3>{t('settings.site')}</h3>
-      <div class="choice-row">
-        {THEMES.map((th) => (
-          <button
-            type="button"
-            key={th}
-            class={`theme-chip ${site.theme === th ? 'selected' : ''}`}
-            style={{ background: THEME_VARS[th].bg, color: THEME_VARS[th].fg, borderColor: THEME_VARS[th].accent }}
-            aria-pressed={site.theme === th}
-            onClick={() => run(ctx, updateSite({ theme: th }))}
-          >
-            {t(`theme.${th}` as Key)}
           </button>
         ))}
       </div>

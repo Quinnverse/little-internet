@@ -25,10 +25,7 @@ import {
 import { projectArb } from './arbitraries.ts'
 
 const base = (): Project =>
-  createProject(
-    { title: 'Home', slug: 'home', theme: 'room', ghostName: 'Boo', ghostColor: 'white' },
-    ['b1', 'b2', 'b3'],
-  )
+  createProject({ title: 'Home', slug: 'home', style: 'scrapbook', ghostName: 'Boo', ghostColor: 'white' })
 
 const withPosts = (n: number): Project => {
   let p = base()

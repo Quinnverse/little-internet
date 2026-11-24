@@ -1,17 +1,11 @@
 import fc from 'fast-check'
 import { describe, expect, it } from 'vitest'
 import { POST_SLUG_PATTERN, parseProject, type Project } from '../src/core/schema.ts'
+import { WIDGET_TYPES, STYLES } from '../src/core/design.ts'
+import * as D from '../src/core/designOps.ts'
 import * as C from '../src/editor/commands.ts'
 import { slugify, suggestSiteSlug, uniquePostSlug } from '../src/editor/ids.ts'
 import { idArb, lineArb, textArb, urlArb } from './arbitraries.ts'
-
-const sizes: C.BlockSize[] = [
-  { w: 1, h: 1 },
-  { w: 2, h: 1 },
-  { w: 2, h: 2 },
-  { w: 4, h: 1 },
-  { w: 4, h: 2 },
-]
 
 const titleArb = fc.oneof(lineArb(120), fc.constantFrom('海边的一天', '😀😀', 'Über café', '', '---', 'a'.repeat(120)))
 
@@ -21,12 +15,20 @@ const stepArb = fc.oneof(
   fc.record({ t: fc.constant('updatePost' as const), i: fc.nat(), title: titleArb, dropPhotos: fc.boolean() }),
   fc.record({ t: fc.constant('publish' as const), i: fc.nat(), pub: fc.boolean() }),
   fc.record({ t: fc.constant('deletePost' as const), i: fc.nat() }),
-  fc.record({ t: fc.constant('addPhotoBlock' as const), s: fc.constantFrom(...sizes) }),
-  fc.record({ t: fc.constant('addPostBlock' as const), i: fc.nat(), s: fc.constantFrom(...sizes) }),
-  fc.record({ t: fc.constant('addNote' as const), text: textArb(500), s: fc.constantFrom(...sizes) }),
-  fc.record({ t: fc.constant('move' as const), i: fc.nat(), x: fc.integer({ min: 0, max: 3 }), y: fc.integer({ min: 0, max: 10 }) }),
-  fc.record({ t: fc.constant('resize' as const), i: fc.nat(), s: fc.constantFrom(...sizes) }),
-  fc.record({ t: fc.constant('deleteBlock' as const), i: fc.nat() }),
+  fc.record({ t: fc.constant('addWidget' as const), type: fc.constantFrom(...WIDGET_TYPES), at: fc.nat({ max: 20 }) }),
+  fc.record({ t: fc.constant('addPhotoWidget' as const), kind: fc.constantFrom('image' as const, 'sticker' as const, 'background' as const) }),
+  fc.record({ t: fc.constant('pickEntry' as const), i: fc.nat() }),
+  fc.record({ t: fc.constant('addNote' as const), text: textArb(500) }),
+  fc.record({ t: fc.constant('move' as const), i: fc.nat(), to: fc.integer({ min: -2, max: 30 }) }),
+  fc.record({ t: fc.constant('resize' as const), i: fc.nat(), span: fc.integer({ min: 1, max: 4 }), mobile: fc.constantFrom('full' as const, 'half' as const, 'hide' as const) }),
+  fc.record({ t: fc.constant('hide' as const), i: fc.nat(), hidden: fc.boolean() }),
+  fc.record({ t: fc.constant('deleteWidget' as const), i: fc.nat() }),
+  fc.record({ t: fc.constant('removeDecoration' as const), i: fc.nat() }),
+  fc.record({ t: fc.constant('addPage' as const), title: lineArb(40) }),
+  fc.record({ t: fc.constant('removePage' as const), i: fc.nat() }),
+  fc.record({ t: fc.constant('style' as const), style: fc.constantFrom(...STYLES), keep: fc.boolean() }),
+  fc.record({ t: fc.constant('publishSite' as const) }),
+  fc.record({ t: fc.constant('revert' as const) }),
   fc.record({ t: fc.constant('addLink' as const), title: lineArb(80), url: urlArb }),
   fc.record({ t: fc.constant('deleteLink' as const), i: fc.nat() }),
   fc.record({ t: fc.constant('site' as const), title: lineArb(80), tagline: lineArb(200) }),
@@ -34,15 +36,13 @@ const stepArb = fc.oneof(
   fc.record({ t: fc.constant('publishRec' as const), i: fc.nat(), pub: fc.boolean() }),
   fc.record({ t: fc.constant('renameRec' as const), i: fc.nat(), title: lineArb(80), openOn: fc.option(fc.constantFrom('2030-01-01', '2099-12-31')) }),
   fc.record({ t: fc.constant('deleteRec' as const), i: fc.nat() }),
-  fc.record({ t: fc.constant('addVoiceBlock' as const), s: fc.constantFrom(...sizes) }),
 )
 
 function start(): Project {
-  return C.createProject(
-    { title: 'Home', slug: 'home', theme: 'paper', ghostName: 'Boo', ghostColor: 'white' },
-    ['b0', 'b1', 'b2'],
-  )
+  return C.createProject({ title: 'Home', slug: 'home', style: 'retro', ghostName: 'Boo', ghostColor: 'white' })
 }
+
+export const DESIGN_STEPS = new Set(['addWidget', 'addPhotoWidget', 'pickEntry', 'addNote', 'move', 'resize', 'hide', 'deleteWidget', 'removeDecoration', 'addPage', 'removePage', 'style', 'publishSite', 'revert'])
 
 function run(steps: fc.Arbitrary<unknown>[] | unknown[], check: (p: Project, step: { t: string }) => void) {
   let p = start()
@@ -76,34 +76,83 @@ function run(steps: fc.Arbitrary<unknown>[] | unknown[], check: (p: Project, ste
         if (post) cmd = C.deletePost(post.id)
         break
       }
-      case 'addPhotoBlock': {
+      case 'addWidget': {
+        const page = p.web.draft.pages[0]!.id
+        if (p.web.draft.widgets.length < 100) cmd = C.design(D.addWidget(nextId(), page, s.type, 'en', s.at))
+        break
+      }
+      case 'addPhotoWidget': {
         const asset = { id: nextId(), mime: 'image/png' as const, data: new Uint8Array([2]) }
-        cmd = C.compose(C.addAsset(asset), C.addBlock(nextId(), { kind: 'image', assetId: asset.id }, s.s))
+        const page = p.web.draft.pages[0]!.id
+        const widget =
+          s.kind === 'background'
+            ? D.setTokens({ bgAssetId: asset.id })
+            : D.addWidget(nextId(), page, s.kind, 'en', undefined, s.kind === 'image' ? { type: 'image', assetId: asset.id, caption: '' } : { type: 'sticker', sticker: 'star', assetId: asset.id, size: 'm', motion: 'none' })
+        if (p.web.draft.widgets.length < 100) cmd = C.compose(C.addAsset(asset), C.design((d) => widget(D.addDecoration({ id: asset.id, kind: s.kind, name: 'x' })(d))))
         break
       }
-      case 'addPostBlock': {
+      case 'pickEntry': {
         const post = at(p.posts, s.i)
-        if (post) cmd = C.addBlock(nextId(), { kind: 'post', postId: post.id }, s.s)
+        const page = p.web.draft.pages[0]!.id
+        if (post && p.web.draft.widgets.length < 100)
+          cmd = C.design(D.addWidget(nextId(), page, 'diary', 'en', 0, { type: 'diary', heading: '', mode: 'pick', postIds: [post.id], count: 1, excerpts: true }))
         break
       }
-      case 'addNote':
-        cmd = C.addBlock(nextId(), { kind: 'text', text: s.text }, s.s)
+      case 'addNote': {
+        const page = p.web.draft.pages[0]!.id
+        if (p.web.draft.widgets.length < 100) cmd = C.design(D.addWidget(nextId(), page, 'text', 'en', undefined, { type: 'text', heading: '', text: s.text }))
         break
+      }
       case 'move': {
-        const b = at(p.blocks, s.i)
-        if (b) cmd = C.moveBlockTo(b.id, s.x, s.y)
+        const w = at(p.web.draft.widgets, s.i)
+        if (w) cmd = C.design(D.moveWidget(w.id, s.to))
         break
       }
       case 'resize': {
-        const b = at(p.blocks, s.i)
-        if (b) cmd = C.resizeBlockTo(b.id, s.s)
+        const w = at(p.web.draft.widgets, s.i)
+        if (w) cmd = C.design(D.setWidgetLayout(w.id, { span: s.span, mobile: s.mobile }))
         break
       }
-      case 'deleteBlock': {
-        const b = at(p.blocks, s.i)
-        if (b) cmd = C.deleteBlock(b.id)
+      case 'hide': {
+        const w = at(p.web.draft.widgets, s.i)
+        if (w) cmd = C.design(D.setWidgetHidden(w.id, s.hidden))
         break
       }
+      case 'deleteWidget': {
+        const w = at(p.web.draft.widgets, s.i)
+        if (w) cmd = C.design(D.removeWidget(w.id))
+        break
+      }
+      case 'removeDecoration': {
+        const a = at(p.web.draft.assets, s.i)
+        if (a) cmd = C.design(D.removeDecoration(a.id))
+        break
+      }
+      case 'addPage': {
+        if (p.web.draft.pages.length < 8) {
+          const id = nextId()
+          cmd = C.design(D.addPage({ id, slug: `p-${id.replace(/[^a-z0-9]/g, '')}`, title: s.title, nav: true, columns: 2 }))
+        }
+        break
+      }
+      case 'removePage': {
+        const page = at(p.web.draft.pages.slice(1), s.i)
+        if (page) cmd = C.design(D.removePage(page.id))
+        break
+      }
+      case 'style': {
+        const page = p.web.draft.pages[0]!.id
+        const base = n
+        n += 20
+        cmd = C.design(D.applyStyle(s.style, { keepWidgets: s.keep, pageId: page, lang: 'en', newId: (i) => `st${base}-${i}` }))
+        break
+      }
+      case 'publishSite':
+        cmd = C.publishDraft(new Date(1_700_000_000_000 + n * 1000).toISOString())
+        break
+      case 'revert':
+        cmd = C.revertDraft
+        break
       case 'addLink':
         cmd = C.addLink({ id: nextId(), title: s.title, url: s.url })
         break
@@ -135,9 +184,6 @@ function run(steps: fc.Arbitrary<unknown>[] | unknown[], check: (p: Project, ste
         if (r) cmd = C.deleteRecording(r.id)
         break
       }
-      case 'addVoiceBlock':
-        cmd = C.addBlock(nextId(), { kind: 'voice' }, s.s)
-        break
     }
     if (!cmd) continue
     p = cmd(p)
@@ -191,17 +237,42 @@ describe('editor command properties', () => {
   })
 
   // E3 — Requirement 3.2
-  it('E3: after deletes and edits there are no orphan images and no dangling blocks', () => {
+  it('E3: after deletes and edits there are no orphan images and no dangling website references', () => {
     fc.assert(
       fc.property(fc.array(stepArb, { minLength: 10, maxLength: 40, size: 'max' }), (steps) => {
         run(steps, (p, s) => {
-          if (!['deletePost', 'deleteBlock', 'updatePost'].includes(s.t)) return
+          if (!['deletePost', 'deleteWidget', 'removeDecoration', 'updatePost', 'revert', 'deleteLink'].includes(s.t)) return
           const used = new Set<string>()
           p.posts.forEach((x) => x.imageIds.forEach((id) => used.add(id)))
-          p.blocks.forEach((b) => b.content.kind === 'image' && used.add(b.content.assetId))
+          for (const d of [p.web.draft, p.web.published?.design]) d?.assets.forEach((a) => used.add(a.id))
+          p.links.forEach((l) => l.buttonAssetId && used.add(l.buttonAssetId))
           expect(p.assets.every((a) => used.has(a.id))).toBe(true)
           const postIds = new Set(p.posts.map((x) => x.id))
-          expect(p.blocks.every((b) => b.content.kind !== 'post' || postIds.has(b.content.postId))).toBe(true)
+          for (const d of [p.web.draft, p.web.published?.design]) {
+            for (const w of d?.widgets ?? []) if (w.content.type === 'diary') expect(w.content.postIds.every((id) => postIds.has(id))).toBe(true)
+          }
+        })
+      }),
+      { numRuns: 200 },
+    )
+  })
+
+  // E5 — Web Atelier: decorating the website never touches entries, the room or recordings,
+  // and never changes what visitors see until the owner publishes.
+  it('E5: website design steps leave content and the published snapshot alone', () => {
+    fc.assert(
+      fc.property(fc.array(stepArb, { minLength: 10, maxLength: 40, size: 'max' }), (steps) => {
+        let before = start()
+        run(steps, (p, s) => {
+          if (DESIGN_STEPS.has(s.t)) {
+            expect(p.posts).toEqual(before.posts)
+            expect(p.room).toEqual(before.room)
+            expect(p.recordings).toEqual(before.recordings)
+            expect(p.links).toEqual(before.links)
+            if (s.t !== 'publishSite') expect(p.web.published).toEqual(before.web.published)
+            else expect(p.web.published?.design).toEqual(p.web.draft)
+          }
+          before = p
         })
       }),
       { numRuns: 200 },

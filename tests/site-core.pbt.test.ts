@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest'
 import { createBackup, restoreBackup } from '../src/core/backup.ts'
 import { exportSite, importSite } from '../src/core/exportZip.ts'
 import { CSP, generateSite } from '../src/core/generate.ts'
-import { isValidLayout, moveBlock, placeBlock, removeBlock, resizeBlock, type LayoutItem } from '../src/core/layout.ts'
 import { normalize } from '../src/core/normalize.ts'
 import { publicProjection } from '../src/core/privacy.ts'
 import { parseProject, type Project } from '../src/core/schema.ts'
@@ -18,12 +17,15 @@ const dec = new TextDecoder()
 const ALLOWED_TAGS = new Set([
   'html', 'head', 'meta', 'title', 'link', 'script', 'body', 'div', 'header', 'p', 'a', 'main',
   'section', 'img', 'h1', 'h2', 'ul', 'li', 'time', 'footer', 'nav', 'article', 'figure', 'iframe', 'br',
-  'audio', 'span',
+  'audio', 'span', 'svg', 'rect', 'form', 'input', 'textarea', 'button', 'figcaption', 'strong',
 ])
 const ALLOWED_ATTRS = new Set([
   'lang', 'charset', 'name', 'content', 'http-equiv', 'rel', 'href', 'type', 'title', 'class', 'id', 'src',
   'alt', 'loading', 'datetime', 'aria-label', 'allow', 'referrerpolicy', 'data-ghost-home', 'defer',
-  'controls', 'preload',
+  'controls', 'preload', 'data-w', 'data-page', 'role', 'aria-current', 'aria-hidden', 'focusable', 'viewBox',
+  'shape-rendering', 'x', 'y', 'width', 'height', 'fill', 'hidden', 'maxlength', 'placeholder', 'required',
+  'tabindex', 'autocomplete', 'readonly', 'rows', 'data-badge-code', 'data-file', 'data-prefix', 'data-title',
+  'data-abs', 'data-copy', 'data-gb', 'data-gb-list', 'data-gb-status',
 ])
 
 function htmlFiles(files: Map<string, Uint8Array>) {
@@ -68,7 +70,8 @@ describe('site core properties', () => {
       fc.property(projectArb, (p) => {
         const files = generateSite(p)
         for (const [path, html] of htmlFiles(files)) {
-          const doc = new JSDOM(html).window.document
+          const dom = new JSDOM(html)
+          const doc = dom.window.document
           for (const el of doc.querySelectorAll('*')) {
             const tag = el.tagName.toLowerCase()
             expect(ALLOWED_TAGS.has(tag), `${path}: unexpected <${tag}>`).toBe(true)
@@ -85,27 +88,36 @@ describe('site core properties', () => {
 
           for (const s of doc.querySelectorAll('script')) {
             if (s.getAttribute('type') === 'application/json') {
-              expect(['ghost-data', 'room-data']).toContain(s.id)
+              expect(['ghost-data', 'room-data', 'site-data']).toContain(s.id)
               const data = JSON.parse(s.textContent!)
               if (s.id === 'ghost-data') {
                 expect(data.name).toBe(p.ghost.name)
                 expect(data.greeting).toContain(p.site.title)
+              } else if (s.id === 'site-data') {
+                expect(data.slug).toBe(p.site.slug)
               } else {
                 // Only the home page carries the room, and it is the same escaped title text.
                 expect(path).toBe('index.html')
                 expect(data.title).toBe(p.site.title)
               }
             } else {
-              expect(['ghost.js', '../ghost.js', 'room.js']).toContain(s.getAttribute('src'))
+              expect(['ghost.js', '../ghost.js', 'room.js', 'site.js', '../site.js']).toContain(s.getAttribute('src'))
               expect(s.textContent).toBe('')
             }
           }
-          expect(doc.querySelectorAll('script').length).toBe((p.ghost.enabled ? 2 : 0) + (path === 'index.html' ? 2 : 0))
+          expect(doc.querySelectorAll('script').length).toBe(2 + (p.ghost.enabled ? 2 : 0) + (path === 'index.html' ? 2 : 0))
           // Escaping is exact: the title round-trips as text, not as markup.
           expect(doc.querySelector('.site-title a')!.textContent).toBe(p.site.title)
+          dom.window.close()
         }
         const css = dec.decode(files.get('style.css')!)
-        expect(css).not.toMatch(/url\(|@import|<\//i)
+        expect(css).not.toMatch(/@import|<\/|expression\(|javascript:/i)
+        // The only URLs in CSS are fixed inline SVG patterns and the site's own background image.
+        for (const m of css.matchAll(/url\(([^)]*)\)/g)) {
+          expect(m[1]!, 'css url').toMatch(/^"(data:image\/svg\+xml,[^"]*|assets\/[a-z0-9_-]+\.(png|jpg|webp|gif))"$/)
+          const ref = /^"assets\/(.+)"$/.exec(m[1]!)
+          if (ref) expect(files.has(`assets/${ref[1]}`)).toBe(true)
+        }
       }),
       RUNS,
     )
@@ -135,45 +147,6 @@ describe('site core properties', () => {
     )
   })
 
-  // P5 — Requirements 2.3–2.5
-  it('P5: any sequence of layout operations keeps the grid valid and keeps every block', () => {
-    const size = fc.constantFrom([1, 1], [2, 1], [2, 2], [4, 1], [4, 2])
-    const op = fc.oneof(
-      fc.record({ t: fc.constant('place' as const), x: fc.integer({ min: -2, max: 6 }), y: fc.integer({ min: -2, max: 12 }), s: size }),
-      fc.record({ t: fc.constant('move' as const), i: fc.nat(), x: fc.integer({ min: -2, max: 6 }), y: fc.integer({ min: -2, max: 12 }) }),
-      fc.record({ t: fc.constant('resize' as const), i: fc.nat(), s: size }),
-      fc.record({ t: fc.constant('remove' as const), i: fc.nat() }),
-    )
-    fc.assert(
-      fc.property(fc.array(op, { maxLength: 40 }), (ops) => {
-        let layout: LayoutItem[] = []
-        const ids = new Set<string>()
-        ops.forEach((o, n) => {
-          const pick = (i: number) => layout[i % layout.length]?.id
-          if (o.t === 'place') {
-            const id = `n${n}`
-            layout = placeBlock(layout, { id, x: o.x, y: o.y, w: o.s[0]!, h: o.s[1]! })
-            ids.add(id)
-          } else if (layout.length === 0) {
-            return
-          } else if (o.t === 'move') {
-            layout = moveBlock(layout, pick(o.i)!, o.x, o.y)
-          } else if (o.t === 'resize') {
-            layout = resizeBlock(layout, pick(o.i)!, o.s[0]!, o.s[1]!)
-          } else {
-            const id = pick(o.i)!
-            layout = removeBlock(layout, id)
-            ids.delete(id)
-          }
-          expect(isValidLayout(layout)).toBe(true)
-          expect(new Set(layout.map((b) => b.id))).toEqual(ids)
-          expect(layout.length).toBe(ids.size)
-        })
-      }),
-      { numRuns: 300 },
-    )
-  })
-
   // P6 — Requirements 3.2–3.4
   it('P6: every reference is relative and resolves, or is an allowed external URL', () => {
     fc.assert(
@@ -184,6 +157,7 @@ describe('site core properties', () => {
           ...pub.links.map((l) => l.url),
           ...Object.values(pub.webring).filter((u): u is string => !!u),
           ...pub.posts.flatMap((x) => (x.video ? [embedSrc(x.video)] : [])),
+          ...pub.web.draft.widgets.flatMap((w) => (w.content.type === 'image' && w.content.href ? [w.content.href] : [])),
         ])
         const check = (page: string, ref: string) => {
           if (/^[a-z][a-z0-9+.-]*:/i.test(ref) || ref.startsWith('//')) {
@@ -196,13 +170,15 @@ describe('site core properties', () => {
           expect(files.has(target), `${page}: ${ref} does not resolve`).toBe(true)
         }
         for (const [page, html] of htmlFiles(files)) {
-          const doc = new JSDOM(html).window.document
+          const dom = new JSDOM(html)
+          const doc = dom.window.document
           for (const el of doc.querySelectorAll('[href],[src]')) {
             const ref = el.getAttribute('href') ?? el.getAttribute('src')!
             check(page, ref)
           }
           const ghost = doc.getElementById('ghost-data')
           if (ghost) for (const g of JSON.parse(ghost.textContent!).guide) check(page, g.href)
+          dom.window.close()
         }
       }),
       RUNS,

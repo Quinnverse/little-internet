@@ -5,15 +5,16 @@ import { join } from 'node:path'
 import { strToU8, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { exportSite } from '../src/core/exportZip.ts'
+import { starterDesign } from '../src/core/design.ts'
 import { defaultRoom } from '../src/core/room.ts'
 import type { Project } from '../src/core/schema.ts'
 import { createApp } from '../server/index.ts'
 
 const project = (slug: string, extra: Partial<Project> = {}): Project => ({
-  schemaVersion: 1,
-  site: { slug, title: 'Moon', tagline: '', theme: 'room', lang: 'en' },
+  schemaVersion: 2,
+  site: { slug, title: 'Moon', tagline: '', lang: 'en' },
   ghost: { enabled: true, name: 'Boo', color: 'white' },
-  blocks: [],
+  web: { draft: starterDesign('retro', { title: 'Moon', lang: 'en' }), guestbook: [] },
   posts: [
     { id: 'p1', slug: 'public-one', title: 'Hello', body: 'hi', createdAt: '2026-01-01T00:00:00.000Z', visibility: 'public', imageIds: [] },
     { id: 'p2', slug: 'secret-one', title: 'TOPSECRETTITLE', body: 'TOPSECRETBODY', createdAt: '2026-01-02T00:00:00.000Z', visibility: 'private', imageIds: [] },

@@ -8,9 +8,10 @@ import { defaultRoom } from '../src/core/room.ts'
 import { parseProject, type Project } from '../src/core/schema.ts'
 import { parseVideoUrl } from '../src/core/video.ts'
 
-function sample(): Project {
+/** A schemaVersion 1 save (block grid + theme), as written by the first releases. */
+function legacySample() {
   return {
-    schemaVersion: 1,
+    schemaVersion: 1 as const,
     site: { slug: 'moon', title: 'Moon’s corner', tagline: 'Notes from the night shift', theme: 'midnight', lang: 'en' },
     ghost: { enabled: true, name: 'Boo', color: 'lilac' },
     assets: [
@@ -51,6 +52,13 @@ function sample(): Project {
   }
 }
 
+/** The same home after migration to schemaVersion 2 (Web Atelier design). */
+function sample(): Project {
+  const r = parseProject(legacySample())
+  if (!r.ok) throw new Error(r.reason)
+  return r.value
+}
+
 const dec = new TextDecoder()
 
 describe('escaping', () => {
@@ -74,9 +82,18 @@ describe('validation', () => {
     ['javascript: link', (p: Project) => (p.links[0]!.url = 'javascript:alert(1)')],
     ['credentials in link', (p: Project) => (p.links[0]!.url = 'https://user:pw@friend.example/')],
     ['non-canonical link', (p: Project) => (p.links[0]!.url = 'HTTPS://friend.example')],
-    ['overlapping blocks', (p: Project) => (p.blocks[1]!.x = 1)],
-    ['block outside grid', (p: Project) => (p.blocks[1]!.x = 3)],
-    ['non-preset size', (p: Project) => ((p.blocks[2] as { w: number }).w = 1, ((p.blocks[2] as { h: number }).h = 2))],
+    ['widget on a missing page', (p: Project) => (p.web.draft.widgets[0]!.pageId = 'nowhere')],
+    ['duplicate widget id', (p: Project) => (p.web.draft.widgets[1]!.id = p.web.draft.widgets[0]!.id)],
+    ['diary widget pointing to a missing entry', (p: Project) => {
+      const w = p.web.draft.widgets.find((x) => x.content.type === 'diary')!
+      if (w.content.type === 'diary') w.content.postIds = ['ghost-post']
+    }],
+    ['CSS injection in a colour', (p: Project) => (p.web.draft.tokens.bg = 'red;}</style><script>')],
+    ['unknown font', (p: Project) => ((p.web.draft.tokens as { bodyFont: string }).bodyFont = 'url(evil)')],
+    ['widget span outside 1-4', (p: Project) => (p.web.draft.widgets[0]!.layout.span = 9)],
+    ['decoration that is also a diary photo', (p: Project) => p.web.draft.assets.push({ id: 'secret', kind: 'image', name: 'x' })],
+    ['decoration without an image', (p: Project) => p.web.draft.assets.push({ id: 'nofile', kind: 'sticker', name: 'x' })],
+    ['javascript: image link', (p: Project) => p.web.draft.widgets.push({ ...p.web.draft.widgets[0]!, id: 'img1', content: { type: 'image', caption: '', href: 'javascript:alert(1)' } })],
     ['missing image reference', (p: Project) => (p.posts[0]!.imageIds = ['nope'])],
     ['duplicate post slug', (p: Project) => (p.posts[1]!.slug = p.posts[0]!.slug)],
     ['control character', (p: Project) => (p.site.title = 'a\u0000b')],
@@ -92,22 +109,38 @@ describe('validation', () => {
 
 describe('compatibility', () => {
   it('loads a project saved before recordings existed', () => {
-    const { recordings: _r, ...old } = sample()
+    const { recordings: _r, ...old } = legacySample()
     const r = parseProject(old)
     expect(r.ok && r.value.recordings).toEqual([])
   })
 
-  it('maps the retired "meadow" theme to "room"', () => {
-    const p = sample() as unknown as { site: { theme: string } }
-    p.site.theme = 'meadow'
-    const r = parseProject(p)
-    expect(r.ok && r.value.site.theme).toBe('room')
+  it('migrates a v1 save: blocks become widgets in reading order, the theme becomes a style', () => {
+    const r = parseProject(legacySample())
+    expect(r.ok).toBe(true)
+    if (!r.ok) return
+    const p = r.value
+    expect(p.schemaVersion).toBe(2)
+    expect('theme' in p.site).toBe(false)
+    expect(p.web.draft.style).toBe('retro')
+    expect(p.web.draft.widgets.map((w) => [w.id, w.content.type])).toEqual([
+      ['b1', 'diary'],
+      ['b2', 'links'],
+      ['b3', 'boo'],
+      ['b4', 'diary'],
+    ])
+    expect(p.web.published).toBeUndefined()
   })
 
-  it('still rejects unknown themes', () => {
-    const p = sample() as unknown as { site: { theme: string } }
-    p.site.theme = 'neon'
-    expect(parseProject(p).ok).toBe(false)
+  it('maps the retired "meadow" theme to the scrapbook style', () => {
+    const old = legacySample() as unknown as { site: { theme: string } }
+    old.site.theme = 'meadow'
+    const r = parseProject(old)
+    expect(r.ok && r.value.web.draft.style).toBe('scrapbook')
+  })
+
+  it('rejects a v2 project without a website design', () => {
+    const { web: _w, ...rest } = sample()
+    expect(parseProject(rest).ok).toBe(false)
   })
 
   it.each([
@@ -148,6 +181,7 @@ describe('generated site', () => {
       'index.html',
       'posts/first-day-at-the-sea.html',
       'room.js',
+      'site.js',
       'site.json',
       'style.css',
     ])

@@ -2,20 +2,23 @@ import { useMemo, useState } from 'preact/hooks'
 import { HOUSES, defaultRoom, type House } from '../../core/room.ts'
 import { GHOST_COLORS, SITE_SLUG_PATTERN, type Project, type Result } from '../../core/schema.ts'
 import type { HomeData } from '../../room3d/view.ts'
+import { STYLES, type StyleId } from '../../core/design.ts'
 import { createProject } from '../commands.ts'
 import { getLang, setLang, t, useLang, type Key } from '../i18n.ts'
-import { randomId, suggestSiteSlug } from '../ids.ts'
+import { suggestSiteSlug } from '../ids.ts'
+import { ta } from '../i18nAtelier.ts'
 import { Field, GhostIcon } from './common.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
 import { Scene } from './Scene.tsx'
 
 /** First run. The little house is already there behind the card, turning slowly. */
-export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
+export function Setup(props: { onDone: (p: Project) => Result<Project>; onDemo?: () => void }) {
   const lang = useLang()
   const [name, setName] = useState('')
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [house, setHouse] = useState<House>('cabin')
+  const [style, setStyle] = useState<StyleId>('retro')
   const [petName, setPetName] = useState('Boo')
   const [petColor, setPetColor] = useState<(typeof GHOST_COLORS)[number]>('white')
   const [error, setError] = useState<string | null>(null)
@@ -31,10 +34,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
   const create = () => {
     const title = name.trim() || t('setup.defaultName')
     if (!slugOk) return setError(t('setup.addressBad'))
-    const project = createProject(
-      { lang: getLang(), title, slug: effectiveSlug, theme: 'room', ghostName: petName.trim() || 'Boo', ghostColor: petColor },
-      [randomId(), randomId(), randomId()],
-    )
+    const project = createProject({ lang: getLang(), title, slug: effectiveSlug, style, ghostName: petName.trim() || 'Boo', ghostColor: petColor })
     project.room = { ...project.room, house }
     const r = props.onDone(project)
     if (!r.ok) setError(r.reason)
@@ -58,6 +58,26 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
           <h1>{t('setup.hero')}</h1>
           <p class="muted">{t('setup.sub')}</p>
         </div>
+
+        {props.onDemo && (
+          <div class="card demo-card">
+            <p>{ta('demo.pitch')}</p>
+            <button type="button" class="btn btn-block" onClick={props.onDemo}>{ta('demo.try')}</button>
+          </div>
+        )}
+
+        <fieldset class="field">
+          <legend class="field-label">{ta('setup.style')}</legend>
+          <div class="style-pick">
+            {STYLES.map((s) => (
+              <button type="button" key={s} class={`style-swatch sw-${s}${style === s ? ' selected' : ''}`} aria-pressed={style === s} onClick={() => setStyle(s)}>
+                <span class="sw-art" aria-hidden="true" />
+                <span class="sw-name">{ta(`style.${s}`)}</span>
+              </button>
+            ))}
+          </div>
+          <span class="field-hint">{ta('setup.styleHint')}</span>
+        </fieldset>
 
         <Field label={t('setup.name')}>
           <input value={name} maxLength={80} placeholder={t('setup.namePh')} onInput={(e) => setName(e.currentTarget.value)} />

@@ -1,20 +1,24 @@
 import ghostRuntime from '../runtime/ghost.js?raw'
 import roomRuntime from '../runtime/room.bundle.js?raw'
+import siteRuntime from '../runtime/site.js?raw'
 import { escapeHtml, jsonForScript } from './escape.ts'
 import { normalize } from './normalize.ts'
-import { publicProjection } from './privacy.ts'
+import { publicProjection, type DesignChoice } from './privacy.ts'
 import { generateFeed } from './rss.ts'
 import { toStored } from './storage.ts'
-import { assetPath, isCanonicalHttpUrl, recordingPath, type Block, type Post, type Project } from './schema.ts'
-import { themeCss, themeExtraCss } from './themes.ts'
-import { ROOM_CSS } from './roomCss.ts'
+import { assetPath, isCanonicalHttpUrl, MIME_EXT, recordingPath, type Asset, type Post, type Project } from './schema.ts'
+import { pageWidgets, type SiteDesign, type SitePage, type SiteWidget } from './design.ts'
+import { designCss } from './siteCss.ts'
+import { spriteSvg } from './pixels.ts'
 import { roomData } from './roomData.ts'
-import { fmt, htmlLang, siteStrings } from './strings.ts'
+import { fmt, htmlLang, siteStrings, type SiteKey } from './strings.ts'
 import { embedSrc, VIDEO_FRAME_HOSTS } from './video.ts'
 
 export type GenerateOptions = {
-  /** Absolute URL where the site will live, ending in "/". Only used for RSS links. */
+  /** Absolute URL where the site will live, ending in "/". Used for RSS links and the badge code. */
   baseUrl?: string
+  /** Which design to build. Publishing and export use the published snapshot (default). */
+  design?: DesignChoice
 }
 
 export type SiteFiles = Map<string, Uint8Array>
@@ -33,25 +37,41 @@ export const CSP = [
 
 const enc = new TextEncoder()
 const h = escapeHtml
-const T = (pub: Project) => siteStrings(pub.site.lang)
+
+/** Path of a page file relative to the site root. */
+export function pagePath(d: SiteDesign, page: SitePage): string {
+  return d.pages[0]?.id === page.id ? 'index.html' : `pages/${page.slug}.html`
+}
+
+/** The 88×31 badge file name, when the design has one. */
+export function buttonFile(pub: Project): { path: string; asset: Asset } | undefined {
+  const id = pub.web.draft.buttonAssetId
+  const asset = id ? pub.assets.find((a) => a.id === id) : undefined
+  return asset ? { path: `button.${MIME_EXT[asset.mime]}`, asset } : undefined
+}
 
 /**
  * The single code path that turns a Project into website files.
- * Publishing uploads this output; exporting zips it.
+ * Publishing uploads this output; exporting zips it; the Atelier preview renders the same pages.
  */
 export function generateSite(project: Project, opts: GenerateOptions = {}): SiteFiles {
   const baseUrl = normalizeBaseUrl(opts.baseUrl)
-  const pub = normalize(publicProjection(project))
+  const pub = normalize(publicProjection(project, opts.design ?? 'published'))
+  const d = pub.web.draft
   const out = new Map<string, string | Uint8Array>()
+  const r = siteRenderer(pub, { mode: 'site', baseUrl })
 
-  out.set('index.html', renderIndex(pub))
-  for (const post of pub.posts) out.set(`posts/${post.slug}.html`, renderPost(pub, post))
-  out.set('style.css', renderCss(pub))
+  for (const page of d.pages) out.set(pagePath(d, page), r.page(page))
+  for (const post of pub.posts) out.set(`posts/${post.slug}.html`, r.post(post))
+  out.set('style.css', designCss(pub, (p) => p))
+  out.set('site.js', siteRuntime)
   out.set('ghost.js', ghostRuntime)
   out.set('room.js', roomRuntime)
   out.set('feed.xml', generateFeed(pub, baseUrl))
   for (const a of pub.assets) out.set(assetPath(a.id, a.mime), a.data)
-  for (const r of pub.recordings) out.set(recordingPath(r.id, r.mime), r.data)
+  for (const rec of pub.recordings) out.set(recordingPath(rec.id, rec.mime), rec.data)
+  const btn = buttonFile(pub)
+  if (btn) out.set(btn.path, btn.asset.data)
 
   out.set('site.json', `${JSON.stringify(toStored(pub).stored, null, 2)}\n`)
 
@@ -63,6 +83,19 @@ export function generateSite(project: Project, opts: GenerateOptions = {}): Site
   return files
 }
 
+/**
+ * One page of the DRAFT design as a self-contained document for the Atelier's live preview:
+ * the same renderer as the real site, with CSS inlined, no scripts, and `urlFor` mapping
+ * site-relative file paths (assets/…, audio/…) to URLs the editor can show.
+ */
+export function renderPreviewPage(project: Project, pageId: string, urlFor: (path: string) => string): string {
+  const pub = normalize(publicProjection(project, 'draft'))
+  const d = pub.web.draft
+  const page = d.pages.find((p) => p.id === pageId) ?? d.pages[0]!
+  const r = siteRenderer(pub, { mode: 'preview', urlFor })
+  return r.page(page)
+}
+
 function normalizeBaseUrl(baseUrl: string | undefined): string | undefined {
   if (!baseUrl) return undefined
   const withSlash = baseUrl.endsWith('/') ? baseUrl : `${baseUrl}/`
@@ -70,277 +103,353 @@ function normalizeBaseUrl(baseUrl: string | undefined): string | undefined {
   return withSlash
 }
 
-// ---------------------------------------------------------------------------- pages
+// ---------------------------------------------------------------------------- renderer
 
-type PageParts = { pub: Project; title: string; prefix: string; main: string; bodyClass: string; room?: boolean }
+type RenderMode = { mode: 'site'; baseUrl?: string } | { mode: 'preview'; urlFor: (path: string) => string }
 
-function page({ pub, title, prefix, main, bodyClass, room }: PageParts): string {
-  const roomScripts = room
-    ? `<script type="application/json" id="room-data">${jsonForScript(roomData(pub))}</script>\n` +
-      `<script src="${prefix}room.js" defer></script>\n`
-    : ''
-  const ghost = pub.ghost.enabled
-    ? `<script type="application/json" id="ghost-data">${jsonForScript(ghostData(pub, prefix))}</script>\n` +
-      `<script src="${prefix}ghost.js" defer></script>\n`
-    : ''
-  return `<!doctype html>
+function siteRenderer(pub: Project, m: RenderMode) {
+  const d = pub.web.draft
+  const S = siteStrings(pub.site.lang)
+  const T = (k: SiteKey) => S[k]
+  const preview = m.mode === 'preview'
+  /** URL of a site file from a page whose root prefix is `prefix`. */
+  const file = (prefix: string, path: string) => (m.mode === 'preview' ? m.urlFor(path) : `${prefix}${path}`)
+  const assetSrc = (prefix: string, a: Asset) => file(prefix, assetPath(a.id, a.mime))
+  const findAsset = (id: string | undefined) => (id ? pub.assets.find((a) => a.id === id) : undefined)
+  const posts = new Map(pub.posts.map((p) => [p.id, p]))
+  const indexPage = d.pages[0]!
+
+  type Doc = { title: string; prefix: string; main: string; bodyClass: string; room?: boolean; current?: string }
+
+  function doc({ title, prefix, main, bodyClass, room, current }: Doc): string {
+    const roomScripts =
+      room && !preview
+        ? `<script type="application/json" id="room-data">${jsonForScript(roomData(pub))}</script>\n` +
+          `<script src="${prefix}room.js" defer></script>\n`
+        : ''
+    const ghost =
+      pub.ghost.enabled && !preview
+        ? `<script type="application/json" id="ghost-data">${jsonForScript(ghostData(prefix))}</script>\n` +
+          `<script src="${prefix}ghost.js" defer></script>\n`
+        : ''
+    const siteScript = preview
+      ? ''
+      : `<script type="application/json" id="site-data">${jsonForScript(siteData())}</script>\n<script src="${prefix}site.js" defer></script>\n`
+    const css = preview
+      ? `<style>${designCss(pub, (p) => file(prefix, p))}</style>\n`
+      : `<meta http-equiv="Content-Security-Policy" content="${h(CSP)}">\n<link rel="stylesheet" href="${prefix}style.css">\n`
+    const fav = findAsset(d.faviconAssetId)
+    const icon = fav ? `<link rel="icon" href="${h(assetSrc(prefix, fav))}">\n` : ''
+    return `<!doctype html>
 <html lang="${htmlLang(pub.site.lang)}">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<meta http-equiv="Content-Security-Policy" content="${h(CSP)}">
-<meta name="generator" content="Little Internet">
+${css}<meta name="generator" content="Little Internet">
 <title>${h(title)}</title>
-<link rel="stylesheet" href="${prefix}style.css">
-<link rel="alternate" type="application/rss+xml" title="${h(pub.site.title)}" href="${prefix}feed.xml">
-${ghost}${roomScripts}</head>
-<body class="${bodyClass} theme-${pub.site.theme}">
+${icon}<link rel="alternate" type="application/rss+xml" title="${h(pub.site.title)}" href="${prefix}feed.xml">
+${siteScript}${ghost}${roomScripts}</head>
+<body class="${bodyClass} style-${d.style}">
 <div class="wrap">
-<header class="site-header">
-<p class="site-title"><a href="${prefix}index.html">${h(pub.site.title)}</a></p>
-${pub.site.tagline ? `<p class="tagline">${h(pub.site.tagline)}</p>\n` : ''}</header>
+${header(prefix, current)}
 ${main}
-${renderFooter(pub, prefix)}
+${footer(prefix)}
 </div>
 </body>
 </html>
 `
-}
-
-function renderIndex(pub: Project): string {
-  const anchors = new Set<string>()
-  for (const kind of ['links', 'voice'] as const) {
-    const first = pub.blocks.find((b) => b.content.kind === kind)
-    if (first) anchors.add(first.id)
   }
-  const blocks = pub.blocks.map((b) => renderBlock(pub, b, anchors.has(b.id))).join('\n')
-  return page({
-    pub,
-    title: pub.site.title,
-    prefix: '',
-    bodyClass: 'home',
-    room: true,
-    main: `<main class="grid">\n${blocks}\n</main>`,
-  })
-}
 
-function renderBlock(pub: Project, b: Block, anchor: boolean): string {
-  const c = b.content
-  let inner = ''
-  switch (c.kind) {
-    case 'post': {
-      const post = pub.posts.find((p) => p.id === c.postId)
-      inner = post ? postCard(pub, post, '') : ''
-      break
-    }
-    case 'image': {
-      const asset = pub.assets.find((a) => a.id === c.assetId)
-      inner = asset ? `<img src="${assetPath(asset.id, asset.mime)}" alt="" loading="lazy">` : ''
-      break
-    }
-    case 'text':
-      inner = `<p>${lines(c.text)}</p>`
-      break
-    case 'links':
-      inner = `<h2>${h(T(pub).friends)}</h2>\n${linkList(pub)}`
-      break
-    case 'latest':
-      inner = `<h2>${h(T(pub).latest)}</h2>\n${latestList(pub, '')}`
-      break
-    case 'ghost-home':
-      inner = '<div class="ghost-home" data-ghost-home></div>'
-      break
-    case 'voice':
-      inner = `<h2>${h(T(pub).answering)}</h2>\n${voiceList(pub)}`
-      break
+  function header(prefix: string, current: string | undefined): string {
+    const navPages = d.pages.filter((p) => p.nav)
+    const nav =
+      navPages.length > 1
+        ? `<nav class="site-nav" aria-label="${h(T('pages'))}">${navPages
+            .map(
+              (p) =>
+                `<a href="${prefix}${pagePath(d, p)}"${p.id === current ? ' aria-current="page"' : ''}>${h(p.title)}</a>`,
+            )
+            .join('')}</nav>\n`
+        : ''
+    const welcome = d.welcome ? `<p class="welcome-banner"><span>${h(d.welcome)}</span></p>\n` : ''
+    return `<header class="site-header">
+<p class="site-title"><a href="${prefix}index.html">${h(pub.site.title)}</a></p>
+${pub.site.tagline ? `<p class="tagline">${h(pub.site.tagline)}</p>\n` : ''}${welcome}${nav}</header>`
   }
-  const id = anchor && (c.kind === 'links' || c.kind === 'voice') ? ` id="${c.kind}"` : ''
-  return `<section class="block b-${b.id} k-${c.kind}"${id}>${inner}</section>`
-}
 
-function postCard(pub: Project, post: Post, prefix: string): string {
-  const cover = post.imageIds[0] ? pub.assets.find((a) => a.id === post.imageIds[0]) : undefined
-  const img = cover ? `<img src="${prefix}${assetPath(cover.id, cover.mime)}" alt="" loading="lazy">` : ''
-  return (
-    `<a class="card" href="${prefix}posts/${post.slug}.html">${img}` +
-    `<h2>${h(post.title)}</h2><p>${h(excerpt(post.body))}</p>` +
-    `<time datetime="${post.createdAt}">${post.createdAt.slice(0, 10)}</time></a>`
-  )
-}
+  function footer(prefix: string): string {
+    const w = pub.webring
+    const ring = [
+      w.prev && `<a href="${h(w.prev)}" rel="noopener">${h(T('prev'))}</a>`,
+      w.hub && `<a href="${h(w.hub)}" rel="noopener">${h(T('webring'))}</a>`,
+      w.random && `<a href="${h(w.random)}" rel="noopener">${h(T('random'))}</a>`,
+      w.next && `<a href="${h(w.next)}" rel="noopener">${h(T('next'))}</a>`,
+    ].filter(Boolean)
+    const hasRingWidget = d.widgets.some((x) => x.content.type === 'webring')
+    const ringNav =
+      ring.length && !hasRingWidget ? `<nav class="webring" aria-label="${h(T('webring'))}">${ring.join(' ')}</nav>\n` : ''
+    return `<footer class="site-footer">
+${ringNav}<p><a href="${prefix}feed.xml">${h(T('rss'))}</a> · ${h(T('madeWith'))}</p>
+</footer>`
+  }
 
-function linkList(pub: Project): string {
-  if (pub.links.length === 0) return `<p class="muted">${h(T(pub).noFriends)}</p>`
-  const items = pub.links
-    .map((l) => `<li><a href="${h(l.url)}" rel="noopener">${h(l.title)}</a></li>`)
-    .join('')
-  return `<ul class="links">${items}</ul>`
-}
-
-function voiceList(pub: Project): string {
-  if (pub.recordings.length === 0) return `<p class="muted">${h(T(pub).noMessages)}</p>`
-  const items = pub.recordings
-    .map((r) => {
-      const label = r.openOn ? ` · <span class="open-on">${h(fmt(T(pub).forDate, { date: r.openOn }))}</span>` : ''
-      const secs = Math.max(1, Math.round(r.durationMs / 1000))
-      return (
-        `<li><p class="rec-title">${h(r.title || T(pub).aMessage)}</p>` +
-        `<p class="rec-meta"><time datetime="${r.createdAt}">${r.createdAt.slice(0, 10)}</time> · ${secs}s${label}</p>` +
-        `<audio controls preload="none" src="${recordingPath(r.id, r.mime)}"></audio></li>`
-      )
+  function page(p: SitePage): string {
+    const prefix = p.id === indexPage.id ? '' : '../'
+    const widgets = pageWidgets(d, p.id)
+      .map((w) => widget(w, prefix))
+      .join('\n')
+    const isIndex = p.id === indexPage.id
+    return doc({
+      title: isIndex ? pub.site.title : `${p.title} · ${pub.site.title}`,
+      prefix,
+      bodyClass: isIndex ? 'home' : 'subpage',
+      room: isIndex,
+      current: p.id,
+      main: `<main class="page-grid cols-${p.columns}" data-page="${p.id}">\n${widgets}\n</main>`,
     })
-    .join('')
-  return `<ul class="voice">${items}</ul>`
-}
+  }
 
-function latestList(pub: Project, prefix: string): string {
-  if (pub.posts.length === 0) return `<p class="muted">${h(T(pub).nothing)}</p>`
-  const items = pub.posts
-    .slice(0, 5)
-    .map((p) => `<li><a href="${prefix}posts/${p.slug}.html">${h(p.title)}</a></li>`)
-    .join('')
-  return `<ul class="latest">${items}</ul>`
-}
+  function widget(w: SiteWidget, prefix: string): string {
+    const look = w.style.look === 'auto' ? d.tokens.look : w.style.look
+    const inner = widgetInner(w, prefix)
+    return `<section class="w w-${w.id} t-${w.content.type} look-${look}" id="w-${w.id}" data-w="${w.id}">${inner}</section>`
+  }
 
-function renderPost(pub: Project, post: Post): string {
-  const prefix = '../'
-  const images = post.imageIds
-    .map((id) => pub.assets.find((a) => a.id === id))
-    .filter((a) => a !== undefined)
-    .map((a) => `<figure><img src="${prefix}${assetPath(a.id, a.mime)}" alt="" loading="lazy"></figure>`)
-    .join('\n')
-  const video = post.video
-    ? `<div class="video"><iframe src="${embedSrc(post.video)}" title="${h(T(pub).video)}" loading="lazy" ` +
-      `allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
-    : ''
-  const main = `<main class="post">
-<p class="back"><a href="${prefix}index.html">← ${h(T(pub).home)}</a></p>
+  const head = (s: string) => (s ? `<h2>${h(s)}</h2>` : '')
+
+  function widgetInner(w: SiteWidget, prefix: string): string {
+    const c = w.content
+    switch (c.type) {
+      case 'welcome':
+        return `${head(c.heading)}${c.text ? paragraphs(c.text) : ''}`
+      case 'about': {
+        const a = findAsset(c.assetId)
+        const img = a ? `<img class="about-photo" src="${h(assetSrc(prefix, a))}" alt="" loading="lazy">` : ''
+        return `${head(c.heading)}${img}${c.text ? paragraphs(c.text) : ''}`
+      }
+      case 'diary': {
+        const list =
+          c.mode === 'latest'
+            ? pub.posts.slice(0, c.count)
+            : c.postIds.map((id) => posts.get(id)).filter((x): x is Post => x !== undefined)
+        if (list.length === 0) return `${head(c.heading)}<p class="muted">${h(T('noEntries'))}</p>`
+        const items = list
+          .map((post) => {
+            const cover = post.imageIds[0] ? findAsset(post.imageIds[0]) : undefined
+            const img = cover && c.excerpts ? `<img src="${h(assetSrc(prefix, cover))}" alt="" loading="lazy">` : ''
+            const ex = c.excerpts && post.body ? `<p>${h(excerpt(post.body))}</p>` : ''
+            return (
+              `<li><a class="entry" href="${prefix}posts/${post.slug}.html">${img}` +
+              `<span class="entry-title">${h(post.title || post.createdAt.slice(0, 10))}</span>` +
+              `<time datetime="${post.createdAt}">${post.createdAt.slice(0, 10)}</time>${ex}</a></li>`
+            )
+          })
+          .join('')
+        return `${head(c.heading)}<ul class="entries${c.excerpts ? ' with-excerpts' : ''}">${items}</ul>`
+      }
+      case 'gallery': {
+        const shots: { a: Asset; href?: string }[] = []
+        if (c.source === 'posts') {
+          for (const post of pub.posts) {
+            for (const id of post.imageIds) {
+              const a = findAsset(id)
+              if (a) shots.push({ a, href: `${prefix}posts/${post.slug}.html` })
+            }
+          }
+        } else {
+          for (const id of c.assetIds) {
+            const a = findAsset(id)
+            if (a) shots.push({ a })
+          }
+        }
+        const pics = shots.slice(0, c.count)
+        if (pics.length === 0) return `${head(c.heading)}<p class="muted">${h(T('noPhotos'))}</p>`
+        const items = pics
+          .map(({ a, href }) => {
+            const img = `<img src="${h(assetSrc(prefix, a))}" alt="" loading="lazy">`
+            return `<li>${href ? `<a href="${href}">${img}</a>` : img}</li>`
+          })
+          .join('')
+        return `${head(c.heading)}<ul class="gallery">${items}</ul>`
+      }
+      case 'bookshelf': {
+        if (c.books.length === 0) return `${head(c.heading)}<p class="muted">${h(T('noBooks'))}</p>`
+        const items = c.books
+          .map(
+            (b) =>
+              `<li><span class="book-title">${h(b.title)}</span>${b.author ? `<span class="book-author">${h(fmt(T('by'), { author: b.author }))}</span>` : ''}${b.note ? `<span class="book-note">${h(b.note)}</span>` : ''}</li>`,
+          )
+          .join('')
+        return `${head(c.heading)}<ul class="books">${items}</ul>`
+      }
+      case 'memories': {
+        const items = pub.room.memory
+          .map((mo) => {
+            const post = posts.get(mo.postId)
+            if (!post) return ''
+            return `<li><a href="${prefix}posts/${post.slug}.html"><span class="keepsake-kind k-${mo.kind}">${h(T('keepsake'))}</span><span class="entry-title">${h(post.title || post.createdAt.slice(0, 10))}</span><time datetime="${post.createdAt}">${post.createdAt.slice(0, 10)}</time></a></li>`
+          })
+          .join('')
+        if (!items) return `${head(c.heading)}<p class="muted">${h(T('noMemories'))}</p>`
+        return `${head(c.heading)}<ul class="keepsakes">${items}</ul>`
+      }
+      case 'audio': {
+        const rec =
+          (pub.room.welcomeRecordingId && pub.recordings.find((x) => x.id === pub.room.welcomeRecordingId)) ||
+          pub.recordings[0]
+        if (!rec) return `${head(c.heading)}<p class="muted">${h(T('noWelcome'))}</p>`
+        const secs = Math.max(1, Math.round(rec.durationMs / 1000))
+        return (
+          `${head(c.heading)}${c.text ? `<p>${h(c.text)}</p>` : ''}` +
+          `<p class="rec-meta">${h(rec.title || T('aMessage'))} · ${secs}s</p>` +
+          `<audio controls preload="none" src="${h(file(prefix, recordingPath(rec.id, rec.mime)))}"></audio>` +
+          `<p class="muted small">${h(T('pressPlay'))}</p>`
+        )
+      }
+      case 'boo':
+        return `${head(c.heading)}<div class="ghost-home" data-ghost-home>${preview || !pub.ghost.enabled ? spriteSvg('ghost', 'px px-boo') : ''}</div>`
+      case 'guestbook': {
+        const notes = pub.web.guestbook
+        const list = notes.length
+          ? notes
+              .slice(0, 50)
+              .map(
+                (n) =>
+                  `<li><strong>${h(n.name)}</strong> <time datetime="${n.createdAt}">${n.createdAt.slice(0, 10)}</time><p>${h(n.text)}</p></li>`,
+              )
+              .join('')
+          : ''
+        const listHtml = `<ul class="gb-list" data-gb-list>${list || `<li class="muted">${h(T('gbEmpty'))}</li>`}</ul>`
+        if (!c.open) return `${head(c.heading)}<p class="muted">${h(T('gbClosed'))}</p>${listHtml}`
+        const form =
+          `<form class="gb-form" data-gb hidden>` +
+          `<input name="name" maxlength="40" placeholder="${h(T('yourName'))}" aria-label="${h(T('yourName'))}">` +
+          `<textarea name="text" maxlength="300" required placeholder="${h(T('yourNote'))}" aria-label="${h(T('yourNote'))}"></textarea>` +
+          `<input name="website" class="gb-trap" tabindex="-1" autocomplete="off" aria-hidden="true">` +
+          `<button type="submit">${h(T('send'))}</button></form>`
+        return `${head(c.heading)}${c.intro ? `<p>${h(c.intro)}</p>` : ''}${form}<p class="gb-status muted small" data-gb-status>${h(T('gbOffline'))}</p>${listHtml}`
+      }
+      case 'links': {
+        if (pub.links.length === 0) return `${head(c.heading)}<p class="muted">${h(T('noFriends'))}</p>`
+        const items = pub.links
+          .map((l) => {
+            const badge = c.look === 'buttons' ? findAsset(l.buttonAssetId) : undefined
+            const label = badge
+              ? `<img class="badge88" src="${h(assetSrc(prefix, badge))}" width="88" height="31" alt="${h(l.title)}">`
+              : `<span class="${c.look === 'buttons' ? 'badge88 badge-text' : ''}">${h(l.title)}</span>`
+            return `<li><a href="${h(l.url)}" rel="noopener">${label}</a></li>`
+          })
+          .join('')
+        return `${head(c.heading)}<ul class="links links-${c.look}">${items}</ul>`
+      }
+      case 'webring': {
+        const w2 = pub.webring
+        const parts = [
+          w2.prev && `<a class="ring-btn" href="${h(w2.prev)}" rel="noopener">${h(T('prev'))}</a>`,
+          w2.random && `<a class="ring-btn" href="${h(w2.random)}" rel="noopener">${h(T('random'))}</a>`,
+          w2.next && `<a class="ring-btn" href="${h(w2.next)}" rel="noopener">${h(T('next'))}</a>`,
+        ].filter(Boolean)
+        const hub = w2.hub ? `<p class="small"><a href="${h(w2.hub)}" rel="noopener">${h(T('webring'))} ↗</a></p>` : ''
+        if (!parts.length && !hub) return `${head(c.heading)}<p class="muted">${h(T('ringJoin'))}</p>`
+        return `${head(c.heading)}<nav class="ring" aria-label="${h(T('webring'))}">${parts.join('')}</nav>${hub}`
+      }
+      case 'button': {
+        const btn = buttonFile(pub)
+        if (!btn) return head(c.heading)
+        const src = file(prefix, btn.path)
+        const home = m.mode === 'site' && m.baseUrl ? m.baseUrl : ''
+        const code = `<a href="${home || './'}"><img src="${home}${btn.path}" width="88" height="31" alt="${h(pub.site.title)}"></a>`
+        return (
+          `${head(c.heading)}<p><img class="badge88" src="${h(src)}" width="88" height="31" alt="${h(pub.site.title)}"></p>` +
+          `<p class="small">${h(T('linkToMe'))}</p>` +
+          `<textarea class="badge-code" readonly rows="3" data-badge-code data-file="${h(btn.path)}" data-prefix="${prefix}" data-title="${h(pub.site.title)}"${home ? ' data-abs="1"' : ''}>${h(code)}</textarea>` +
+          `<button type="button" class="copy-btn" data-copy hidden>${h(T('copy'))}</button>`
+        )
+      }
+      case 'text':
+        return `${head(c.heading)}${c.text ? paragraphs(c.text) : ''}`
+      case 'image': {
+        const a = findAsset(c.assetId)
+        if (!a) return ''
+        const img = `<img src="${h(assetSrc(prefix, a))}" alt="${h(c.caption)}" loading="lazy">`
+        const linked = c.href ? `<a href="${h(c.href)}" rel="noopener">${img}</a>` : img
+        return `<figure>${linked}${c.caption ? `<figcaption>${h(c.caption)}</figcaption>` : ''}</figure>`
+      }
+      case 'sticker': {
+        const a = findAsset(c.assetId)
+        const art = a ? `<img src="${h(assetSrc(prefix, a))}" alt="" loading="lazy">` : spriteSvg(c.sticker)
+        return `<div class="sticker size-${c.size} motion-${c.motion}">${art}</div>`
+      }
+      case 'divider':
+        return `<div class="divider dv-${c.pattern}" role="separator"></div>`
+      case 'construction':
+        return `<div class="construction">${spriteSvg('construction', 'px px-cone')}<span>${h(c.text)}</span>${spriteSvg('construction', 'px px-cone')}</div>`
+    }
+  }
+
+  function post(p: Post): string {
+    const prefix = '../'
+    const images = p.imageIds
+      .map((id) => findAsset(id))
+      .filter((a) => a !== undefined)
+      .map((a) => `<figure><img src="${h(assetSrc(prefix, a))}" alt="" loading="lazy"></figure>`)
+      .join('\n')
+    const video = p.video
+      ? `<div class="video"><iframe src="${embedSrc(p.video)}" title="${h(T('video'))}" loading="lazy" ` +
+        `allow="encrypted-media; picture-in-picture; fullscreen" referrerpolicy="strict-origin-when-cross-origin"></iframe></div>`
+      : ''
+    const main = `<main class="post">
+<p class="back"><a href="${prefix}index.html">← ${h(T('home'))}</a></p>
 <article>
-<h1>${h(post.title)}</h1>
-<p class="date"><time datetime="${post.createdAt}">${post.createdAt.slice(0, 10)}</time></p>
-${paragraphs(post.body)}
+<h1>${h(p.title)}</h1>
+<p class="date"><time datetime="${p.createdAt}">${p.createdAt.slice(0, 10)}</time></p>
+${paragraphs(p.body)}
 ${images}
 ${video}
 </article>
 </main>`
-  return page({ pub, title: `${post.title} · ${pub.site.title}`, prefix, main, bodyClass: 'post-page' })
-}
-
-function renderFooter(pub: Project, prefix: string): string {
-  const w = pub.webring
-  const ring = [
-    w.prev && `<a href="${h(w.prev)}" rel="noopener">${h(T(pub).prev)}</a>`,
-    w.hub && `<a href="${h(w.hub)}" rel="noopener">${h(T(pub).webring)}</a>`,
-    w.random && `<a href="${h(w.random)}" rel="noopener">${h(T(pub).random)}</a>`,
-    w.next && `<a href="${h(w.next)}" rel="noopener">${h(T(pub).next)}</a>`,
-  ].filter(Boolean)
-  const ringNav = ring.length ? `<nav class="webring" aria-label="${h(T(pub).webring)}">${ring.join(' ')}</nav>\n` : ''
-  return `<footer class="site-footer">
-${ringNav}<p><a href="${prefix}feed.xml">${h(T(pub).rss)}</a> · ${h(T(pub).madeWith)}</p>
-</footer>`
-}
-
-// ---------------------------------------------------------------------------- ghost
-
-type GuideItem = { label: string; href: string }
-
-/** Public-only data for ghost.js (ghost spec, Requirement 2.2). */
-function ghostData(pub: Project, prefix: string) {
-  const guide: GuideItem[] = []
-  const latest = pub.posts[0]
-  const latestTitle = latest ? latest.title || latest.createdAt.slice(0, 10) : ''
-  if (latest) guide.push({ label: fmt(T(pub).readTitle, { title: latestTitle }), href: `${prefix}posts/${latest.slug}.html` })
-  if (pub.recordings.length && pub.blocks.some((b) => b.content.kind === 'voice')) {
-    guide.push({ label: T(pub).listen, href: `${prefix}index.html#voice` })
+    return doc({ title: `${p.title} · ${pub.site.title}`, prefix, main, bodyClass: 'post-page' })
   }
-  if (pub.blocks.some((b) => b.content.kind === 'links')) {
-    guide.push({ label: T(pub).meet, href: `${prefix}index.html#links` })
+
+  // ---------------------------------------------------------------------- runtime data
+
+  function siteData() {
+    return {
+      v: 1,
+      slug: pub.site.slug,
+      t: { gbOffline: T('gbOffline'), gbEmpty: T('gbEmpty'), gbSending: T('gbSending'), thanks: T('thanks'), sendFail: T('sendFail'), guestHint: T('guestHint'), copied: T('copied'), copy: T('copy') },
+    }
   }
-  if (pub.webring.random) guide.push({ label: T(pub).randomSite, href: pub.webring.random })
-  guide.push({ label: T(pub).followRss, href: `${prefix}feed.xml` })
-  return {
-    enabled: pub.ghost.enabled,
-    name: pub.ghost.name,
-    color: pub.ghost.color,
-    greeting: fmt(T(pub).greeting, { name: pub.ghost.name || T(pub).fallbackName, site: pub.site.title }),
-    ...(pub.site.lang === 'zh' ? { aria: `${pub.ghost.name || T(pub).fallbackName} · 带你逛这个家`, newText: '有新内容：' } : {}),
-    guide: guide.slice(0, 4),
-    ...(latest
-      ? { latest: { title: latestTitle, href: `${prefix}posts/${latest.slug}.html`, createdAt: latest.createdAt } }
-      : {}),
+
+  type GuideItem = { label: string; href: string }
+
+  /** Public-only data for ghost.js (ghost spec, Requirement 2.2). */
+  function ghostData(prefix: string) {
+    const guide: GuideItem[] = []
+    const latest = pub.posts[0]
+    const latestTitle = latest ? latest.title || latest.createdAt.slice(0, 10) : ''
+    if (latest) guide.push({ label: fmt(T('readTitle'), { title: latestTitle }), href: `${prefix}posts/${latest.slug}.html` })
+    const onIndex = (type: SiteWidget['content']['type']) => pageWidgets(d, indexPage.id).find((w) => w.content.type === type)
+    const audio = onIndex('audio')
+    if (pub.recordings.length && audio) guide.push({ label: T('listen'), href: `${prefix}index.html#w-${audio.id}` })
+    const links = onIndex('links')
+    if (links) guide.push({ label: T('meet'), href: `${prefix}index.html#w-${links.id}` })
+    if (pub.webring.random) guide.push({ label: T('randomSite'), href: pub.webring.random })
+    guide.push({ label: T('followRss'), href: `${prefix}feed.xml` })
+    return {
+      enabled: pub.ghost.enabled,
+      name: pub.ghost.name,
+      color: pub.ghost.color,
+      greeting: fmt(T('greeting'), { name: pub.ghost.name || T('fallbackName'), site: pub.site.title }),
+      ...(pub.site.lang === 'zh' ? { aria: `${pub.ghost.name || T('fallbackName')} · 带你逛这个家`, newText: '有新内容：' } : {}),
+      guide: guide.slice(0, 4),
+      ...(latest
+        ? { latest: { title: latestTitle, href: `${prefix}posts/${latest.slug}.html`, createdAt: latest.createdAt } }
+        : {}),
+    }
   }
-}
 
-// ---------------------------------------------------------------------------- css
-
-const BASE_CSS = `*{box-sizing:border-box}
-body{margin:0;background:var(--bg);color:var(--fg);font-family:var(--font);line-height:1.5}
-a{color:var(--accent)}
-.wrap{max-width:720px;margin:0 auto;padding:16px;container-type:inline-size}
-.site-header{margin-bottom:16px}
-.site-title{font-size:1.6rem;font-weight:700;margin:0}
-.site-title a{color:var(--fg);text-decoration:none}
-.tagline,.muted,.date{color:var(--muted);margin:4px 0 0}
-.grid{--gap:8px;display:grid;grid-template-columns:repeat(4,1fr);grid-auto-rows:calc((100cqi - 3 * var(--gap)) / 4);gap:var(--gap)}
-.block{background:var(--card);border:1px solid var(--border);border-radius:12px;overflow:hidden;padding:10px;min-width:0}
-.block h2{font-size:1rem;margin:0 0 6px}
-.block p{margin:0}
-.block ul{margin:0;padding-left:1.1em}
-.k-image{padding:0}
-.k-image img,.card img{width:100%;height:100%;object-fit:cover;display:block}
-.card{display:flex;flex-direction:column;height:100%;color:inherit;text-decoration:none}
-.card img{height:auto;max-height:55%;border-radius:8px;margin-bottom:6px}
-.card p{overflow:hidden;flex:1;color:var(--muted)}
-.card time{font-size:.8rem;color:var(--muted)}
-.k-ghost-home{background:transparent;border-style:dashed;position:relative}
-.post article img{max-width:100%;border-radius:8px}
-.post figure{margin:16px 0}
-.video{position:relative;aspect-ratio:16/9}
-.video iframe{position:absolute;inset:0;width:100%;height:100%;border:0;border-radius:8px}
-.site-footer{margin-top:24px;color:var(--muted);font-size:.9rem;text-align:center}
-.webring a{margin:0 6px}
-.k-ghost-home{display:grid;place-items:center;overflow:visible;z-index:3}
-.k-voice{overflow:auto}
-.voice{list-style:none;padding:0!important;margin:0}
-.voice li{padding:6px 0;border-top:1px dashed var(--border)}
-.voice li:first-child{border-top:0}
-.rec-title{font-weight:700}
-.rec-meta{font-size:.8rem;color:var(--muted)}
-.voice audio{width:100%;height:36px;margin-top:4px}
-.ghost-wrap{position:relative;display:inline-block}
-.ghost-floating{position:fixed;right:16px;bottom:16px;z-index:20}
-.ghost{display:block;width:60px;height:68px;padding:0;border:0;background:transparent;cursor:pointer;-webkit-tap-highlight-color:transparent}
-.ghost:focus-visible{outline:3px solid var(--accent);outline-offset:4px;border-radius:30px}
-.ghost svg{width:100%;height:100%;overflow:visible;filter:drop-shadow(0 4px 6px rgba(0,0,0,.25))}
-.g-body{stroke:#2b2140;stroke-width:2}
-.ghost-white .g-body{fill:#fbfbff}.ghost-mint .g-body{fill:#c9f2df}.ghost-peach .g-body{fill:#ffd9c4}.ghost-lilac .g-body{fill:#e3d6ff}
-.g-eyes-open,.g-mouth{fill:#2b2140}
-.g-eyes-closed{display:none;fill:none;stroke:#2b2140;stroke-width:2.4;stroke-linecap:round}
-.g-z{opacity:0;fill:var(--fg);font:700 14px/1 system-ui,sans-serif}
-[data-state=idle] .ghost{animation:ghost-float 4s ease-in-out infinite}
-[data-state=sleep] .ghost{animation:ghost-float 7s ease-in-out infinite}
-[data-state=sleep] .g-eyes-open,[data-state=sleep] .g-mouth{display:none}
-[data-state=sleep] .g-eyes-closed{display:inline}
-[data-state=sleep] .g-z{animation:ghost-z 2.4s ease-in-out infinite}
-[data-state=react] .ghost{animation:ghost-jump .7s ease-out 2}
-[data-state=guide] .ghost{transform:scale(1.06)}
-.ghost-bubble{position:absolute;bottom:calc(100% + 10px);left:50%;margin-left:-110px;width:220px;background:var(--card);color:var(--fg);border:1px solid var(--border);border-radius:14px;padding:10px 12px;font-size:.9rem;line-height:1.4;box-shadow:0 8px 24px rgba(0,0,0,.2);z-index:30}
-.ghost-floating .ghost-bubble{left:auto;right:0;margin-left:0}
-.ghost-below .ghost-bubble{bottom:auto;top:calc(100% + 10px)}
-.ghost-bubble p{margin:0 0 6px}
-.ghost-bubble ul{margin:0;padding-left:1.1em}
-.ghost-bubble li{margin:4px 0}
-.ghost-bubble a{display:inline-block;padding:2px 0}
-@keyframes ghost-float{0%,100%{transform:translate(0,0)}25%{transform:translate(3px,-5px)}50%{transform:translate(0,-8px)}75%{transform:translate(-3px,-4px)}}
-@keyframes ghost-jump{0%,100%{transform:translateY(0)}40%{transform:translateY(-18px)}}
-@keyframes ghost-z{0%{opacity:0;transform:translate(0,4px)}50%{opacity:1}100%{opacity:0;transform:translate(6px,-8px)}}
-@media (prefers-reduced-motion:reduce){.ghost,.g-z{animation:none!important}[data-state=sleep] .g-z{opacity:1}}
-`
-
-function renderCss(pub: Project): string {
-  const rules = pub.blocks
-    .map((b) => `.b-${b.id}{grid-column:${b.x + 1} / span ${b.w};grid-row:${b.y + 1} / span ${b.h}}`)
-    .join('\n')
-  return `${themeCss(pub.site.theme)}\n${BASE_CSS}${ROOM_CSS}${themeExtraCss(pub.site.theme)}${rules}\n`
+  return { page, post }
 }
 
 // ---------------------------------------------------------------------------- text
