@@ -6,11 +6,12 @@
 // from the holder of the slug's key (stored as a SHA-256 hash). Guestbook text is plain text,
 // length-capped, rate limited, and pending until the owner approves it.
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto'
-import { createReadStream, existsSync, mkdirSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
+import { createReadStream, existsSync, mkdirSync, readFileSync, renameSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http'
 import { dirname, extname, join, normalize, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { DatabaseSync } from 'node:sqlite'
+import { brotliCompressSync, constants as zc, gzipSync } from 'node:zlib'
 import { unzipSync } from 'fflate'
 import { StoredProjectSchema } from '../src/core/schema.ts'
 
@@ -302,7 +303,11 @@ export function createApp(opts: AppOptions): {
     res.setHeader('Access-Control-Max-Age', '600')
   }
 
-  function serveFile(req: IncomingMessage, res: ServerResponse, root: string, rel: string, fallbackIndex = true) {
+  /** Compressed copies of text files, made once per file version (a Shanghai host serves overseas visitors). */
+  const squeezed = new Map<string, Buffer>()
+  const COMPRESSIBLE = new Set(['.html', '.css', '.js', '.json', '.xml', '.svg', '.webmanifest'])
+
+  function serveFile(req: IncomingMessage, res: ServerResponse, root: string, rel: string, fallbackIndex = true, immutable = false) {
     const abs = resolve(root, `.${sep}${normalize(rel)}`)
     if (abs !== root && !abs.startsWith(root + sep)) throw new HttpError(404, 'Not found')
     let file = abs
@@ -325,8 +330,25 @@ export function createApp(opts: AppOptions): {
       'Content-Type': type,
       'X-Content-Type-Options': 'nosniff',
       'Referrer-Policy': 'no-referrer',
-      'Cache-Control': 'no-cache',
+      'Cache-Control': immutable ? 'public, max-age=31536000, immutable' : 'no-cache',
       'Accept-Ranges': 'bytes',
+      Vary: 'Accept-Encoding',
+    }
+    const ext = extname(file).toLowerCase()
+    const accept = String(req.headers['accept-encoding'] ?? '')
+    const enc = !range && COMPRESSIBLE.has(ext) && st.size > 1024 && st.size < 20 * 1024 * 1024 ? (/\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : '') : ''
+    if (enc) {
+      const key = `${enc}:${file}:${st.mtimeMs}:${st.size}`
+      let body = squeezed.get(key)
+      if (!body) {
+        const raw = readFileSync(file)
+        body = enc === 'br' ? brotliCompressSync(raw, { params: { [zc.BROTLI_PARAM_QUALITY]: 5, [zc.BROTLI_PARAM_SIZE_HINT]: raw.length } }) : gzipSync(raw, { level: 6 })
+        if (squeezed.size > 200) squeezed.clear()
+        squeezed.set(key, body)
+      }
+      res.writeHead(200, { ...headers, 'Content-Encoding': enc, 'Content-Length': body.length })
+      if (req.method === 'HEAD') return void res.end()
+      return void res.end(body)
     }
     if (range && (range[1] || range[2])) {
       const start = range[1] ? Number(range[1]) : Math.max(0, st.size - Number(range[2]))
@@ -604,7 +626,7 @@ export function createApp(opts: AppOptions): {
     }
 
     // The editor app.
-    if (opts.appDir) return serveFile(req, res, resolve(opts.appDir), path === '/' ? '/index.html' : path)
+    if (opts.appDir) return serveFile(req, res, resolve(opts.appDir), path === '/' ? '/index.html' : path, true, path.startsWith('/assets/'))
     throw new HttpError(404, 'Not found')
   }
 

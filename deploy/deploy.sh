@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 TAG="$(git rev-parse --short HEAD)"
-PREV="$(docker inspect --format '{{.Config.Image}}' little-internet-app-1 2>/dev/null || true)"
+PREV="$(docker inspect --format '{{.Config.Image}}' li-v3-app 2>/dev/null || true)"
 [ -n "$PREV" ] && echo "$PREV" > deploy/.previous-image
 TAG="$TAG" docker compose build
 TAG="$TAG" docker compose up -d

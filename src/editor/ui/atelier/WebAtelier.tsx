@@ -252,7 +252,7 @@ export function WebAtelier(props: { ctx: Ctx; onClose: () => void }) {
   return (
     <div class={`atelier${isNarrow ? ' is-narrow' : ''}`} role="dialog" aria-modal="true" aria-label={ta('at.title')}>
       <header class="at-bar">
-        <button type="button" class="btn btn-small" onClick={close}>
+        <button type="button" class="btn btn-small" onClick={close} aria-label={ta('at.back')}>
           <Icon name="home" size={18} /> <span class="hide-sm">{ta('at.back')}</span>
         </button>
         <h1 class="at-title hide-sm">{ta('at.title')}</h1>
@@ -266,14 +266,14 @@ export function WebAtelier(props: { ctx: Ctx; onClose: () => void }) {
           <button type="button" class="icon-btn" onClick={redo} disabled={!hist.current.redo.length} aria-label={ta('at.redo')} title={ta('at.redo')}><Icon name="redo" /></button>
         </div>
         <div class="seg at-device-toggle" role="group" aria-label={`${ta('at.desktop')} / ${ta('at.phone')}`}>
-          <button type="button" class={device === 'desktop' ? 'on' : ''} aria-pressed={device === 'desktop'} onClick={() => setDevice('desktop')} title={ta('at.desktop')}><Icon name="computer" size={18} /><span class="hide-sm"> {ta('at.desktop')}</span></button>
-          <button type="button" class={device === 'phone' ? 'on' : ''} aria-pressed={device === 'phone'} onClick={() => setDevice('phone')} title={ta('at.phone')}><Icon name="mobile" size={18} /><span class="hide-sm"> {ta('at.phone')}</span></button>
+          <button type="button" class={device === 'desktop' ? 'on' : ''} aria-pressed={device === 'desktop'} onClick={() => setDevice('desktop')} title={ta('at.desktop')} aria-label={ta('at.desktop')}><Icon name="computer" size={18} /><span class="hide-sm"> {ta('at.desktop')}</span></button>
+          <button type="button" class={device === 'phone' ? 'on' : ''} aria-pressed={device === 'phone'} onClick={() => setDevice('phone')} title={ta('at.phone')} aria-label={ta('at.phone')}><Icon name="mobile" size={18} /><span class="hide-sm"> {ta('at.phone')}</span></button>
         </div>
         <span class={`at-status${dirty ? ' dirty' : ''} hide-sm`} role="status">{status}</span>
-        <button type="button" class="btn btn-small hide-sm" onClick={() => ctx.toast(ta('at.saved'))}>
+        <button type="button" class="btn btn-small hide-sm" onClick={() => ctx.toast(ta('at.saved'))} aria-label={ta('at.saveDraft')}>
           <Icon name="check" size={16} /> {ta('at.saveDraft')}
         </button>
-        <button type="button" class="btn btn-small" onClick={() => setVisitor(true)} title={ta('at.visitorView')}>
+        <button type="button" class="btn btn-small" onClick={() => setVisitor(true)} title={ta('at.visitorView')} aria-label={ta('at.visitorView')}>
           <Icon name="eye" size={16} /><span class="hide-sm"> {ta('at.visitorView')}</span>
         </button>
         <button type="button" class="btn btn-small btn-primary" onClick={() => setPublishing(true)}>

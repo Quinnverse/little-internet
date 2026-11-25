@@ -433,7 +433,15 @@ export class RoomView {
       if (hot.wall !== undefined) show = show && (this.shell.walls[hot.wall]?.alpha ?? 1) > 0.6
       if (this.decorMode && !hot.id.startsWith('memory:')) show = false
       hot.el.style.display = show ? '' : 'none'
-      if (show) hot.el.style.transform = `translate(${((p.x + 1) / 2) * w}px, ${((1 - p.y) / 2) * h}px) translate(-50%, -50%)`
+      if (show) {
+        const px = ((p.x + 1) / 2) * w
+        hot.el.style.transform = `translate(${px}px, ${((1 - p.y) / 2) * h}px) translate(-50%, -50%)`
+        // Keep the name tag inside the screen: shift it away from the edge it would cross.
+        const half = Math.min(80, hot.el.dataset.tip ? 0 : 70)
+        const shift = half ? (px < half + 6 ? half + 6 - px : px > w - half - 6 ? w - half - 6 - px : 0) : 0
+        hot.el.style.setProperty('--tip-shift', `${Math.round(shift)}px`)
+        if (hot.el.dataset.tip === 'left') hot.el.toggleAttribute('data-flip', px < 150)
+      }
     }
   }
 

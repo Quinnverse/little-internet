@@ -6,7 +6,7 @@ import { onLangChange, t, type Key } from '../i18n.ts'
 import { assetUrl } from './common.tsx'
 import { iconSvg, type IconName } from './icons.tsx'
 
-export const PRIMARY_HOTSPOTS = ['diary', 'computer', 'voice', 'pet', 'window', 'door', 'shelf', 'export']
+export const PRIMARY_HOTSPOTS = ['diary', 'computer', 'voice', 'pet', 'window', 'door', 'shelf']
 
 const HOT_ICON: Record<string, IconName> = {
   diary: 'pen',

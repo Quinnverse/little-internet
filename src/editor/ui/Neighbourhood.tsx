@@ -161,9 +161,10 @@ export function DoorSheet(props: { ctx: Ctx; onClose: () => void; onPreview: () 
           </button>
         ) : (
           <>
-            <p class="muted small">{ta('door.reopenNote')}</p>
-            <button type="button" class="btn btn-primary btn-block" disabled={busy || status === 'loading'} onClick={reopen}>
-              <Icon name="door" size={18} /> {busy ? ta('door.working') : ctx.project.web.published ? ta('door.reopen') : ta('crt.decorate')}
+            {ctx.project.web.published && status !== null && <p class="muted small">{ta('door.reopenNote')}</p>}
+            {(!ctx.project.web.published || status === null) && <p class="muted small">{ta('door.notYet')}</p>}
+            <button type="button" class="btn btn-primary btn-block" disabled={busy || status === 'loading'} onClick={status === null || !ctx.project.web.published ? props.onAtelier : reopen}>
+              <Icon name="door" size={18} /> {busy ? ta('door.working') : ctx.project.web.published && status !== null ? ta('door.reopen') : ta('door.toAtelier')}
             </button>
           </>
         )}

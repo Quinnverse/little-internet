@@ -1,0 +1,80 @@
+// Visual sweep of the owner app: home (day/night), decorate, journal, keepsake, atelier, badge, walk, door, move.
+// Usage: SERVER=http://127.0.0.1:4173 SHOTS=.shots node scripts/shot-owner.mjs [375|390|768|1440 ...]
+import { mkdirSync } from 'node:fs'
+import { chromium } from 'playwright'
+const APP = (process.env.SERVER ?? 'http://127.0.0.1:4173') + '/'
+const SHOTS = process.env.SHOTS ?? '.shots'
+mkdirSync(SHOTS, { recursive: true })
+const sizes = { 375: [375, 667], 390: [390, 844], 768: [768, 1024], 1440: [1440, 900] }
+const want = process.argv.slice(2).length ? process.argv.slice(2) : Object.keys(sizes)
+const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+for (const k of want) {
+  const [w, h] = sizes[k]
+  const c = await b.newContext({ viewport: { width: w, height: h }, isMobile: w < 800, hasTouch: w < 800 })
+  const p = await c.newPage()
+  const s = (n) => p.screenshot({ path: `${SHOTS}/${k}-${n}.png` })
+  const closeAll = async () => {
+    for (let i = 0; i < 4; i++) {
+      const x = p.locator('.sheet-head button[aria-label="Close"]').last()
+      if (!(await x.count())) break
+      await x.click({ timeout: 1500 }).catch(() => {})
+      await p.waitForTimeout(250)
+    }
+  }
+  const over = async (n) => console.log(k, n, 'overflow', await p.evaluate(() => document.documentElement.scrollWidth - innerWidth))
+  await p.goto(APP)
+  await p.locator('.setup').waitFor()
+  await p.waitForTimeout(1500)
+  await s('00-first-run'); await over('first-run')
+  await p.getByRole('button', { name: 'Try a demo home' }).click()
+  await p.getByRole('button', { name: 'The Book Nook' }).click()
+  await p.locator('.home .scene canvas').waitFor()
+  await p.waitForTimeout(3500)
+  await s('01-home-day'); await over('home')
+  await p.getByRole('button', { name: 'Light', exact: false }).first().click({ timeout: 1500 }).catch(() => {})
+  await p.locator('button.hotspot[data-id="window"]').click({ force: true }).catch(() => {})
+  await p.getByRole('button', { name: 'Night', exact: true }).click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(1500); await s('02-home-night')
+  await closeAll(); await p.waitForTimeout(500)
+  await p.getByRole('button', { name: 'Decorate', exact: true }).click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(1200); await s('03-decorate')
+  await p.locator('.deco').getByRole('button', { name: 'Done' }).click({ timeout: 2000 }).catch(() => {}); await p.waitForTimeout(600)
+  await p.getByRole('button', { name: 'Write', exact: true }).click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(800); await s('04-write'); await over('write')
+  await closeAll()
+  await p.getByRole('button', { name: 'Journal', exact: true }).click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(600); await s('05-journal')
+  await p.locator('.entry-main').first().click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(600); await s('06-entry-keepsake'); await over('entry')
+  await closeAll()
+  await p.locator('button.hotspot[data-id="computer"]').click({ force: true, timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(600); await s('07-crt-menu')
+  await p.locator('.crt-item', { hasText: 'Decorate my website' }).click({ timeout: 3000 }).catch(() => {})
+  await p.locator('.atelier').waitFor({ timeout: 5000 }).catch(() => {})
+  await p.waitForTimeout(1200); await s('08-atelier'); await over('atelier')
+  await p.getByRole('tab', { name: 'Add' }).click().catch(() => {}); await p.waitForTimeout(300); await s('09-atelier-add')
+  await p.getByRole('tab', { name: 'Style' }).click().catch(() => {}); await p.waitForTimeout(300); await s('10-atelier-style')
+  await p.frameLocator('.at-frame').locator('[data-w]').nth(2).click().catch(() => {}); await p.waitForTimeout(500); await s('11-atelier-edit')
+  await p.getByRole('tab', { name: 'Site' }).click().catch(() => {}); await p.waitForTimeout(300)
+  await p.getByRole('button', { name: 'Make my badge' }).click({ timeout: 2000 }).catch(() => {}); await p.waitForTimeout(500); await s('12-badge'); await over('badge')
+  await closeAll()
+  await p.locator('.atelier .sheet-backdrop').click({ position: { x: 3, y: 3 } }).catch(() => {})
+  await p.locator('.at-bar button').first().click({ timeout: 2000 }).catch(() => {})
+  await p.locator('button.hotspot[data-id="computer"]').click({ force: true, timeout: 3000 }).catch(() => {})
+  await p.locator('.crt-item', { hasText: 'Internet Walk' }).click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(800); await s('13-walk'); await over('walk')
+  await closeAll()
+  await p.locator('button.hotspot[data-id="computer"]').click({ force: true, timeout: 3000 }).catch(() => {})
+  await p.locator('.crt-item', { hasText: 'Move my home' }).click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(1000); await s('14-move-packing')
+  await p.getByRole('button', { name: 'Skip' }).click({ timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(400); await s('15-move'); await over('move')
+  await closeAll()
+  await p.locator('button.hotspot[data-id="door"]').click({ force: true, timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(1200); await s('16-door'); await over('door')
+  await closeAll()
+  await p.locator('button.hotspot[data-id="pet"]').click({ force: true, timeout: 3000 }).catch(() => {})
+  await p.waitForTimeout(800); await s('17-pet')
+  await c.close()
+}
+await b.close()

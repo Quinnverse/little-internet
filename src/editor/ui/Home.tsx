@@ -226,7 +226,7 @@ export function Home(props: { ctx: Ctx }) {
         </div>
         <div class="hud-actions">
           <button type="button" class="round" onClick={toggleLang} aria-label={t('hud.lang')} title={t('hud.lang')}>
-            <span class="lang-text">{lang === 'en' ? '中' : 'EN'}</span>
+            <Icon name="globe" size={18} /><span class="lang-text">{lang === 'en' ? '中文' : 'EN'}</span>
           </button>
           <button type="button" class="round" onClick={() => open({ kind: 'settings' })} aria-label={t('hud.settings')} title={t('hud.settings')}>
             <Icon name="gear" size={20} />

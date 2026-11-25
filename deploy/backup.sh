@@ -5,6 +5,6 @@ set -euo pipefail
 OUT="${1:-/root/little-internet-backups}"
 mkdir -p "$OUT"
 FILE="$OUT/data-$(date +%Y%m%d-%H%M%S).tar.gz"
-docker run --rm -v little-internet_little-internet-v3:/data:ro -v "$OUT":/out alpine \
+docker run --rm -v li-v3-data:/data:ro -v "$OUT":/out alpine \
   tar czf "/out/$(basename "$FILE")" -C /data .
 echo "$FILE"

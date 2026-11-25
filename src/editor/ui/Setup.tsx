@@ -9,6 +9,7 @@ import { getLang, setLang, t, useLang, type Key } from '../i18n.ts'
 import { suggestSiteSlug } from '../ids.ts'
 import { ta } from '../i18nAtelier.ts'
 import { Field, GhostIcon } from './common.tsx'
+import { Icon } from './icons.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
 import { Scene } from './Scene.tsx'
 
@@ -53,7 +54,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
     <div class="setup-wrap">
       <Scene data={data} hotspots={[]} decorate={false} selected={null} drift onPick={() => undefined} />
       <button type="button" class="round lang-float" onClick={() => setLang(lang === 'en' ? 'zh' : 'en')} aria-label={t('hud.lang')}>
-        <span class="lang-text">{lang === 'en' ? '中' : 'EN'}</span>
+        <Icon name="globe" size={18} /><span class="lang-text">{lang === 'en' ? '中文' : 'EN'}</span>
       </button>
       <main class="setup">
         <div class="setup-hero">
@@ -102,6 +103,8 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
           <input value={name} maxLength={80} placeholder={t('setup.namePh')} onInput={(e) => setName(e.currentTarget.value)} />
         </Field>
 
+        <details class="more-opts">
+          <summary>{ta('setup.more')}</summary>
         <Field label={t('setup.address')} hint={t('setup.addressHint', { slug: effectiveSlug || '…' })}>
           <input
             value={effectiveSlug}
@@ -149,6 +152,8 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
             ))}
           </div>
         </fieldset>
+
+        </details>
 
         {error && <p class="error" role="alert">{error}</p>}
 

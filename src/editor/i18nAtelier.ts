@@ -2,6 +2,7 @@ import { getLang } from './i18n.ts'
 
 /** UI words for Web Atelier, the door, the walk, the badge editor and Move My Home (en / zh). */
 const en = {
+  'setup.more': 'Address, house and pet (optional)',
   'setup.style': 'Website style',
   'setup.styleHint': 'Only a starting point. You can change everything later in Web Atelier.',
   'demo.pitch': 'Not ready to move in? Explore a fully decorated demo home first. It is your own copy and stays on this device.',
@@ -269,6 +270,8 @@ const en = {
   'door.close': 'Close the door',
   'door.reopen': 'Open the door again',
   'door.closeConfirm': 'Close your door? The published copy is removed from the server. Your entries and decorations stay on this device.',
+  'door.notYet': 'Your door is closed until you publish. Decorate your website, press Publish, and your address goes live.',
+  'door.toAtelier': 'Decorate and publish my website',
   'door.reopenNote': 'Opening publishes your current published design again. Check the visitor preview first.',
   'door.copies': 'Copies other people already downloaded, or that a third party cached, cannot be pulled back.',
   'door.preview': 'Visitor preview',
@@ -319,6 +322,7 @@ const en = {
 export type AtelierKey = keyof typeof en
 
 const zh: Record<AtelierKey, string> = {
+  'setup.more': '地址、房屋和宠物（可选）',
   'setup.style': '网站风格',
   'setup.styleHint': '只是一个起点。之后在网站装修室里，一切都可以改。',
   'demo.pitch': '还没想好搬进来？先逛逛一个装修好的示范家园。那是你自己的副本，只保存在这台设备上。',
@@ -586,6 +590,8 @@ const zh: Record<AtelierKey, string> = {
   'door.close': '关上门',
   'door.reopen': '重新开门',
   'door.closeConfirm': '要关门吗？服务器上的公开副本会被移除。你的日记和装修仍保存在这台设备上。',
+  'door.notYet': '发布之前门是关着的。先装修网站，点“发布”，你的地址就会上线。',
+  'door.toAtelier': '装修并发布我的网站',
   'door.reopenNote': '开门会重新发布你当前的已发布设计。请先看看访客预览。',
   'door.copies': '已经被别人下载、或被第三方缓存的副本，无法远程撤回。',
   'door.preview': '访客预览',
