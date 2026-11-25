@@ -8,11 +8,12 @@ import { dirname, join, normalize as normPath } from 'node:path'
 import { JSDOM } from 'jsdom'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { exportSite } from '../src/core/exportZip.ts'
-import type { Project } from '../src/core/schema.ts'
+import { defaultRoom } from '../src/core/room.ts'
+import { parseProject, type Project } from '../src/core/schema.ts'
 
-const project: Project = {
-  schemaVersion: 1,
-  site: { slug: 'moon', title: 'Moon’s corner', tagline: 'Notes from the night shift', theme: 'midnight' },
+const legacy = {
+  schemaVersion: 1 as const,
+  site: { slug: 'moon', title: 'Moon’s corner', tagline: 'Notes from the night shift', theme: 'midnight', lang: 'en' },
   ghost: { enabled: true, name: 'Boo', color: 'lilac' },
   assets: [{ id: 'sea', mime: 'image/png', data: new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10]) }],
   posts: [
@@ -39,7 +40,13 @@ const project: Project = {
   ],
   links: [{ id: 'l1', title: 'A friend', url: 'https://friend.example/' }],
   webring: { next: 'https://ring.example/next' },
+  room: defaultRoom(),
 }
+
+// The fixture is a v1 save; exports always run on the migrated (v2) project.
+const parsed = parseProject(legacy)
+if (!parsed.ok) throw new Error(parsed.reason)
+const project: Project = parsed.value
 
 let root: string
 let server: Server
@@ -110,6 +117,8 @@ describe('exported site runs on a plain static host', () => {
       'ghost.js',
       'index.html',
       'posts/first-day-at-the-sea.html',
+      'room.js',
+      'site.js',
       'style.css',
     ])
     expect([...new Set(external)].sort()).toEqual(['https://friend.example/', 'https://ring.example/next'])

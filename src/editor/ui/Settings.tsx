@@ -1,71 +1,75 @@
 import { useState } from 'preact/hooks'
-import { GHOST_COLORS, SITE_SLUG_PATTERN, THEMES } from '../../core/schema.ts'
-import { THEME_VARS } from '../../core/themes.ts'
+import { GHOST_COLORS, SITE_SLUG_PATTERN } from '../../core/schema.ts'
 import { compose, updateGhost, updateSite } from '../commands.ts'
-import { Field, GhostIcon, run, type Ctx } from './common.tsx'
+import { idbDelete } from '../idb.ts'
+import { resetState } from '../store.ts'
+import { ta } from '../i18nAtelier.ts'
+import { Icon } from './icons.tsx'
+import { setLang, t, useLang, type Key } from '../i18n.ts'
+import { Field, GhostIcon, run, Sheet, type Ctx } from './common.tsx'
 
-export function Settings(props: { ctx: Ctx }) {
+export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; setFlat: (v: boolean) => void }) {
+  const lang = useLang()
   const { ctx } = props
   const { site, ghost } = ctx.project
   const [title, setTitle] = useState(site.title)
   const [tagline, setTagline] = useState(site.tagline)
   const [slug, setSlug] = useState(site.slug)
-  const [ghostName, setGhostName] = useState(ghost.name)
+  const [petName, setPetName] = useState(ghost.name)
 
   const saveText = () => {
-    if (!SITE_SLUG_PATTERN.test(slug)) return ctx.toast('The address may only use a–z, 0–9 and dashes.', 'error')
+    if (!SITE_SLUG_PATTERN.test(slug)) return ctx.toast(t('setup.addressBad'), 'error')
     run(
       ctx,
-      compose(updateSite({ title: title.trim() || site.title, tagline: tagline.trim(), slug }), updateGhost({ name: ghostName.trim() || ghost.name })),
-      'Saved.',
+      compose(updateSite({ title: title.trim() || site.title, tagline: tagline.trim(), slug }), updateGhost({ name: petName.trim() || ghost.name })),
+      t('settings.saved'),
     )
   }
 
   return (
-    <section class="screen">
-      <div class="screen-head">
-        <h1>Settings</h1>
-      </div>
+    <Sheet title={t('settings.title')} onClose={props.onClose}>
       <div class="card">
-        <Field label="Home name">
+        <Field label={t('settings.name')}>
           <input value={title} maxLength={80} onInput={(e) => setTitle(e.currentTarget.value)} />
         </Field>
-        <Field label="Tagline">
-          <input value={tagline} maxLength={200} placeholder="A few words under the name" onInput={(e) => setTagline(e.currentTarget.value)} />
+        <Field label={t('settings.tagline')}>
+          <input value={tagline} maxLength={200} placeholder={t('settings.taglinePh')} onInput={(e) => setTagline(e.currentTarget.value)} />
         </Field>
-        <Field label="Address" hint="Changing it changes where your published site lives.">
+        <Field label={t('settings.address')} hint={t('settings.addressHint')}>
           <input value={slug} maxLength={32} autocapitalize="off" spellcheck={false} onInput={(e) => setSlug(e.currentTarget.value.toLowerCase())} />
         </Field>
-        <Field label="Ghost’s name">
-          <input value={ghostName} maxLength={24} onInput={(e) => setGhostName(e.currentTarget.value)} />
+        <Field label={t('settings.petName')}>
+          <input value={petName} maxLength={24} onInput={(e) => setPetName(e.currentTarget.value)} />
         </Field>
-        <button type="button" class="btn btn-primary" onClick={saveText}>Save</button>
+        <button type="button" class="btn btn-primary" onClick={saveText}>{t('common.save')}</button>
       </div>
 
-      <h2>Style</h2>
+      <h3>{t('settings.language')}</h3>
       <div class="choice-row">
-        {THEMES.map((t) => (
+        {(['en', 'zh'] as const).map((l) => (
           <button
             type="button"
-            key={t}
-            class={`theme-chip ${site.theme === t ? 'selected' : ''}`}
-            style={{ background: THEME_VARS[t].bg, color: THEME_VARS[t].fg, borderColor: THEME_VARS[t].accent }}
-            aria-pressed={site.theme === t}
-            onClick={() => run(ctx, updateSite({ theme: t }))}
+            key={l}
+            class={`chip ${lang === l ? 'selected' : ''}`}
+            aria-pressed={lang === l}
+            onClick={() => {
+              setLang(l)
+              run(ctx, updateSite({ lang: l }))
+            }}
           >
-            {t[0]!.toUpperCase() + t.slice(1)}
+            {l === 'en' ? 'English' : '中文'}
           </button>
         ))}
       </div>
 
-      <h2>Ghost</h2>
+      <h3>{t('settings.petColor')}</h3>
       <div class="choice-row">
         {GHOST_COLORS.map((c) => (
           <button
             type="button"
             key={c}
             class={`ghost-chip ${ghost.color === c ? 'selected' : ''}`}
-            aria-label={c}
+            aria-label={t(`color.${c}` as Key)}
             aria-pressed={ghost.color === c}
             onClick={() => run(ctx, updateGhost({ color: c }))}
           >
@@ -75,8 +79,35 @@ export function Settings(props: { ctx: Ctx }) {
       </div>
       <label class="switch-row">
         <input type="checkbox" checked={ghost.enabled} onChange={(e) => run(ctx, updateGhost({ enabled: e.currentTarget.checked }))} />
-        <span>Ghost welcomes visitors</span>
+        <span>{t('settings.petOn')}</span>
       </label>
-    </section>
+      <h3>{ta('reset.title')}</h3>
+      <div class="card card-warn">
+        <p class="small">{ta('reset.body')}</p>
+        <button
+          type="button"
+          class="btn btn-danger btn-block"
+          onClick={async () => {
+            if (!confirm(ta('reset.confirm'))) return
+            resetState.on = true
+            try {
+              await idbDelete('project')
+              window.location.replace(window.location.pathname)
+            } catch (e) {
+              resetState.on = false
+              ctx.toast(String(e), 'error')
+            }
+          }}
+        >
+          <Icon name="trash" size={18} /> {ta('reset.button')}
+        </button>
+      </div>
+      <label class="switch-row">
+        <input type="checkbox" checked={props.flat} onChange={(e) => props.setFlat(e.currentTarget.checked)} />
+        <span>
+          {t('settings.low')} <span class="muted small">{t('settings.lowHint')}</span>
+        </span>
+      </label>
+    </Sheet>
   )
 }

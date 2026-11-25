@@ -2,126 +2,120 @@
 inclusion: always
 ---
 
-# Product: Little Internet
+# Product: Little Internet 2.0
 
-**Tagline:** A quiet corner of the internet, just for you.
+**Tagline:** Your world, your web. A small home that remembers your life.
 **Principle:** Private by default. Personal by design. Portable by nature.
 
-A private little home on the internet. The owner writes a diary, keeps photos, decorates
-the room, and lives alongside a small ghost. Nothing needs to perform for anyone. When the
-owner chooses to open the door, the public part becomes an independent personal website
-that can be exported and kept running without our platform. The owner can leave recordings
-of their own voice in the house (voice time capsule) for whoever visits, now or after
-they are gone.
+A cozy life-sim where the **home is the interface**. The owner lives in a small 3D house
+with a pet. The things in the house are real entry points: the diary on the desk opens the
+writing sheet, the computer opens the owner's personal website, the answering machine plays
+the owner's own voice, the shelf holds memories, the door is how visitors come in.
 
-Hackathon category: **Resurrection** — reviving the GeoCities-era personal homepage and
-the answering machine, reimagined as a private home rather than a profile to impress.
-Death is part of the theme, not a contradiction: the ghost keeps the house warm, and the
-owner's real voice stays in it.
+Hackathon category: **Resurrection**. What we resurrect is the **GeoCities-era personal
+homepage** (a plot of the web you decorate and own, friend links / webring, a guestbook) and
+the **answering machine**, rebuilt as a home you live in. What is new today: a 3D room in the
+browser, memories that become objects, and a site you can export and keep running without us.
+Death is part of the theme, not a contradiction: the pet keeps the house warm, and the owner's
+real voice stays in it.
 
-## Privacy defaults
+## One world, three views (one data model, no duplicated content)
 
-- Every new post and recording is **private** by default. Making something public is an
-  explicit owner action, every time.
-- Private content lives only on the device (IndexedDB) and in the private backup. It is
-  never sent to any server or API.
+- **Home** (3D room): the emotional view. Tap an object to use it.
+- **Journal** (lists/sheets): the efficient view. Write and read without hunting for a desk.
+- **Web** (generated static site): the public view, opened from the computer, exportable.
+
+A memory is written once and shown in all three. Changing visibility or deleting it updates
+the room object and the public page together.
+
+## Privacy defaults (unchanged, non-negotiable)
+
+- Every new post, recording and memory object is **private** by default. Making something
+  public is an explicit owner action, every time. No reward, level or unlock depends on
+  publishing.
+- Private content lives on the device (IndexedDB) and in the private backup. It never
+  reaches any server, API, or AI service. The backend receives only the **public
+  projection** the owner chooses to publish.
+- A memory object is only generated from a choice the owner makes (pick an object kind). The
+  system never reads private text to decide what to create.
 
 ## Product form (decided)
 
-- The **creator** is a Web App, installable as a PWA, that works on **phone, tablet and
-  desktop**. Phone is designed first; tablet and desktop get a layout of their own
-  (side navigation, centred dialogs, mouse and keyboard), not a stretched phone UI.
-  Installing is a convenience for creators, never a requirement for visitors.
-- Every published/exported site also works on phone, tablet and desktop (the grid scales).
-- What users publish is an **independent static website**, not an app. Visitors open it
-  in any browser, on phone or desktop, with no account and no install.
-- Online publishing and ZIP export use **the same static site generator**. There is no
-  second rendering path.
-- Publish address for the hackathon: path form, `<host>/@<slug>/`. No subdomains,
-  no custom domains.
-- Editor preview loads the same `ghost.js` runtime that ships in exported sites.
+- Web App, installable PWA, phone first, with tablet/desktop layouts. 3D room is the main
+  screen; sheets (standard HTML) are used for writing, so input stays comfortable.
+- Languages: **English and Chinese (zh)**, switchable at runtime, default from the browser.
+  The exported site uses the owner's chosen site language.
+- What users publish is an **independent static website** that also contains an optional 3D
+  room runtime for visitors. It must stay readable without JavaScript and without WebGL.
+- Online publishing and ZIP export use **the same generator**. No second rendering path.
+- Publish address: `<host>/@<slug>/`.
+- 3D assets: low-poly models built in **Blender from code** (`assets/blender`), reviewed by the
+  owner, quantized and embedded in the app and in `room.js`. The code-drawn Three.js objects stay
+  as the fallback when a model is missing. No runtime AI calls. The Hunyuan3D-2 pipeline is kept
+  (`scripts/assets`, `assets/hunyuan`) but no Hunyuan model ships today.
 
 ## Two files, never confused
 
-- **Site export ZIP**: public projection only. Meant to be deployed. Contains HTML, CSS,
-  RSS, assets, ghost runtime, and a public `site.json` for re-import.
-- **Private backup**: full project including private drafts. Meant to stay with the user
-  (drafts live in IndexedDB, which browsers can clear). Never deployed, never published.
-  The UI must make this difference obvious.
-
-## Grid contract
-
-Fixed 4-column grid. Phones fill the width; desktop centres the grid at a max width
-(~720px). Layout **scales, it never reflows** — one layout, every screen.
+- **Site export ZIP**: public projection only. Deployable. HTML, CSS, RSS, assets, ghost
+  runtime, room runtime, public `site.json`.
+- **Private backup**: full project including private items and room layout. Never deployed.
 
 ## The one acceptance chain (must never break)
 
 **Edit → Publish → Export → Run independently → Re-import**
 
-Any change that risks this chain is lower priority than keeping it working.
+## Priority order (cut from the bottom)
 
-## Priority order (when time runs short, cut from the bottom)
+1. Ownership and export chain (static, self-contained, re-importable)
+2. Home: one polished room, pet, tappable objects, rotate/zoom, mobile controls
+3. Memory → object (owner chooses), diary/journal sheets, voice welcome at the door
+4. Visitor entrance (door, doorbell, pet greeting, welcome voice, public objects)
+5. Computer → website, publish to backend, guestbook with owner moderation
+6. Decorate mode (wallpaper, floor, furniture move/rotate/add/remove, 2 house styles)
+7. Webring / friend links, themes
 
-1. Site ownership and export (static HTML/CSS/RSS/site.json, fully self-contained)
-2. Mobile creation (snap-grid editor, private-by-default posts, photos)
-3. Ghost (website companion component, including local "memories")
-4. Voice time capsule (answering-machine block)
-5. Themes (exactly 3; one is the "room" skin)
-6. Friend links / webring (static links only; already in the generator)
-
-The guestbook is removed; the voice time capsule took its slot.
 Rule: a new feature may only enter by **replacing** one of equal cost.
 
-## Voice time capsule
+## Backend (added in 2.0)
 
-- An answering-machine block in the room. The owner records their own voice in the
-  browser (MediaRecorder), up to 60 seconds per recording, a few recordings total.
-- Each recording is public or private like a post. Public recordings ship in the export as
-  plain audio files and play with a native `<audio>` element; private ones exist only in
-  the private backup.
-- Real recordings only. No voice synthesis or cloning, ever.
-- No accounts, verification, or "memorial mode". The owner simply leaves recordings.
-- An optional "open on" date may only be shown as a label. A static site cannot really
-  lock a file, so the UI must not claim it is locked.
+A small Node server: hosts published sites at `/@slug/`, and stores guestbook messages.
+- Publishing accepts only a site-export ZIP (public data). The owner proves ownership of a
+  slug with a secret key created in their browser; the server stores only its hash.
+- Guestbook: visitors leave text only. Messages are **pending** until the owner approves
+  them. Rate limited, length limited, rendered as text. Works only on the platform copy;
+  exported copies on other hosts hide the form.
+- No accounts, no emails, no analytics, no visitor counters.
 
-## Room skin (theme id `room`, replaces the old `meadow`)
+## Voice welcome
 
-The "room" is a visual theme over the same grid, not a new system: post blocks look like
-a notebook, image blocks like picture frames, link blocks like a bookshelf, the voice
-block like an answering machine, the ghost's spot like a rug. Same data, same export,
-gradients only (no image files). The three themes are `paper`, `midnight`, `room`.
+Real recordings only. No synthesis or cloning. The owner marks one recording as the welcome.
+Visitors press play themselves; nothing autoplays. "Open on" stays a label, never a lock.
 
-## Frozen scope — do NOT add
+## Pet
 
-Garden, pet growth stats, economies, follows, comments, notifications, visitor counters,
-guestbook, custom domains (roadmap only), LLM/cloud AI features, voice synthesis/cloning,
-memorial/inheritance modes, inactivity-triggered behaviour, avatar characters,
-multiple rooms, free-form (non-grid) layout, video upload, user-authored HTML/CSS/JS.
+The existing ghost is the pet. Four states (idle, sleep, react, guide), local rules only.
+In the room it walks/sits near the diary or desk and greets visitors. Visitor-side it only
+knows public content. Owner-side memories (on this day, ask) stay on device.
 
-## The ghost is a component, not a system
+## Memory objects
 
-Exactly four states, driven by local rules only (no LLM, no backend):
-- **Idle** — wanders on the homepage
-- **Sleep** — after inactivity
-- **React** — to newly published content
-- **Guide** — points visitors to posts, photos, friend links, voice recordings
+When saving an entry the owner may pick an object (shell, postcard, plant, ticket, photo
+frame, candle, book, ...). It appears in the room, can be placed on the shelf, desk or
+wall, and opens that entry. Objects tied to private entries are never shown to visitors.
+Growth is calm: basic furniture is free; there is no streak, no word-count reward, no
+currency.
 
-The ghost has two audiences with strictly separated data:
-- **Owner view (editor):** may use private posts for local "memories": *on this day*
-  (an entry from a past year) and *last time you wrote about X* (local keyword search),
-  always showing which entry it came from. Never invents content. No network.
-- **Visitor view (exported site):** uses public content only. Private data never reaches
-  `ghost.js` or the ghost JSON in a generated page.
+## Frozen scope. Do NOT add
 
-## Mobile editing interaction
-
-Bottom toolbar; tap a block to select; tap an empty cell to place; preset sizes
-(1×1, 2×1, 2×2, 4×1, 4×2); a separate panel for editing content. No pinch-zoom,
-no free drag-resize.
+Furniture shop / currency / economy, forum or town square, follows, notifications, visitor
+counters, runtime LLM/cloud AI features, voice synthesis/cloning, memorial/inheritance modes,
+inactivity-triggered behaviour, first-person walking, multiplayer, multiple rooms (one room;
+house style is a skin), video upload, user-authored HTML/CSS/JS, visitor voice messages.
 
 ## Honesty rules for the submission
 
-- Demo sites used for webring "random" must be labelled as sample sites.
-- External embeds (YouTube/Vimeo) and outbound links are not guaranteed to keep working
-  after export; say so in the UI and docs.
 - Never describe something in the video that is not a running feature.
+- The 3D models are made in Blender by script; say so. Do not claim AI-generated 3D in the app:
+  the Hunyuan3D-2 pipeline exists but nothing it made is shipped.
+- External embeds and outbound links are not guaranteed to keep working after export.
+- Sample/demo content must be labelled as sample.

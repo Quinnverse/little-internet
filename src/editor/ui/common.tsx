@@ -2,6 +2,7 @@ import type { ComponentChildren } from 'preact'
 import { useEffect } from 'preact/hooks'
 import type { Asset, Project, Result } from '../../core/schema.ts'
 import type { Command } from '../commands.ts'
+import { formatDateLocal, t, useLang } from '../i18n.ts'
 import { Icon } from './icons.tsx'
 
 export type Ctx = {
@@ -35,7 +36,8 @@ export function assetUrl(asset: Asset): string {
   return blobUrl(asset.data, asset.mime)
 }
 
-export function Sheet(props: { title: string; onClose: () => void; children: ComponentChildren }) {
+export function Sheet(props: { title: string; onClose: () => void; children: ComponentChildren; wide?: boolean }) {
+  useLang()
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && props.onClose()
     document.addEventListener('keydown', onKey)
@@ -43,10 +45,11 @@ export function Sheet(props: { title: string; onClose: () => void; children: Com
   }, [props.onClose])
   return (
     <div class="sheet-backdrop" onClick={(e) => e.target === e.currentTarget && props.onClose()}>
-      <div class="sheet" role="dialog" aria-modal="true" aria-label={props.title}>
+      <div class={`sheet${props.wide ? ' sheet-wide' : ''}`} role="dialog" aria-modal="true" aria-label={props.title}>
+        <div class="sheet-grab" aria-hidden="true" />
         <div class="sheet-head">
           <h2>{props.title}</h2>
-          <button type="button" class="icon-btn" aria-label="Close" onClick={props.onClose}>
+          <button type="button" class="icon-btn" aria-label={t('common.close')} onClick={props.onClose}>
             <Icon name="close" />
           </button>
         </div>
@@ -67,10 +70,11 @@ export function Field(props: { label: string; hint?: string; children: Component
 }
 
 export function Lock(props: { private: boolean }) {
+  useLang()
   return props.private ? (
-    <span class="badge badge-private" title="Only you can see this"><Icon name="lock" size={13} /> Private</span>
+    <span class="badge badge-private" title={t('badge.privateTip')}><Icon name="lock" size={13} /> {t('badge.private')}</span>
   ) : (
-    <span class="badge badge-public" title="Visitors can see this"><Icon name="open" size={13} /> Public</span>
+    <span class="badge badge-public" title={t('badge.publicTip')}><Icon name="open" size={13} /> {t('badge.public')}</span>
   )
 }
 
@@ -87,6 +91,4 @@ export function GhostIcon(props: { color: string; size?: number }) {
   )
 }
 
-export function formatDate(iso: string): string {
-  return new Date(iso).toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })
-}
+export const formatDate = formatDateLocal

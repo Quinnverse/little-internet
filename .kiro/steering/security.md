@@ -27,3 +27,15 @@ inclusion: always
 - The private backup file is the only artifact allowed to contain private posts. It is
   produced by a separate function from the site export, and the two code paths must
   not share an "include private" flag that could be flipped by mistake.
+
+## Backend (publish and guestbook)
+- Treat every request as hostile. Validate slug, sizes, and content types before touching disk.
+- Published ZIPs: reject absolute paths, `..`, backslashes, duplicate names, symlink-like
+  names, unknown file extensions, more than the entry/size limits; never execute uploaded
+  files; serve with the same restrictive CSP and `X-Content-Type-Options: nosniff`.
+- Slug ownership: secret key generated in the browser, stored server-side only as a SHA-256
+  hash, compared in constant time. The key is never placed in `site.json`, backups, or URLs.
+- Guestbook text is stored as plain text, length-capped, rate limited per IP and per site,
+  `pending` until the owner approves; output goes through the same escaping rules.
+- Private content must never be sent to the backend. The client sends only a site-export ZIP.
+- No secrets in the repo. Configuration comes from environment variables.

@@ -1,24 +1,28 @@
 // Pure editor commands. Every data change in the UI goes through one of these and is
 // then validated by `parseProject` in the store (Requirement 3.1).
-import {
-  firstFreeSpot,
-  moveBlock,
-  placeBlock,
-  removeBlock,
-  resizeBlock,
-} from '../core/layout.ts'
+import { designAssetRefs, starterDesign, type GuestNote, type SiteDesign, type StyleId } from '../core/design.ts'
+import type { DesignOp } from '../core/designOps.ts'
 import type {
   Asset,
-  Block,
-  BlockContent,
   GHOST_COLORS,
+  Lang,
   Link,
   Post,
   Project,
   Recording,
-  Theme,
   VideoEmbed,
 } from '../core/schema.ts'
+import {
+  autoSlot,
+  canPlaceDecor,
+  defaultRoom,
+  firstFreeCell,
+  freeSlotsFor,
+  MAX_DECOR,
+  type DecorKind,
+  type MemoryKind,
+  type Room,
+} from '../core/room.ts'
 import { uniquePostSlug } from './ids.ts'
 
 export type Command = (p: Project) => Project
@@ -31,27 +35,26 @@ export const compose =
 // ------------------------------------------------------------------ project
 
 export type NewProjectInput = {
+  lang?: Lang
   title: string
   slug: string
-  theme: Theme
+  style: StyleId
   ghostName: string
   ghostColor: (typeof GHOST_COLORS)[number]
 }
 
-/** A new home is never empty: latest entries, the ghost's spot, and friends. */
-export function createProject(input: NewProjectInput, blockIds: [string, string, string]): Project {
+/** A new home is never empty: its website starts from the chosen style, ready to decorate. */
+export function createProject(input: NewProjectInput): Project {
+  const lang = input.lang ?? 'en'
   return {
-    schemaVersion: 1,
-    site: { slug: input.slug, title: input.title, tagline: '', theme: input.theme },
+    schemaVersion: 2,
+    site: { slug: input.slug, title: input.title, tagline: '', lang },
     ghost: { enabled: true, name: input.ghostName, color: input.ghostColor },
-    blocks: [
-      { id: blockIds[0], x: 0, y: 0, w: 2, h: 2, content: { kind: 'latest' } },
-      { id: blockIds[1], x: 2, y: 0, w: 2, h: 1, content: { kind: 'ghost-home' } },
-      { id: blockIds[2], x: 2, y: 1, w: 2, h: 1, content: { kind: 'links' } },
-    ],
+    web: { draft: starterDesign(input.style, { title: input.title, lang }), guestbook: [] },
     posts: [],
     links: [],
     webring: {},
+    room: defaultRoom(),
     assets: [],
     recordings: [],
   }
@@ -71,11 +74,16 @@ export const addAsset =
   (asset: Asset): Command =>
   (p) => ({ ...p, assets: [...p.assets.filter((a) => a.id !== asset.id), asset] })
 
-/** Removes images that no post and no block uses any more. */
+/** Removes images that no post, no website design (draft or published) and no friend badge uses. */
 export const collectGarbage: Command = (p) => {
   const used = new Set<string>()
   for (const post of p.posts) post.imageIds.forEach((id) => used.add(id))
-  for (const b of p.blocks) if (b.content.kind === 'image') used.add(b.content.assetId)
+  for (const d of [p.web.draft, p.web.published?.design]) {
+    if (!d) continue
+    d.assets.forEach((a) => used.add(a.id))
+    designAssetRefs(d).forEach((id) => used.add(id))
+  }
+  for (const l of p.links) if (l.buttonAssetId) used.add(l.buttonAssetId)
   return { ...p, assets: p.assets.filter((a) => used.has(a.id)) }
 }
 
@@ -139,44 +147,59 @@ export const setVisibility =
   (id: string, visibility: Post['visibility']): Command =>
   (p) => ({ ...p, posts: p.posts.map((post) => (post.id === id ? { ...post, visibility } : post)) })
 
+/** Website components keep pointing at content; a deleted entry simply drops out of them. */
+function forgetPost(d: SiteDesign, id: string): SiteDesign {
+  return {
+    ...d,
+    widgets: d.widgets.map((w) =>
+      w.content.type === 'diary' && w.content.postIds.includes(id)
+        ? { ...w, content: { ...w.content, postIds: w.content.postIds.filter((x) => x !== id) } }
+        : w,
+    ),
+  }
+}
+
 export const deletePost =
   (id: string): Command =>
   (p) =>
     collectGarbage({
       ...p,
       posts: p.posts.filter((post) => post.id !== id),
-      blocks: p.blocks.filter((b) => !(b.content.kind === 'post' && b.content.postId === id)),
+      web: {
+        ...p.web,
+        draft: forgetPost(p.web.draft, id),
+        ...(p.web.published ? { published: { ...p.web.published, design: forgetPost(p.web.published.design, id) } } : {}),
+      },
+      // A memory object lives and dies with its entry.
+      room: { ...p.room, memory: p.room.memory.filter((m) => m.postId !== id) },
     })
 
-// ------------------------------------------------------------------ blocks
+// ------------------------------------------------------------------ website design (Web Atelier)
 
-export type BlockSize = { w: Block['w']; h: Block['h'] }
+/** Runs a design operation on the DRAFT. Visitors keep seeing the published snapshot. */
+export const design =
+  (op: DesignOp): Command =>
+  (p) =>
+    collectGarbage({ ...p, web: { ...p.web, draft: op(p.web.draft) } })
 
-export const addBlock =
-  (id: string, content: BlockContent, size: BlockSize): Command =>
-  (p) => {
-    const { x, y } = firstFreeSpot(p.blocks, size.w, size.h)
-    return { ...p, blocks: placeBlock(p.blocks, { id, x, y, ...size, content }) }
-  }
+/** Replaces the whole draft (undo / redo). */
+export const setDraft =
+  (draft: SiteDesign): Command =>
+  (p) =>
+    collectGarbage({ ...p, web: { ...p.web, draft } })
 
-export const moveBlockTo =
-  (id: string, x: number, y: number): Command =>
-  (p) => ({ ...p, blocks: moveBlock(p.blocks, id, x, y) })
+/** Publishing freezes the current draft as the snapshot that is built for visitors and exports. */
+export const publishDraft =
+  (at: string): Command =>
+  (p) => ({ ...p, web: { ...p.web, published: { design: structuredClone(p.web.draft), at } } })
 
-export const resizeBlockTo =
-  (id: string, size: BlockSize): Command =>
-  (p) => ({ ...p, blocks: resizeBlock(p.blocks, id, size.w, size.h) })
+/** Throws away draft changes and goes back to what is published. */
+export const revertDraft: Command = (p) =>
+  p.web.published ? collectGarbage({ ...p, web: { ...p.web, draft: structuredClone(p.web.published.design) } }) : p
 
-export const deleteBlock =
-  (id: string): Command =>
-  (p) => collectGarbage({ ...p, blocks: removeBlock(p.blocks, id) })
-
-export const setBlockText =
-  (id: string, text: string): Command =>
-  (p) => ({
-    ...p,
-    blocks: p.blocks.map((b) => (b.id === id && b.content.kind === 'text' ? { ...b, content: { kind: 'text', text } } : b)),
-  })
+export const setGuestbookSnapshot =
+  (notes: GuestNote[]): Command =>
+  (p) => ({ ...p, web: { ...p.web, guestbook: notes.slice(0, 100) } })
 
 // ------------------------------------------------------------------ links
 
@@ -202,7 +225,7 @@ export const addLink =
 
 export const deleteLink =
   (id: string): Command =>
-  (p) => ({ ...p, links: p.links.filter((l) => l.id !== id) })
+  (p) => collectGarbage({ ...p, links: p.links.filter((l) => l.id !== id) })
 
 export const moveLink =
   (id: string, delta: -1 | 1): Command =>
@@ -253,4 +276,88 @@ export const setRecordingVisibility =
 
 export const deleteRecording =
   (id: string): Command =>
-  (p) => ({ ...p, recordings: p.recordings.filter((r) => r.id !== id) })
+  (p) => {
+    const { welcomeRecordingId, ...room } = p.room
+    return {
+      ...p,
+      recordings: p.recordings.filter((r) => r.id !== id),
+      room: welcomeRecordingId === id ? room : p.room,
+    }
+  }
+
+// ------------------------------------------------------------------ room
+
+export const updateRoomSkin =
+  (patch: Partial<Pick<Room, 'house' | 'wall' | 'floor' | 'light'>>): Command =>
+  (p) => ({ ...p, room: { ...p.room, ...patch } })
+
+/** Puts a new decor item on the first free floor cell. Throws when the room is full. */
+export const addDecor =
+  (id: string, kind: DecorKind): Command =>
+  (p) => {
+    if (p.room.decor.length >= MAX_DECOR) throw new Error('The room is full')
+    if (p.room.decor.some((d) => d.id === id)) throw new Error('Duplicate id')
+    const spot = firstFreeCell(p.room)
+    if (!spot) throw new Error('No free floor space')
+    const decor = [...p.room.decor, { id, kind, x: spot[0], z: spot[1], rot: 0 }]
+    return { ...p, room: { ...p.room, decor } }
+  }
+
+export const moveDecor =
+  (id: string, x: number, z: number): Command =>
+  (p) => {
+    const why = canPlaceDecor(p.room, id, x, z)
+    if (why) throw new Error(`Cannot place here (${why})`)
+    return { ...p, room: { ...p.room, decor: p.room.decor.map((d) => (d.id === id ? { ...d, x, z } : d)) } }
+  }
+
+export const rotateDecor =
+  (id: string): Command =>
+  (p) => ({
+    ...p,
+    room: { ...p.room, decor: p.room.decor.map((d) => (d.id === id ? { ...d, rot: (d.rot + 1) % 4 } : d)) },
+  })
+
+export const removeDecor =
+  (id: string): Command =>
+  (p) => ({ ...p, room: { ...p.room, decor: p.room.decor.filter((d) => d.id !== id) } })
+
+/**
+ * The owner's choice of object for an entry (or none). Replaces any earlier object of the entry,
+ * keeping its slot when the new kind may sit there. Throws when no slot is free.
+ */
+export const setPostObject =
+  (postId: string, kind: MemoryKind | null, objectId: string): Command =>
+  (p) => {
+    if (!p.posts.some((x) => x.id === postId)) throw new Error('No such entry')
+    const old = p.room.memory.find((m) => m.postId === postId)
+    const rest = p.room.memory.filter((m) => m.postId !== postId)
+    if (kind === null) return { ...p, room: { ...p.room, memory: rest } }
+    if (old?.kind === kind) return p
+    const base = { ...p.room, memory: rest }
+    const keep = old && freeSlotsFor(base, kind).includes(old.slot) ? old.slot : undefined
+    const slot = keep ?? autoSlot(base, kind)
+    if (!slot) throw new Error('There is no free spot for that object')
+    const newId = old?.id ?? objectId
+    if (rest.some((m) => m.id === newId)) throw new Error('Duplicate id')
+    return { ...p, room: { ...base, memory: [...rest, { id: newId, kind, postId, slot }] } }
+  }
+
+export const moveMemoryObject =
+  (id: string, slot: string): Command =>
+  (p) => {
+    const m = p.room.memory.find((x) => x.id === id)
+    if (!m) return p
+    if (!freeSlotsFor(p.room, m.kind, id).includes(slot)) throw new Error('That spot is not free')
+    return { ...p, room: { ...p.room, memory: p.room.memory.map((x) => (x.id === id ? { ...x, slot } : x)) } }
+  }
+
+export const setWelcome =
+  (recordingId: string | null): Command =>
+  (p) => {
+    if (recordingId !== null && !p.recordings.some((r) => r.id === recordingId)) {
+      throw new Error('No such recording')
+    }
+    const { welcomeRecordingId: _w, ...room } = p.room
+    return { ...p, room: recordingId === null ? room : { ...room, welcomeRecordingId: recordingId } }
+  }

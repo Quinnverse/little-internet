@@ -1,17 +1,43 @@
 import fc from 'fast-check'
-import { placeBlock } from '../src/core/layout.ts'
+import {
+  BORDERS,
+  DIVIDERS,
+  FONTS,
+  LOOKS,
+  PATTERNS,
+  STICKERS,
+  STYLES,
+  WIDGET_TYPES,
+  defaultButton,
+  type DecorationAsset,
+  type SiteDesign,
+  type SiteWidget,
+  type ThemeTokens,
+  type WidgetContent,
+  type WidgetType,
+} from '../src/core/design.ts'
+import {
+  autoSlot,
+  DECOR_KINDS,
+  FLOOR_SIZE,
+  FLOORS,
+  HOUSES,
+  isReservedCell,
+  LIGHTS,
+  MEMORY_KINDS,
+  WALLS,
+  type Room,
+} from '../src/core/room.ts'
 import {
   GHOST_COLORS,
   IMAGE_MIMES,
   isCanonicalHttpUrl,
   isSafeLine,
   isSafeText,
-  THEMES,
+  LANGS,
   AUDIO_MIMES,
   type Asset,
   type Recording,
-  type Block,
-  type BlockContent,
   type Link,
   type Post,
   type Project,
@@ -122,36 +148,212 @@ const recordingArb: fc.Arbitrary<Recording> = fc.record(
 
 const linkArb: fc.Arbitrary<Link> = fc.record({ id: idArb, title: lineArb(80), url: urlArb })
 
-const sizeArb = fc.constantFrom<[1 | 2 | 4, 1 | 2]>([1, 1], [2, 1], [2, 2], [4, 1], [4, 2])
+const colorArb = fc.stringMatching(/^#[0-9a-f]{6}$/)
 
-function blocksArb(postIds: string[], assetIds: string[]): fc.Arbitrary<Block[]> {
-  const contents: fc.Arbitrary<BlockContent>[] = [
-    textArb(500).map((text) => ({ kind: 'text' as const, text })),
-    fc.constant({ kind: 'links' as const }),
-    fc.constant({ kind: 'latest' as const }),
-    fc.constant({ kind: 'ghost-home' as const }),
-    fc.constant({ kind: 'voice' as const }),
-  ]
-  if (postIds.length) contents.push(fc.constantFrom(...postIds).map((postId) => ({ kind: 'post' as const, postId })))
-  if (assetIds.length) contents.push(fc.constantFrom(...assetIds).map((assetId) => ({ kind: 'image' as const, assetId })))
-  const draft = fc.record({
-    content: fc.oneof(...contents),
-    size: sizeArb,
-    x: fc.integer({ min: 0, max: 3 }),
-    y: fc.integer({ min: 0, max: 6 }),
-  })
-  return fc.array(draft, { maxLength: 8 }).map((drafts) =>
-    drafts.reduce<Block[]>(
-      (layout, d, i) =>
-        placeBlock(layout, { id: `blk${i}`, x: d.x, y: d.y, w: d.size[0], h: d.size[1], content: d.content }),
-      [],
-    ),
-  )
+const tokensArb = (decoIds: string[]): fc.Arbitrary<ThemeTokens> =>
+  fc
+    .record({
+      bg: colorArb,
+      pattern: fc.constantFrom(...PATTERNS),
+      patternColor: colorArb,
+      bgAssetId: decoIds.length ? fc.option(fc.constantFrom(...decoIds), { nil: undefined }) : fc.constant(undefined),
+      bgFit: fc.constantFrom('tile' as const, 'cover' as const),
+      text: colorArb,
+      muted: colorArb,
+      accent: colorArb,
+      link: colorArb,
+      panel: colorArb,
+      panelText: colorArb,
+      headingFont: fc.constantFrom(...FONTS),
+      bodyFont: fc.constantFrom(...FONTS),
+      baseSize: fc.integer({ min: 13, max: 20 }),
+      border: fc.constantFrom(...BORDERS),
+      borderColor: colorArb,
+      borderWidth: fc.integer({ min: 0, max: 8 }),
+      radius: fc.integer({ min: 0, max: 24 }),
+      shadow: fc.constantFrom('none' as const, 'soft' as const, 'hard' as const),
+      look: fc.constantFrom(...LOOKS),
+      divider: fc.constantFrom(...DIVIDERS),
+      width: fc.constantFrom('narrow' as const, 'normal' as const, 'wide' as const),
+      headerAlign: fc.constantFrom('left' as const, 'center' as const),
+      titleSize: fc.integer({ min: 18, max: 64 }),
+    })
+    .map(({ bgAssetId, ...t }) => (bgAssetId ? { ...t, bgAssetId } : t))
+
+function contentArb(type: WidgetType, postIds: string[], decoIds: string[]): fc.Arbitrary<WidgetContent> {
+  const optDeco = decoIds.length ? fc.option(fc.constantFrom(...decoIds), { nil: undefined }) : fc.constant(undefined)
+  const strip = <T extends Record<string, unknown>>(o: T) =>
+    Object.fromEntries(Object.entries(o).filter(([, v]) => v !== undefined)) as T
+  switch (type) {
+    case 'welcome':
+      return fc.record({ type: fc.constant(type), heading: lineArb(80), text: textArb(600) })
+    case 'about':
+      return fc.record({ type: fc.constant(type), heading: lineArb(80), text: textArb(1200), assetId: optDeco }).map(strip)
+    case 'diary':
+      return fc.record({
+        type: fc.constant(type),
+        heading: lineArb(80),
+        mode: fc.constantFrom('latest' as const, 'pick' as const),
+        postIds: postIds.length ? fc.subarray(postIds) : fc.constant<string[]>([]),
+        count: fc.integer({ min: 1, max: 12 }),
+        excerpts: fc.boolean(),
+      })
+    case 'gallery':
+      return fc.record({
+        type: fc.constant(type),
+        heading: lineArb(80),
+        source: fc.constantFrom('posts' as const, 'uploads' as const),
+        assetIds: decoIds.length ? fc.subarray(decoIds) : fc.constant<string[]>([]),
+        count: fc.integer({ min: 1, max: 24 }),
+      })
+    case 'bookshelf':
+      return fc.record({
+        type: fc.constant(type),
+        heading: lineArb(80),
+        books: fc.uniqueArray(fc.record({ id: idArb, title: lineArb(120), author: lineArb(80), note: lineArb(200) }), { selector: (b) => b.id, maxLength: 3 }),
+      })
+    case 'memories':
+    case 'boo':
+    case 'webring':
+    case 'button':
+      return fc.record({ type: fc.constant(type), heading: lineArb(80) }) as fc.Arbitrary<WidgetContent>
+    case 'audio':
+      return fc.record({ type: fc.constant(type), heading: lineArb(80), text: lineArb(200) })
+    case 'guestbook':
+      return fc.record({ type: fc.constant(type), heading: lineArb(80), intro: lineArb(200), open: fc.boolean() })
+    case 'links':
+      return fc.record({ type: fc.constant(type), heading: lineArb(80), look: fc.constantFrom('list' as const, 'buttons' as const) })
+    case 'text':
+      return fc.record({ type: fc.constant(type), heading: lineArb(80), text: textArb(2000) })
+    case 'image':
+      return fc.record({ type: fc.constant(type), assetId: optDeco, caption: lineArb(200), href: fc.option(urlArb, { nil: undefined }) }).map(strip)
+    case 'sticker':
+      return fc
+        .record({
+          type: fc.constant(type),
+          sticker: fc.constantFrom(...STICKERS),
+          assetId: optDeco,
+          size: fc.constantFrom('s' as const, 'm' as const, 'l' as const),
+          motion: fc.constantFrom('none' as const, 'bob' as const, 'spin' as const, 'blink' as const),
+        })
+        .map(strip)
+    case 'divider':
+      return fc.record({ type: fc.constant(type), pattern: fc.constantFrom(...DIVIDERS) })
+    case 'construction':
+      return fc.record({ type: fc.constant(type), text: lineArb(80) })
+  }
+}
+
+/** A valid design whose widgets point at the given posts and decorations. */
+export function designArb(postIds: string[], decoIds: string[], title = 'Site'): fc.Arbitrary<SiteDesign> {
+  const widget = (i: number, pageIds: string[]) =>
+    fc.constantFrom(...WIDGET_TYPES).chain((type) =>
+      fc.record({
+        id: fc.constant(`w${i}`),
+        pageId: fc.constantFrom(...pageIds),
+        order: fc.integer({ min: 0, max: 50 }),
+        hidden: fc.boolean(),
+        layout: fc.record({
+          span: fc.integer({ min: 1, max: 4 }),
+          mobile: fc.constantFrom('full' as const, 'half' as const, 'hide' as const),
+          desktop: fc.constantFrom('show' as const, 'hide' as const),
+          align: fc.constantFrom('left' as const, 'center' as const, 'right' as const),
+        }),
+        style: fc
+          .record({
+            look: fc.constantFrom('auto' as const, ...LOOKS),
+            bg: fc.option(colorArb, { nil: undefined }),
+            fg: fc.option(colorArb, { nil: undefined }),
+            tilt: fc.integer({ min: -3, max: 3 }),
+          })
+          .map(({ bg, fg, ...st }) => ({ ...st, ...(bg ? { bg } : {}), ...(fg ? { fg } : {}) })),
+        content: contentArb(type, postIds, decoIds),
+      }) as fc.Arbitrary<SiteWidget>,
+    )
+  return fc
+    .record({
+      style: fc.constantFrom(...STYLES),
+      welcome: lineArb(200),
+      pageCount: fc.integer({ min: 1, max: 3 }),
+      count: fc.integer({ min: 0, max: 10 }),
+      tokens: tokensArb(decoIds),
+      favicon: decoIds.length ? fc.option(fc.constantFrom(...decoIds), { nil: undefined }) : fc.constant(undefined),
+      buttonAsset: decoIds.length ? fc.option(fc.constantFrom(...decoIds), { nil: undefined }) : fc.constant(undefined),
+      pageTitles: fc.array(lineArb(40), { minLength: 3, maxLength: 3 }),
+      columns: fc.array(fc.integer({ min: 1, max: 4 }), { minLength: 3, maxLength: 3 }),
+    })
+    .chain((r) => {
+      const pages = Array.from({ length: r.pageCount }, (_, i) => ({
+        id: `pg${i}`,
+        slug: i === 0 ? 'index' : `page-${i}`,
+        title: r.pageTitles[i]!,
+        nav: true,
+        columns: r.columns[i]!,
+      }))
+      const pageIds = pages.map((p) => p.id)
+      return fc.tuple(...Array.from({ length: r.count }, (_, i) => widget(i, pageIds))).map((widgets) => {
+        const assets: DecorationAsset[] = decoIds.map((id) => ({ id, kind: 'image', name: `deco ${id}` }))
+        const d: SiteDesign = {
+          v: 1,
+          style: r.style,
+          welcome: r.welcome,
+          tokens: r.tokens,
+          pages,
+          widgets,
+          assets,
+          button: defaultButton(title),
+          ...(r.favicon ? { faviconAssetId: r.favicon } : {}),
+          ...(r.buttonAsset ? { buttonAssetId: r.buttonAsset } : {}),
+        }
+        return d
+      })
+    })
 }
 
 function uniqueBy<T>(xs: T[], key: (x: T) => string): T[] {
   const seen = new Set<string>()
   return xs.filter((x) => (seen.has(key(x)) ? false : (seen.add(key(x)), true)))
+}
+
+/** A valid room whose memory objects point at some of the given posts. */
+function roomArb(postIds: string[], recordingIds: string[]): fc.Arbitrary<Room> {
+  const cells = fc
+    .uniqueArray(fc.tuple(fc.nat(FLOOR_SIZE - 1), fc.nat(FLOOR_SIZE - 1)), {
+      selector: ([x, z]) => `${x},${z}`,
+      maxLength: 8,
+    })
+    .map((cs) => cs.filter(([x, z]) => !isReservedCell(x, z)))
+  return fc
+    .record({
+      house: fc.constantFrom(...HOUSES),
+      wall: fc.constantFrom(...WALLS),
+      floor: fc.constantFrom(...FLOORS),
+      light: fc.constantFrom(...LIGHTS),
+      cells,
+      kinds: fc.array(fc.constantFrom(...DECOR_KINDS), { minLength: 8, maxLength: 8 }),
+      rots: fc.array(fc.nat(3), { minLength: 8, maxLength: 8 }),
+      memoryKinds: fc.array(fc.constantFrom(...MEMORY_KINDS), { minLength: postIds.length, maxLength: postIds.length }),
+      memoryOn: fc.array(fc.boolean(), { minLength: postIds.length, maxLength: postIds.length }),
+      welcome: recordingIds.length ? fc.option(fc.constantFrom(...recordingIds), { nil: undefined }) : fc.constant(undefined),
+    })
+    .map((r) => {
+      const room: Room = {
+        house: r.house,
+        wall: r.wall,
+        floor: r.floor,
+        light: r.light,
+        decor: r.cells.map(([x, z], i) => ({ id: `d${i}`, kind: r.kinds[i]!, x, z, rot: r.rots[i]! })),
+        memory: [],
+      }
+      postIds.forEach((postId, i) => {
+        if (!r.memoryOn[i]) return
+        const kind = r.memoryKinds[i]!
+        const slot = autoSlot(room, kind)
+        if (slot) room.memory.push({ id: `m${i}`, kind, postId, slot })
+      })
+      if (r.welcome !== undefined) room.welcomeRecordingId = r.welcome
+      return room
+    })
 }
 
 export const projectArb: fc.Arbitrary<Project> = fc
@@ -160,31 +362,42 @@ export const projectArb: fc.Arbitrary<Project> = fc
       slug: siteSlugArb,
       title: lineArb(80),
       tagline: lineArb(200),
-      theme: fc.constantFrom(...THEMES),
+      lang: fc.constantFrom(...LANGS),
     }),
     ghost: fc.record({ enabled: fc.boolean(), name: lineArb(24), color: fc.constantFrom(...GHOST_COLORS) }),
-    assets: fc.uniqueArray(assetArb, { selector: (a) => a.id, maxLength: 4 }),
+    assets: fc.uniqueArray(assetArb, { selector: (a) => a.id, maxLength: 4 }).map((xs) => xs.map((a) => ({ ...a, id: `p${a.id}`.slice(0, 40) }))),
+    decorations: fc.uniqueArray(assetArb, { selector: (a) => a.id, maxLength: 3 }).map((xs) => xs.map((a) => ({ ...a, id: `d${a.id}`.slice(0, 40) }))),
+    published: fc.boolean(),
+    guestbook: fc.array(fc.record({ name: lineArb(40), text: lineArb(300), createdAt: isoArb }), { maxLength: 3 }),
     posts: fc.uniqueArray(postBaseArb, { selector: (p) => p.id, maxLength: 6 }),
     links: fc.uniqueArray(linkArb, { selector: (l) => l.id, maxLength: 4 }),
     recordings: fc.uniqueArray(recordingArb, { selector: (r) => r.id, maxLength: 4 }),
     webring: fc.record({ prev: urlArb, next: urlArb, random: urlArb, hub: urlArb }, { requiredKeys: [] }),
   })
-  .chain(({ assets, posts: rawPosts, ...rest }) => {
+  .chain(({ assets, decorations, published, guestbook, posts: rawPosts, ...rest }) => {
     const bases = uniqueBy(rawPosts, (p) => p.slug)
     const assetIds = assets.map((a) => a.id)
+    const decoIds = decorations.map((a) => a.id)
     const imagesArb = assetIds.length
       ? fc.subarray(assetIds, { maxLength: Math.min(3, assetIds.length) })
       : fc.constant<string[]>([])
     return fc
       .tuple(
         fc.array(imagesArb, { minLength: bases.length, maxLength: bases.length }),
-        blocksArb(bases.map((p) => p.id), assetIds),
+        designArb(bases.map((p) => p.id), decoIds, rest.site.title),
+        designArb(bases.map((p) => p.id), decoIds, rest.site.title),
+        roomArb(bases.map((p) => p.id), rest.recordings.map((r) => r.id)),
       )
-      .map(([images, blocks]) => ({
-        schemaVersion: 1 as const,
+      .map(([images, draft, pubDesign, room]) => ({
+        schemaVersion: 2 as const,
         ...rest,
-        assets,
-        blocks,
+        assets: [...assets, ...decorations],
+        web: {
+          draft,
+          ...(published ? { published: { design: pubDesign, at: '2026-11-20T10:00:00.000Z' } } : {}),
+          guestbook,
+        },
+        room,
         posts: bases.map((p, i) => ({ ...p, imageIds: images[i]! })),
       }))
   })

@@ -17,10 +17,11 @@ export function toStored(p: Project): { stored: StoredProject; files: Map<string
     schemaVersion: p.schemaVersion,
     site: p.site,
     ghost: p.ghost,
-    blocks: p.blocks,
+    web: p.web,
     posts: p.posts,
     links: p.links,
     webring: p.webring,
+    room: p.room,
     assets,
     recordings,
   }

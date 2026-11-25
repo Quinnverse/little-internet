@@ -25,3 +25,17 @@ dist-ssr
 
 # local end-to-end check output
 .e2e/
+
+# server data
+/data
+.e2e
+/assets/raw
+/assets/refs
+/assets/blender/__pycache__
+.e2e-atelier/
+.demo-run/
+data/
+.img-test/
+deploy/.previous-image
+.shots/
+.e2e-shots-data/

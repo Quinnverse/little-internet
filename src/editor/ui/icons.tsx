@@ -25,6 +25,45 @@ const PATHS = {
   mic: 'M12 3.5a3 3 0 0 0-3 3v5a3 3 0 0 0 6 0v-5a3 3 0 0 0-3-3zM6 11a6 6 0 0 0 12 0M12 17v3.5M9 20.5h6',
   phone: 'M5 9.5c2.5-3 11.5-3 14 0l-1.5 2.5-3-1V9h-5v2l-3 1zM6 13h12l1 7H5zM12 15.5v.01M9.5 17.5v.01M14.5 17.5v.01',
   search: 'M10.5 17a6.5 6.5 0 1 0 0-13 6.5 6.5 0 0 0 0 13zM15.5 15.5 20 20',
+  pen: 'M4 20l1-4L16.5 4.5a2 2 0 0 1 3 3L8 19zM14.5 6.5l3 3',
+  sofa: 'M5 11V8a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2v3M3 13a2 2 0 0 1 4 0v2h10v-2a2 2 0 0 1 4 0v5H3zM6 18v2M18 18v2',
+  rotl: 'M4 12a8 8 0 1 0 3-6.2M4 4v4h4',
+  rotr: 'M20 12a8 8 0 1 1-3-6.2M20 4v4h-4',
+  reset: 'M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6zM12 3v3M12 18v3M3 12h3M18 12h3',
+  sun: 'M12 16a4 4 0 1 0 0-8 4 4 0 0 0 0 8zM12 2.5v2M12 19.5v2M2.5 12h2M19.5 12h2M5.3 5.3l1.4 1.4M17.3 17.3l1.4 1.4M5.3 18.7l1.4-1.4M17.3 6.7l1.4-1.4',
+  moon: 'M20 14.5A8 8 0 0 1 9.5 4a8 8 0 1 0 10.5 10.5z',
+  globe: 'M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18zM3 12h18M12 3c3 3 3 15 0 18M12 3c-3 3-3 15 0 18',
+  check: 'M5 12.5l4.5 4.5L19 7.5',
+  undo: 'M8 6l-4.5 4.5L8 15M4 10.5h9a5.5 5.5 0 0 1 0 11h-3',
+  mail: 'M4 6h16v12H4zM4 7l8 6 8-6',
+  link: 'M10 14a4 4 0 0 0 5.7 0l3-3a4 4 0 0 0-5.7-5.7l-1 1M14 10a4 4 0 0 0-5.7 0l-3 3a4 4 0 0 0 5.7 5.7l1-1',
+  cloud: 'M7 18a4 4 0 0 1-.5-8A5.5 5.5 0 0 1 17 8.5 4.5 4.5 0 0 1 17.5 18zM12 17v-6M9.5 13.5l2.5-2.5 2.5 2.5',
+  computer: 'M4 4.5h16v11H4zM9 20h6M12 15.5V20M7 8h6',
+  play: 'M8 5l11 7-11 7z',
+  stop: 'M7 7h10v10H7z',
+  rotate: 'M20 12a8 8 0 1 1-3-6.2M20 4v4h-4',
+  // keepsakes
+  shell: 'M12 19c-5 0-8-3-8-7 0-2 3-6 8-6s8 4 8 6c0 4-3 7-8 7zM12 19V6M8 18.5 7 8M16 18.5 17 8',
+  candle: 'M10 20V10h4v10zM12 7c-1.5-1.5-1.5-3 0-4.5 1.5 1.5 1.5 3 0 4.5zM8 20h8',
+  flower: 'M12 20v-8M12 12a3 3 0 1 0-3-3M12 12a3 3 0 1 1 3-3M8 20h8',
+  cassette: 'M4 6h16v12H4zM8 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM16 10.5a1.5 1.5 0 1 0 0 3 1.5 1.5 0 0 0 0-3zM7 17h10l-1-3H8z',
+  postcard: 'M3.5 6h17v12h-17zM6.5 10h6M6.5 13h4M16 9h2.5v3H16z',
+  ticket: 'M3 8h18v3a2 2 0 0 0 0 4v3H3v-3a2 2 0 0 0 0-4zM14 8v10',
+  plant: 'M12 21v-9M12 12c-4 0-6-3-6-6 4 0 6 2 6 6zM12 14c3 0 5-2 5-5-3 0-5 2-5 5zM8 21h8',
+  lamp: 'M12 3l-5 8h10zM12 11v8M8.5 21h7',
+  cactus: 'M12 21V6a2 2 0 0 1 4 0v6M12 15H8a2 2 0 0 1-2-2V9M8 21h8',
+  stool: 'M5 8h14M7 8l-1 12M17 8l1 12M12 8v12',
+  basket: 'M4 10h16l-2 10H6zM8 10a4 4 0 0 1 8 0',
+  none: 'M5 5l14 14M12 21a9 9 0 1 0 0-18 9 9 0 0 0 0 18z',
+  redo: 'M16 6l4.5 4.5L16 15M20 10.5h-9a5.5 5.5 0 0 0 0 11h3',
+  grip: 'M9 6v.01M15 6v.01M9 12v.01M15 12v.01M9 18v.01M15 18v.01',
+  mobile: 'M8 3h8v18H8zM11 18h2',
+  copy: 'M8 8h11v12H8zM5 16V4h11',
+  layers: 'M12 4l9 5-9 5-9-5zM3 14l9 5 9-5',
+  palette: 'M12 21a9 9 0 1 1 9-9c0 2-1.5 3-3.5 3H16a2 2 0 0 0-1.5 3.3A2 2 0 0 1 12 21zM7.5 11v.01M10 7.5v.01M14.5 7.5v.01',
+  suitcase: 'M4 8h16v12H4zM9 8V5h6v3M4 13h16',
+  badge: 'M3 8h18v8H3zM6 12h5M14 11h4v2h-4z',
+  pages: 'M7 3h9l4 4v14H7zM16 3v4h4M4 7v14h3',
 } as const
 
 export type IconName = keyof typeof PATHS
@@ -49,4 +88,9 @@ export function Icon(props: { name: IconName; size?: number; label?: string }) {
       <path d={PATHS[props.name]} />
     </svg>
   )
+}
+
+/** The same icon as an SVG string, for DOM built outside Preact (3D hotspots). */
+export function iconSvg(name: IconName, size = 18): string {
+  return `<svg class="icon" width="${size}" height="${size}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${PATHS[name]}"/></svg>`
 }

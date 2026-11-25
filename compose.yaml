@@ -1,0 +1,20 @@
+# Little Internet (v3) on its own subdomain.
+# Unique names on purpose, so it can never collide with the older "little-internet" project/container
+# that serves resurrection.quinnverse.tech: project li-v3, container li-v3-app, volume li-v3-data, port 18090.
+# Binds 127.0.0.1 only; the host's nginx terminates HTTPS.
+name: li-v3
+services:
+  app:
+    build: .
+    image: li-v3:${TAG:-local}
+    container_name: li-v3-app
+    restart: unless-stopped
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://little.quinnverse.tech}
+    ports:
+      - "127.0.0.1:${PORT:-18090}:8787"
+    volumes:
+      - li-v3-data:/data
+volumes:
+  li-v3-data:
+    name: li-v3-data

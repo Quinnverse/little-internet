@@ -5,27 +5,38 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "tsc && vite build",
+    "build": "npm run build:runtime && tsc && vite build",
     "preview": "vite preview",
     "test": "vitest --run",
     "typecheck": "tsc",
     "check:export": "vitest --run tests/export-independence.test.ts",
     "e2e": "bash scripts/e2e.sh",
-    "icons": "node scripts/make-icons.mjs"
+    "icons": "node scripts/make-icons.mjs",
+    "build:runtime": "vite build --config vite.runtime.config.ts",
+    "server": "node server/index.ts",
+    "assets:pack": "node scripts/assets/optimize.mjs",
+    "assets:kit": "node scripts/assets/export-kit.mjs && node scripts/pack-models.mjs",
+    "e2e:atelier": "bash scripts/e2e-atelier.sh"
   },
   "devDependencies": {
+    "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/functions": "^4.5.1",
     "@preact/preset-vite": "^2.10.6",
     "@types/jsdom": "^30.0.0",
+    "@types/three": "^0.187.0",
     "fast-check": "^4.11.0",
     "jsdom": "^31.0.1",
+    "meshoptimizer": "^1.3.0",
     "playwright": "^1.65.1",
     "typescript": "~7.0.2",
     "vite": "^8.3.6",
-    "vitest": "^5.1.1"
+    "vitest": "^5.1.1",
+    "@gltf-transform/extensions": "^4.5.1"
   },
   "dependencies": {
     "fflate": "^0.8.3",
     "preact": "^11.2.0",
+    "three": "^0.187.0",
     "zod": "^4.6.7"
   }
 }
