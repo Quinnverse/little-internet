@@ -39,6 +39,8 @@ describe('service worker never caches private or closable content', () => {
     'https://little.example/ring/',
     'https://little.example/ring/moon/next',
     'https://little.example/healthz',
+    'https://little.example/vision/hand_landmarker.task',
+    'https://little.example/vision/wasm/vision_wasm_internal.wasm',
   ])('leaves %s alone', (url) => expect(sw.takes(url)).toBe(false))
 
   it.each(['https://little.example/', 'https://little.example/index.html', 'https://little.example/assets/index-abc.js', 'https://little.example/preview/index.html'])(

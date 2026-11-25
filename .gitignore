@@ -44,3 +44,7 @@ deploy/.previous-image
 .v4shots/
 .e2e-mail/
 .e2e-mail-data/
+public/vision/wasm/
+.shot-data/
+.shots-letter/
+.probe/

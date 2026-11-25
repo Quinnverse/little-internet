@@ -5,13 +5,14 @@
   "type": "module",
   "scripts": {
     "dev": "vite",
-    "build": "npm run build:runtime && tsc && vite build",
+    "build": "npm run build:vendor && npm run build:runtime && tsc && vite build",
     "preview": "vite preview",
     "test": "vitest --run",
     "typecheck": "tsc",
     "check:export": "vitest --run tests/export-independence.test.ts",
     "e2e": "bash scripts/e2e.sh",
     "icons": "node scripts/make-icons.mjs",
+    "build:vendor": "node scripts/copy-vision.mjs",
     "build:runtime": "vite build --config vite.runtime.config.ts",
     "server": "node server/index.ts",
     "assets:pack": "node scripts/assets/optimize.mjs",
@@ -20,6 +21,7 @@
   },
   "devDependencies": {
     "@gltf-transform/core": "^4.5.1",
+    "@gltf-transform/extensions": "^4.5.1",
     "@gltf-transform/functions": "^4.5.1",
     "@preact/preset-vite": "^2.10.6",
     "@types/jsdom": "^30.0.0",
@@ -30,10 +32,10 @@
     "playwright": "^1.65.1",
     "typescript": "~7.0.2",
     "vite": "^8.3.6",
-    "vitest": "^5.1.1",
-    "@gltf-transform/extensions": "^4.5.1"
+    "vitest": "^5.1.1"
   },
   "dependencies": {
+    "@mediapipe/tasks-vision": "1.2.3",
     "fflate": "^0.8.3",
     "preact": "^11.2.0",
     "three": "^0.187.0",

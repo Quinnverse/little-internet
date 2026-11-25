@@ -323,6 +323,11 @@ export function Home(props: { ctx: Ctx }) {
           ctx={ctx}
           onClose={close}
           onWrite={() => view?.pet.attend('desk', 15)}
+          onReact={(r) => {
+            // Gestures only make Boo react. They never change or send anything.
+            view?.pet.set(r === 'greet' ? 'greet' : 'react')
+            if (r === 'come') view?.pet.nudge()
+          }}
           onDecorate={() => {
             setPanel(null)
             startDecorate()

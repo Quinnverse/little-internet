@@ -50,6 +50,8 @@ const MIME: Record<string, string> = {
   '.mp3': 'audio/mpeg',
   '.webmanifest': 'application/manifest+json',
   '.glb': 'model/gltf-binary',
+  '.wasm': 'application/wasm',
+  '.task': 'application/octet-stream',
 }
 
 /** Files a published site may contain. Anything else is refused, never stored. */

@@ -10,6 +10,8 @@ import { freeSlotsAll } from '../../core/room.ts'
 import { Field, GhostIcon, Sheet, type Ctx } from './common.tsx'
 import { EntrySheet } from './EntrySheet.tsx'
 import { Icon } from './icons.tsx'
+import { CameraControl } from './CameraControl.tsx'
+import type { BooReaction } from '../../perception/router.ts'
 
 type Turn = { who: 'me' | 'boo'; text: string; cards?: BooCard[]; proposal?: BooProposal; done?: 'confirmed' | 'cancelled' | undefined; chips?: string[]; open?: BooReply['open'] }
 
@@ -32,7 +34,7 @@ function applyAction(a: BooAction, posts: readonly Post[]) {
  * propose changes to several records at once. It always shows what would change and waits for a click.
  * Runs on this device. An optional model can only rephrase Boo's own answer (Settings → Boo's voice).
  */
-export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () => void; onDecorate?: () => void }) {
+export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () => void; onDecorate?: () => void; onReact?: (r: BooReaction) => void }) {
   useLang()
   const { ctx } = props
   const { ghost, posts } = ctx.project
@@ -106,6 +108,16 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
           </p>
         </div>
       </div>
+
+      <CameraControl
+        mode="boo"
+        hint={ta('cam.booHint')}
+        onAction={(a) => {
+          if (a.kind !== 'boo') return
+          props.onReact?.(a.reaction)
+          if (a.reaction === 'catch-heart') ctx.toast(ta('cam.booCaught'))
+        }}
+      />
 
       <div class="boo-chat" role="log" aria-live="polite" aria-label={ta('boo.log')}>
         {turns.length === 0 && <p class="muted">{ta('boo.intro', { name })}</p>}

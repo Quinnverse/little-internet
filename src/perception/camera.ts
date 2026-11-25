@@ -1,0 +1,150 @@
+import { GestureRecognizer } from './recognizer.ts'
+import { createHandTracker, type HandTracker } from './tracker.ts'
+import type { Hand, PerceptionEvent } from './types.ts'
+
+export type CamState = 'off' | 'asking' | 'loading' | 'on' | 'error'
+export type CamHint = 'ok' | 'dark' | 'no-hand'
+
+export function describeCameraError(e: unknown): string {
+  const name = (e as { name?: string })?.name
+  if (name === 'NotAllowedError' || name === 'SecurityError') return 'Camera access was refused. You can allow it in the browser settings, or keep drawing with the mouse or your finger.'
+  if (name === 'NotFoundError' || name === 'OverconstrainedError') return 'No camera was found. Mouse, touch and pen work the same way.'
+  if (name === 'NotReadableError') return 'The camera is busy in another app.'
+  return e instanceof Error ? e.message : 'The camera is not available here.'
+}
+
+export const cameraSupported = () => typeof navigator !== 'undefined' && !!navigator.mediaDevices?.getUserMedia && (typeof isSecureContext === 'undefined' || isSecureContext)
+
+/**
+ * One camera session. Off until `start()`. While on: tracks are live, frames are analysed in memory and dropped,
+ * only small perception events go out. `stop()` releases the camera (the browser's recording light goes out).
+ * The loop slows itself down when the device is slow and pauses while the tab is hidden.
+ */
+export class CameraSession {
+  private stream: MediaStream | null = null
+  private tracker: HandTracker | null = null
+  private timer = 0
+  private running = false
+  private ema = 20
+  private lastDark = 0
+  private canvas: HTMLCanvasElement | null = null
+  private rec: GestureRecognizer
+  private sawHandAt = 0
+  private hint: CamHint = 'ok'
+  private handsNow = 0
+  private onVis = () => {
+    if (document.hidden) window.clearTimeout(this.timer)
+    else if (this.running) this.schedule(0)
+  }
+
+  readonly video: HTMLVideoElement
+  private cb: {
+    onEvent: (e: PerceptionEvent) => void
+    onState: (s: CamState, message?: string) => void
+    onHint?: (h: CamHint) => void
+    onFrame?: (hands: readonly Hand[]) => void
+  }
+
+  constructor(video: HTMLVideoElement, cb: CameraSession['cb'], sessionId: string) {
+    this.video = video
+    this.cb = cb
+    this.rec = new GestureRecognizer(sessionId)
+  }
+
+  get delegate() {
+    return this.tracker?.delegate
+  }
+
+  async start(): Promise<void> {
+    if (this.running) return
+    this.cb.onState('asking')
+    try {
+      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false })
+    } catch (e) {
+      this.cb.onState('error', describeCameraError(e))
+      return
+    }
+    this.cb.onState('loading')
+    try {
+      this.video.srcObject = this.stream
+      this.video.muted = true
+      this.video.playsInline = true
+      await this.video.play()
+      this.tracker = await createHandTracker('VIDEO')
+    } catch (e) {
+      this.stop()
+      this.cb.onState('error', e instanceof Error ? `Hand tracking could not start: ${e.message}` : 'Hand tracking could not start.')
+      return
+    }
+    this.running = true
+    document.addEventListener('visibilitychange', this.onVis)
+    this.cb.onState('on')
+    this.schedule(0)
+  }
+
+  stop() {
+    this.running = false
+    window.clearTimeout(this.timer)
+    document.removeEventListener('visibilitychange', this.onVis)
+    this.stream?.getTracks().forEach((t) => t.stop())
+    this.stream = null
+    this.video.srcObject = null
+    try {
+      this.tracker?.close()
+    } catch {
+      /* already closed */
+    }
+    this.tracker = null
+    this.rec.reset()
+    this.cb.onState('off')
+  }
+
+  private schedule(ms: number) {
+    window.clearTimeout(this.timer)
+    this.timer = window.setTimeout(() => this.tick(), ms)
+  }
+
+  private tick() {
+    if (!this.running || !this.tracker) return
+    if (document.hidden) return
+    const t0 = performance.now()
+    if (this.video.readyState >= 2 && this.video.videoWidth > 0) {
+      let hands: Hand[] = []
+      try {
+        hands = this.tracker.detect(this.video, t0)
+      } catch {
+        hands = []
+      }
+      this.cb.onFrame?.(hands)
+      if (hands.length) this.sawHandAt = t0
+      this.handsNow = hands.length
+      for (const e of this.rec.feed({ t: t0, hands })) this.cb.onEvent(e)
+      this.checkHint(t0)
+    }
+    const cost = performance.now() - t0
+    this.ema = this.ema * 0.8 + cost * 0.2
+    // Run at most ~20 fps and back off on slow devices so the page stays responsive.
+    this.schedule(Math.max(0, Math.min(200, Math.max(50, this.ema * 2) - cost)))
+  }
+
+  private checkHint(now: number) {
+    let h: CamHint = this.hint
+    if (now - this.lastDark > 1500) {
+      this.lastDark = now
+      this.canvas ??= Object.assign(document.createElement('canvas'), { width: 16, height: 12 })
+      const g = this.canvas.getContext('2d', { willReadFrequently: true })
+      if (g) {
+        g.drawImage(this.video, 0, 0, 16, 12)
+        const d = g.getImageData(0, 0, 16, 12).data
+        let sum = 0
+        for (let i = 0; i < d.length; i += 4) sum += 0.2126 * d[i]! + 0.7152 * d[i + 1]! + 0.0722 * d[i + 2]!
+        const luma = sum / (d.length / 4)
+        h = luma < 45 ? 'dark' : this.handsNow === 0 && now - this.sawHandAt > 4000 ? 'no-hand' : 'ok'
+      }
+    }
+    if (h !== this.hint) {
+      this.hint = h
+      this.cb.onHint?.(h)
+    }
+  }
+}

@@ -5,7 +5,7 @@
 // owner-only data (guestbook inbox) or content that a closed door has to make unreachable.
 const PREVIEW_CACHE = 'li-preview'
 const SHELL_CACHE = 'li-shell-v2'
-const NEVER = /(^|\/)(api|ring)(\/|$)|\/healthz$|\/@[a-z0-9-]+(\/|$)/
+const NEVER = /(^|\/)(api|ring|vision)(\/|$)|\/healthz$|\/@[a-z0-9-]+(\/|$)/
 
 self.addEventListener('install', () => self.skipWaiting())
 self.addEventListener('activate', (event) =>

@@ -31,7 +31,9 @@ import { letterToPng, photoForLetter, voiceToDataUrl } from '../letterMedia.ts'
 import { newClientId, sendQueued, type Person } from '../people.ts'
 import { describeMicError, recordingSupported, startRecording, type RecorderHandle } from '../recorder.ts'
 import { Sheet } from './common.tsx'
-import { DrawPad } from './DrawPad.tsx'
+import { CameraControl } from './CameraControl.tsx'
+import { DrawPad, type DrawPadHandle } from './DrawPad.tsx'
+import type { Action } from '../../perception/router.ts'
 import { Icon } from './icons.tsx'
 
 const DRAFT = 'letter-draft'
@@ -112,6 +114,8 @@ export function LetterAtelier(props: {
   const paperRef = useRef<HTMLDivElement>(null)
   const sentOnce = useRef(false)
   const clientId = useRef(newClientId())
+  const penRef = useRef<DrawPadHandle | null>(null)
+  const [proposal, setProposal] = useState(false)
 
   // A draft is kept on this device only, so closing by accident loses nothing.
   useEffect(() => {
@@ -251,9 +255,9 @@ export function LetterAtelier(props: {
     }
   }
 
-  const send = async () => {
+  const send = async (l: Letter = letter) => {
     if (sentOnce.current) return
-    const parsed = LetterSchema.safeParse(letter)
+    const parsed = LetterSchema.safeParse(l)
     if (!parsed.success) return setStatus({ kind: 'failed', text: ta('let.invalid') })
     if (letterIsEmpty(parsed.data)) return setStatus({ kind: 'failed', text: ta('let.empty') })
     if (!to) return setStatus({ kind: 'failed', text: ta('let.pickFriend') })
@@ -283,6 +287,20 @@ export function LetterAtelier(props: {
         <DrawPad
           dark={letter.paper === 'night'}
           onCancel={() => setMode('edit')}
+          onHandle={(h) => (penRef.current = h)}
+          extra={
+            <CameraControl
+              mode="draw"
+              hint={ta('cam.drawHint')}
+              onAction={(a: Action) => {
+                const h = penRef.current
+                if (!h || a.kind !== 'draw') return
+                if (a.op === 'begin') h.begin()
+                if (a.op !== 'end') h.point(a.x * 1000, a.y * 1000, performance.now())
+                else h.end()
+              }}
+            />
+          }
           onDone={(d: Drawing | null) => {
             setMode('edit')
             if (d && d.strokes.length) add({ id: newItemId(), t: 'drawing', drawing: d, x: 500, y: 650, rot: 0, scale: 0.7 })
@@ -316,6 +334,28 @@ export function LetterAtelier(props: {
               <span>{ta('let.shareable')}</span>
             </label>
             <p class="muted small">{ta('let.shareableHint')}</p>
+            <CameraControl mode="send" hint={ta('cam.sendHint')} onAction={(a: Action) => a.kind === 'propose-gift' && setProposal(true)} />
+            {proposal && status?.kind !== 'sent' && (
+              <div class="cam-proposal" role="group" aria-label={ta('cam.proposal', { to: to || '…' })}>
+                <p>{to ? ta('cam.proposal', { to }) : ta('let.pickFriend')}</p>
+                <div class="choice-row">
+                  <button
+                    type="button"
+                    class="btn btn-primary btn-small"
+                    disabled={!to || status?.kind === 'sending'}
+                    onClick={() => {
+                      const heart = template('heart')
+                      setLetter(heart)
+                      setProposal(false)
+                      void send(heart)
+                    }}
+                  >
+                    {ta('cam.proposalYes')}
+                  </button>
+                  <button type="button" class="btn btn-small" onClick={() => setProposal(false)}>{ta('cam.proposalNo')}</button>
+                </div>
+              </div>
+            )}
             {status && (
               <p class={`small ${status.kind === 'failed' ? 'error' : ''}`} role={status.kind === 'failed' ? 'alert' : 'status'} data-state={status.kind}>
                 {status.text}
@@ -323,7 +363,7 @@ export function LetterAtelier(props: {
             )}
             <div class="sheet-actions">
               <button type="button" class="btn" onClick={() => setMode('edit')}>{ta('let.back')}</button>
-              <button type="button" class="btn btn-primary" disabled={status?.kind === 'sending' || status?.kind === 'sent' || !to} onClick={() => void send()}>
+              <button type="button" class="btn btn-primary" disabled={status?.kind === 'sending' || status?.kind === 'sent' || !to} onClick={() => void send(letter)}>
                 <Icon name="mail" size={18} /> {status?.kind === 'failed' ? ta('let.retry') : ta('let.send')}
               </button>
               {status?.kind === 'sent' && <button type="button" class="btn" onClick={props.onClose}>{ta('let.done')}</button>}
