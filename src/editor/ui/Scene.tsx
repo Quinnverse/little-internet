@@ -3,6 +3,7 @@ import type { Project } from '../../core/schema.ts'
 import { preloadModels } from '../../room3d/models.ts'
 import { RoomView, webglAvailable, type HomeData } from '../../room3d/view.ts'
 import { onLangChange, t, type Key } from '../i18n.ts'
+import { ta } from '../i18nAtelier.ts'
 import { assetUrl } from './common.tsx'
 import { iconSvg, type IconName } from './icons.tsx'
 
@@ -70,6 +71,9 @@ export function Scene(props: SceneProps) {
   const latest = useRef(props)
   latest.current = props
   const [failed, setFailed] = useState(false)
+  /** Why the room is not showing: a model problem, or the GPU context could not be restored. */
+  const [problem, setProblem] = useState<null | 'load' | 'gpu'>(null)
+  const [attempt, setAttempt] = useState(0)
 
   useEffect(() => {
     if (!host.current) return
@@ -81,16 +85,21 @@ export function Scene(props: SceneProps) {
     const titles = () => new Map(latest.current.data.memory.map((m) => [m.id, m.title]))
     let cancelled = false
     let cleanup = () => {}
+    setProblem(null)
     // The Blender models are embedded; parsing them takes a moment, then the room is built once.
-    void preloadModels().then(() => {
-      if (cancelled || !host.current) return
-      cleanup = mount(titles)
-    })
+    // A failure here used to leave a blank screen forever: now it is reported and can be retried.
+    void preloadModels().then(
+      () => {
+        if (cancelled || !host.current) return
+        cleanup = mount(titles)
+      },
+      () => !cancelled && setProblem('load'),
+    )
     return () => {
       cancelled = true
       cleanup()
     }
-  }, [])
+  }, [attempt])
 
   function mount(titles: () => Map<string, string>): () => void {
     let view: RoomView
@@ -103,6 +112,8 @@ export function Scene(props: SceneProps) {
         onCell: (x, z) => latest.current.onCell?.(x, z),
         hotspots: latest.current.hotspots,
         reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
+        onContextLost: () => setProblem('gpu'),
+        onContextRestored: () => setProblem(null),
       })
     } catch {
       setFailed(true)
@@ -135,7 +146,18 @@ export function Scene(props: SceneProps) {
     viewRef.current?.select(props.selected)
   }, [props.selected, props.data])
 
-  return <div class="scene" ref={host} data-webgl={failed ? 'off' : 'on'} aria-label="3D home" role="presentation" />
+  return (
+    <div class="scene" ref={host} data-webgl={failed ? 'off' : 'on'} aria-label="3D home" role="presentation">
+      {problem && (
+        <div class="scene-problem" role="alert">
+          <p>{ta(problem === 'gpu' ? 'scene.gpu' : 'scene.load')}</p>
+          <button type="button" class="btn btn-primary" onClick={() => setAttempt((n) => n + 1)}>{ta('scene.retry')}</button>
+          <button type="button" class="btn" onClick={() => window.location.reload()}>{ta('scene.reload')}</button>
+          <p class="muted small">{ta('scene.simple')}</p>
+        </div>
+      )}
+    </div>
+  )
 }
 
 export function sceneFailed(): boolean {

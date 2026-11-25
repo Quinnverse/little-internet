@@ -224,6 +224,8 @@ function start(c: Clean) {
     onPick: (id) => pick(id),
     hotspots: [],
     reduceMotion: reduce,
+    // If the GPU takes the context away and it does not come back, hand the visitor the plain website.
+    onContextLost: () => close(),
   })
   view.setData(c.home)
   view.setNight(night, true)
@@ -444,7 +446,23 @@ function run() {
   if (!c) return
   if (!webglAvailable()) return // the page below is already a complete website
   // The models are embedded in this file; parse them before the door appears.
-  void preloadModels().then(() => start(c))
+  // Whatever goes wrong, the page underneath is a complete website: release it and stay out of the way.
+  const release = () => {
+    document.querySelector('.li-room')?.remove()
+    document.documentElement.classList.remove('li-lock')
+    const page = document.querySelector('.wrap') as (HTMLElement & { inert?: boolean }) | null
+    if (page) page.inert = false
+  }
+  preloadModels().then(
+    () => {
+      try {
+        start(c)
+      } catch {
+        release()
+      }
+    },
+    release,
+  )
 }
 
 if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', run)

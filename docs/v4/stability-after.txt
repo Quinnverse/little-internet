@@ -1,0 +1,11 @@
+PASS  3 cold starts and resets: room opens every time  (contexts created across last page: 2)
+PASS  UI toggles do not create extra WebGL contexts  (+0 contexts over 12 rounds)
+PASS  no "too many WebGL contexts" warnings
+PASS  room has a visible message or recovers after WebGL context loss  (lost=4 restored=2 contextAlive=true)
+PASS  camera still responds after context loss
+PASS  room still draws after background → foreground
+PASS  reload returns to the room (data kept)
+PASS  offline reload still opens the app shell
+PASS  published site stays usable when the 3D room cannot start  ({"inert":false,"locked":false,"overlay":false})
+
+9/9 stability checks passed

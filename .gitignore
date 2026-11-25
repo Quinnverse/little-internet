@@ -39,3 +39,5 @@ data/
 deploy/.previous-image
 .shots/
 .e2e-shots-data/
+.stab-data/
+.stability/

@@ -52,6 +52,10 @@ export type ViewOptions = {
   hotspots: string[]
   reduceMotion: boolean
   onHover?: (id: string | null) => void
+  /** The GPU context was lost and could not be restored in time; show the owner a real choice. */
+  onContextLost?: () => void
+  /** The GPU context came back and the scene was redrawn. */
+  onContextRestored?: () => void
 }
 
 type Hot = { id: string; el: HTMLButtonElement; anchor: () => THREE.Vector3; wall?: number }
@@ -180,6 +184,10 @@ export class RoomView {
     this.scene.add(this.ring, this.grid)
     this.grid.visible = false
 
+    // Phones drop WebGL contexts when the tab is backgrounded or memory is tight. preventDefault on `lost`
+    // tells the browser we want it back; on `restored` three.js rebuilds GPU resources and we redraw.
+    el.addEventListener('webglcontextlost', this.onLost)
+    el.addEventListener('webglcontextrestored', this.onRestored)
     el.addEventListener('pointerdown', this.onDown)
     el.addEventListener('pointermove', this.onMove)
     el.addEventListener('pointerup', this.onUp)
@@ -683,8 +691,26 @@ export class RoomView {
     this.zoomBy(Math.exp(e.deltaY * 0.0012))
   }
 
+  private lostTimer = 0
+  private onLost = (e: Event) => {
+    e.preventDefault()
+    window.clearTimeout(this.lostTimer)
+    this.lostTimer = window.setTimeout(() => {
+      if (!this.disposed && this.renderer.getContext().isContextLost()) this.opts.onContextLost?.()
+    }, 4000)
+  }
+  private onRestored = () => {
+    window.clearTimeout(this.lostTimer)
+    this.dirty = true
+    this.opts.onContextRestored?.()
+  }
+
   private onVis = () => {
-    if (!document.hidden) this.dirty = true
+    if (!document.hidden) {
+      this.dirty = true
+      // Came back to a dead context that never restored: tell the owner instead of showing a frozen canvas.
+      if (this.renderer.getContext().isContextLost()) this.onLost(new Event('webglcontextlost'))
+    }
   }
 
   private ndc(e: PointerEvent): THREE.Vector2 {
@@ -876,9 +902,15 @@ export class RoomView {
     this.io.disconnect()
     document.removeEventListener('visibilitychange', this.onVis)
     for (const h of this.hots) h.el.remove()
+    window.clearTimeout(this.lostTimer)
+    const el = this.renderer.domElement
+    el.removeEventListener('webglcontextlost', this.onLost)
+    el.removeEventListener('webglcontextrestored', this.onRestored)
     disposeTree(this.scene)
     this.renderer.dispose()
-    this.renderer.domElement.remove()
+    // Release the GPU context now instead of waiting for garbage collection (contexts are a scarce resource).
+    this.renderer.forceContextLoss()
+    el.remove()
   }
 
   /** For tests: the current camera azimuth in radians. */
@@ -910,11 +942,22 @@ export function disposeTree(root: THREE.Object3D) {
   })
 }
 
+let probed: boolean | undefined
+
+/**
+ * Whether this browser can create a WebGL context. The answer is cached and the probe context is released:
+ * every `getContext` call makes a real GPU context, browsers keep only about 16, and when they run out they
+ * silently kill the OLDEST one, which is the room. (Found by reproduction: scripts/stability.mjs.)
+ */
 export function webglAvailable(): boolean {
+  if (probed !== undefined) return probed
   try {
     const c = document.createElement('canvas')
-    return !!(c.getContext('webgl2') || c.getContext('webgl'))
+    const gl = (c.getContext('webgl2') || c.getContext('webgl')) as WebGLRenderingContext | WebGL2RenderingContext | null
+    probed = !!gl
+    gl?.getExtension('WEBGL_lose_context')?.loseContext()
   } catch {
-    return false
+    probed = false
   }
+  return probed
 }

@@ -54,7 +54,7 @@ export function Home(props: { ctx: Ctx }) {
   const [decorating, setDecorating] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<RoomView | null>(null)
-  const [flat, setFlat] = useState(flatPref() || sceneFailed())
+  const [flat, setFlat] = useState(() => flatPref() || sceneFailed())
   const [labels, setLabels] = useState(true)
   const data = useMemo(() => toHomeData(ctx.project), [ctx.project])
   const history = useRef<Project[]>([])
