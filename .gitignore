@@ -41,3 +41,4 @@ deploy/.previous-image
 .e2e-shots-data/
 .stab-data/
 .stability/
+.v4shots/

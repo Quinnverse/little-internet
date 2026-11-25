@@ -8,7 +8,7 @@ import { Icon } from './icons.tsx'
 import { setLang, t, useLang, type Key } from '../i18n.ts'
 import { Field, GhostIcon, run, Sheet, type Ctx } from './common.tsx'
 
-export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; setFlat: (v: boolean) => void }) {
+export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; setFlat: (v: boolean) => void; assist: boolean; setAssist: (v: boolean) => void }) {
   const lang = useLang()
   const { ctx } = props
   const { site, ghost } = ctx.project
@@ -102,6 +102,12 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
           <Icon name="trash" size={18} /> {ta('reset.button')}
         </button>
       </div>
+      <label class="switch-row">
+        <input type="checkbox" checked={props.assist} onChange={(e) => props.setAssist(e.currentTarget.checked)} />
+        <span>
+          {ta('hud.assistAlways')} <span class="muted small">{ta('hud.assistHint')}</span>
+        </span>
+      </label>
       <label class="switch-row">
         <input type="checkbox" checked={props.flat} onChange={(e) => props.setFlat(e.currentTarget.checked)} />
         <span>

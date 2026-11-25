@@ -95,7 +95,7 @@ for (const [label, ctxOpts] of [['desktop', { viewport: { width: 1440, height: 9
   await p.getByRole('button', { name: 'The Midnight Internet' }).click()
   await p.locator('.home .scene canvas').waitFor({ timeout: 30000 })
   check(`${label}: demo copy opens without sign-up`, true)
-  await p.locator('button.hotspot[data-id="computer"]').click({ force: true })
+  await p.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
   await p.locator('.crt-item', { hasText: 'Decorate my website' }).click()
   await p.locator('.atelier').waitFor()
   await p.frameLocator('.at-frame').locator('[data-w]').first().waitFor()

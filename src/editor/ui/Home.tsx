@@ -36,6 +36,14 @@ type Panel =
   | { kind: 'settings' }
   | { kind: 'light' }
 
+const ASSIST_KEY = 'li-assist'
+const assistPref = () => {
+  try {
+    return localStorage.getItem(ASSIST_KEY) === '1'
+  } catch {
+    return false
+  }
+}
 const FLAT_KEY = 'li-flat'
 const flatPref = () => {
   try {
@@ -55,7 +63,9 @@ export function Home(props: { ctx: Ctx }) {
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<RoomView | null>(null)
   const [flat, setFlat] = useState(() => flatPref() || sceneFailed())
-  const [labels, setLabels] = useState(true)
+  // Quiet by default: names and markers show on hover/focus, or when the owner asks (Hints button or Settings).
+  const [assistAlways, setAssistAlways] = useState(assistPref())
+  const [peek, setPeek] = useState(false)
   const data = useMemo(() => toHomeData(ctx.project), [ctx.project])
   const history = useRef<Project[]>([])
   const [undoable, setUndoable] = useState(0)
@@ -84,9 +94,10 @@ export function Home(props: { ctx: Ctx }) {
   }
 
   useEffect(() => {
-    const id = window.setTimeout(() => setLabels(false), 7000)
+    if (!peek) return
+    const id = window.setTimeout(() => setPeek(false), 6000)
     return () => window.clearTimeout(id)
-  }, [])
+  }, [peek])
 
   const close = () => {
     setPanel(null)
@@ -204,7 +215,7 @@ export function Home(props: { ctx: Ctx }) {
   const flatMode = flat || !!(view === null && sceneFailed())
 
   return (
-    <div class={`home${labels ? ' show-labels' : ''}${decorating ? ' is-decorating' : ''}`}>
+    <div class={`home${assistAlways || peek ? ' assist' : ''}${decorating ? ' is-decorating' : ''}`}>
       {flatMode ? (
         <FlatHome ctx={ctx} onPick={onPick} />
       ) : (
@@ -240,7 +251,8 @@ export function Home(props: { ctx: Ctx }) {
         <nav class="dock" aria-label="Home">
           {!flatMode && (
             <>
-              <DockBtn icon="rotl" label={t('hud.rotateL')} onClick={() => view?.rotateBy(-Math.PI / 4)} />
+              <DockBtn icon="eye" label={ta('hud.hints')} onClick={() => setPeek((v) => !v)} />
+          <DockBtn icon="rotl" label={t('hud.rotateL')} onClick={() => view?.rotateBy(-Math.PI / 4)} />
               <DockBtn icon="rotr" label={t('hud.rotateR')} onClick={() => view?.rotateBy(Math.PI / 4)} />
             </>
           )}
@@ -270,6 +282,15 @@ export function Home(props: { ctx: Ctx }) {
         <Settings
           ctx={ctx}
           onClose={close}
+          assist={assistAlways}
+          setAssist={(v) => {
+            setAssistAlways(v)
+            try {
+              localStorage.setItem(ASSIST_KEY, v ? '1' : '0')
+            } catch {
+              /* ignore */
+            }
+          }}
           flat={flat}
           setFlat={(v) => {
             setFlat(v)

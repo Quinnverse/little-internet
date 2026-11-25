@@ -59,7 +59,7 @@ await write('Harbor lights', 'PUBLICBODY the lighthouse blinked twice.', true)
 await write('Unsent letter', 'TOPSECRETBODY not for anyone.', false)
 
 // ---- 1-3: CRT → Decorate my website
-await page.locator('button.hotspot[data-id="computer"]').click({ force: true })
+await page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
 await page.locator('.crt-item', { hasText: 'Decorate my website' }).click()
 await page.locator('.atelier').waitFor()
 const frame = () => page.frameLocator('.at-frame')
@@ -165,7 +165,7 @@ check('…and its old page URL is gone', postGone === 404, String(postGone))
 await page.keyboard.press('Escape')
 
 // ---- Close the Door (from the door in the room), then open it again
-await page.locator('button.hotspot[data-id="door"]').click({ force: true })
+await page.locator('button.hotspot[data-id=\"door\"]').evaluate((el) => el.click())
 await page.locator('.door-state.is-open').waitFor({ timeout: 15000 })
 page.once('dialog', (d) => d.accept())
 await page.getByRole('button', { name: 'Close the door' }).click()
@@ -182,7 +182,7 @@ check('opening the door publishes the site again', (await fetch(url)).status ===
 await page.keyboard.press('Escape')
 
 // ---- 14-15: export the website and open it offline on another host
-await page.locator('button.hotspot[data-id="computer"]').click({ force: true })
+await page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
 await page.locator('.crt-item', { hasText: 'Move my home' }).click()
 await page.getByRole('button', { name: 'Skip' }).click().catch(() => {})
 const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download website ZIP' }).click()])

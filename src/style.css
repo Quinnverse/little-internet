@@ -141,8 +141,13 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .hotspot[data-tip='left'] .hot-tip { top: 50%; left: auto; right: 100%; transform: translateY(-50%); margin: 0 -2px 0 0; }
 .hotspot[data-tip='top'] .hot-tip { top: auto; bottom: 100%; margin: 0 0 -2px; }
 .hotspot:hover .hot-tip, .hotspot:focus-visible .hot-tip { opacity: 1; }
-.home.show-labels .hotspot:not(.hotspot-small) .hot-tip { opacity: 1; }
-@media (min-width: 900px) { .hotspot:not(.hotspot-small) .hot-tip { opacity: 1; } }
+/* Quiet by default: no markers or names floating over furniture. They appear when the pointer is on the object,
+   when it has keyboard focus, in decorate mode, or when the owner asks for hints (Hints button / Settings). */
+.hotspot { opacity: 0; pointer-events: none; transition: opacity 0.18s ease; }
+.hotspot.is-hover, .hotspot:focus-visible, .home.assist .hotspot { opacity: 1; }
+.hotspot.is-hover .hot-tip, .home.assist .hotspot:not(.hotspot-small) .hot-tip { opacity: 1; }
+.home.assist .hotspot { pointer-events: auto; }
+.hotspot:focus-visible { pointer-events: auto; }
 
 .hud-top {
   position: absolute; z-index: 5; top: 0; left: 0; right: 0; pointer-events: none;
@@ -505,12 +510,5 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .demo-links li { padding: 6px 0; border-top: 1px dashed #e7cf8f; }
 .demo-links li:first-child { border-top: 0; }
 .demo-links a { font-weight: 700; }
-
-/* Narrow screens: only the two main name tags up front; the rest appear on tap/focus. */
-@media (max-width: 599px) {
-  .home.show-labels .hotspot:not(.hotspot-small):not([data-id='diary']):not([data-id='computer']) .hot-tip { opacity: 0; }
-  .home.show-labels .hotspot:not(.hotspot-small):not([data-id='diary']):not([data-id='computer']):hover .hot-tip,
-  .home.show-labels .hotspot:not(.hotspot-small):not([data-id='diary']):not([data-id='computer']):focus-visible .hot-tip { opacity: 1; }
-}
 
 .scene-problem { position: absolute; z-index: 8; left: 50%; top: 40%; transform: translate(-50%, -50%); width: min(92%, 380px); padding: 18px; border-radius: 18px; background: rgba(255, 250, 240, 0.96); box-shadow: 0 10px 40px rgba(60, 35, 20, 0.3); text-align: center; display: grid; gap: 10px; }

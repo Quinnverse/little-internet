@@ -61,6 +61,11 @@ export type ViewOptions = {
 type Hot = { id: string; el: HTMLButtonElement; anchor: () => THREE.Vector3; wall?: number }
 
 const TARGET = new THREE.Vector3(3, 1.0, 3)
+/** Closest the camera may get to its target: close enough to read a diary page or a mug's pattern. */
+const MIN_RADIUS = 1.1
+/** The camera target stays inside the house, so panning can never lose the room. */
+const PAN_MIN = new THREE.Vector3(-0.5, 0.05, -0.5)
+const PAN_MAX = new THREE.Vector3(6.5, 2.4, 6.5)
 const TIP_SIDE: Record<string, string> = { diary: 'left', computer: 'top', shelf: 'top', voice: 'left' }
 const ANCHORS: Record<string, [number, number, number]> = {
   diary: [0.62, 1.05, 0.5],
@@ -80,7 +85,7 @@ export function isNightNow(mode: LightMode, hour = new Date().getHours()): boole
 export class RoomView {
   readonly renderer: THREE.WebGLRenderer
   readonly scene = new THREE.Scene()
-  readonly camera = new THREE.PerspectiveCamera(32, 1, 0.1, 80)
+  readonly camera = new THREE.PerspectiveCamera(32, 1, 0.04, 80)
   readonly pet: Pet
   private opts: ViewOptions
   private root = new THREE.Group()
@@ -105,6 +110,8 @@ export class RoomView {
   private ro: ResizeObserver
   private io: IntersectionObserver
   private raycaster = new THREE.Raycaster()
+  /** Soft light that rides with the camera and fades in when you zoom close, so details stay readable. */
+  private fill = new THREE.PointLight('#fff1dc', 0, 9, 1.4)
   private pickRoots: THREE.Object3D[] = []
   private floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private decorMode = false
@@ -140,6 +147,9 @@ export class RoomView {
   private pinch = 0
   private downAt = { x: 0, y: 0, t: 0 }
   private moved = 0
+  private panning = false
+  private lastTap = { t: 0, x: 0, y: 0 }
+  private mid = { x: 0, y: 0 }
 
   constructor(opts: ViewOptions) {
     this.opts = opts
@@ -156,7 +166,7 @@ export class RoomView {
     opts.container.prepend(el)
     this.hotLayer = opts.container
 
-    this.scene.add(this.root, this.dynamic, this.hemi, this.ambient, this.sun, this.sun.target)
+    this.scene.add(this.root, this.dynamic, this.hemi, this.ambient, this.sun, this.sun.target, this.fill)
     this.sun.position.set(8, 9, -8)
     this.sun.target.position.set(3, 0, 3)
     this.sun.castShadow = true
@@ -188,6 +198,7 @@ export class RoomView {
     // tells the browser we want it back; on `restored` three.js rebuilds GPU resources and we redraw.
     el.addEventListener('webglcontextlost', this.onLost)
     el.addEventListener('webglcontextrestored', this.onRestored)
+    el.addEventListener('contextmenu', (ev) => ev.preventDefault())
     el.addEventListener('pointerdown', this.onDown)
     el.addEventListener('pointermove', this.onMove)
     el.addEventListener('pointerup', this.onUp)
@@ -393,6 +404,7 @@ export class RoomView {
   private hover(id: string | null) {
     if (this.lastHover === id) return
     this.lastHover = id
+    for (const h of this.hots) h.el.classList.toggle('is-hover', h.id === id)
     this.setGlow(id)
     this.opts.onHover?.(id)
     this.dirty = true
@@ -573,9 +585,54 @@ export class RoomView {
     this.dirty = true
   }
 
-  zoomBy(f: number) {
-    this.want.radius = clamp(this.want.radius * f, 4.2, this.baseRadius * 1.25)
+  /** Zooms; when zooming in with a screen point (wheel, pinch centre) the view also drifts toward what is under it. */
+  zoomBy(f: number, at?: { x: number; y: number }) {
+    const before = this.want.radius
+    this.want.radius = clamp(before * f, MIN_RADIUS, this.baseRadius * 1.25)
+    if (at && f < 1 && this.want.radius < before) {
+      const r = this.renderer.domElement.getBoundingClientRect()
+      this.raycaster.setFromCamera(new THREE.Vector2(((at.x - r.left) / r.width) * 2 - 1, -((at.y - r.top) / r.height) * 2 + 1), this.camera)
+      const hit = this.raycaster.intersectObjects([this.root, this.dynamic, this.pet.group], true).find((h) => h.object.visible && h.distance > 0.3)
+      const p = hit?.point ?? this.raycaster.ray.intersectPlane(this.floorPlane, new THREE.Vector3()) ?? null
+      if (p) {
+        const k = Math.min(0.6, (1 - this.want.radius / before) * 1.6)
+        this.want.tgt.lerp(p, k).clamp(PAN_MIN, PAN_MAX)
+      }
+    }
     this.dirty = true
+  }
+
+  /** Moves the look-at point across the screen plane by a pixel delta (two-finger drag, right/shift drag). */
+  private panBy(dxPx: number, dyPx: number) {
+    const h = Math.max(1, this.renderer.domElement.clientHeight)
+    const unit = (2 * this.radius * Math.tan((this.camera.fov * Math.PI) / 360)) / h
+    const right = new THREE.Vector3().setFromMatrixColumn(this.camera.matrix, 0)
+    right.y = 0
+    right.normalize()
+    const forward = new THREE.Vector3(-right.z, 0, right.x)
+    const d = right.multiplyScalar(-dxPx * unit).add(forward.multiplyScalar(-dyPx * unit))
+    this.want.tgt.add(d).clamp(PAN_MIN, PAN_MAX)
+    this.tgt.copy(this.want.tgt)
+    this.dirty = true
+  }
+
+  /** Flies close to the point under the pointer (double tap / double click): look at details up close. */
+  private focusPoint(e: PointerEvent): boolean {
+    this.raycaster.setFromCamera(this.ndc(e), this.camera)
+    // A wall that has faded out to show the room is not something the visitor is pointing at.
+    const faded = new Set<THREE.Object3D>()
+    for (const w of this.shell?.walls ?? []) if (w.alpha < 0.95) w.group.traverse((o) => faded.add(o))
+    const hits = this.raycaster
+      .intersectObjects([this.root, this.dynamic, this.pet.group], true)
+      .filter((h) => h.object.visible && h.distance > 0.3 && !faded.has(h.object))
+    const h = hits[0]
+    if (!h) return false
+    const dist = this.camera.position.distanceTo(h.point)
+    this.want.tgt.copy(h.point).clamp(PAN_MIN, PAN_MAX)
+    this.want.radius = clamp(dist * 0.42, 1.5, this.baseRadius)
+    this.want.pol = clamp(this.pol, 0.7, 1.2)
+    this.dirty = true
+    return true
   }
 
   resetView() {
@@ -639,10 +696,12 @@ export class RoomView {
     if (this.pointers.size === 1) {
       this.downAt = { x: e.clientX, y: e.clientY, t: performance.now() }
       this.moved = 0
+      this.panning = e.pointerType === 'mouse' && (e.button === 2 || e.shiftKey)
     }
     if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()] as [{ x: number; y: number }, { x: number; y: number }]
       this.pinch = Math.hypot(a.x - b.x, a.y - b.y)
+      this.mid = { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 }
     }
     this.vAz = 0
   }
@@ -657,7 +716,9 @@ export class RoomView {
     const dy = e.clientY - prev.y
     this.pointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
     this.moved += Math.abs(dx) + Math.abs(dy)
-    if (this.pointers.size === 1) {
+    if (this.pointers.size === 1 && this.panning) {
+      this.panBy(dx, dy)
+    } else if (this.pointers.size === 1) {
       const k = 0.0075
       this.want.az -= dx * k
       this.az -= dx * k
@@ -668,9 +729,14 @@ export class RoomView {
     } else if (this.pointers.size === 2) {
       const [a, b] = [...this.pointers.values()] as [{ x: number; y: number }, { x: number; y: number }]
       const d = Math.hypot(a.x - b.x, a.y - b.y)
-      if (this.pinch > 0) this.zoomBy(this.pinch / d)
+      if (this.pinch > 0) this.zoomBy(this.pinch / d, { x: (a.x + b.x) / 2, y: (a.y + b.y) / 2 })
       this.radius = this.want.radius
       this.pinch = d
+      // Two fingers moving together pan the view; moving apart/together zooms (both at once is fine).
+      const mx = (a.x + b.x) / 2
+      const my = (a.y + b.y) / 2
+      this.panBy(mx - this.mid.x, my - this.mid.y)
+      this.mid = { x: mx, y: my }
     }
   }
 
@@ -679,7 +745,12 @@ export class RoomView {
     this.pointers.delete(e.pointerId)
     if (!had) return
     if (this.pointers.size === 0 && this.moved < 8 && performance.now() - this.downAt.t < 450) {
-      this.tap(e)
+      const now = performance.now()
+      const dbl = now - this.lastTap.t < 360 && Math.hypot(e.clientX - this.lastTap.x, e.clientY - this.lastTap.y) < 28
+      this.lastTap = { t: now, x: e.clientX, y: e.clientY }
+      // Double tap on something that is not itself a button (a chair, a plant, a mug) flies in to look at it.
+      if (dbl && !this.hitId(e) && this.focusPoint(e)) this.lastTap.t = 0
+      else this.tap(e)
     } else if (this.pointers.size === 0) {
       this.want.az += Math.max(-0.5, Math.min(0.5, this.vAz * 0.12))
     }
@@ -688,7 +759,7 @@ export class RoomView {
 
   private onWheel = (e: WheelEvent) => {
     e.preventDefault()
-    this.zoomBy(Math.exp(e.deltaY * 0.0012))
+    this.zoomBy(Math.exp(e.deltaY * 0.0012), { x: e.clientX, y: e.clientY })
   }
 
   private lostTimer = 0
@@ -888,6 +959,11 @@ export class RoomView {
       this.pet.update(0.016, t)
     }
 
+    {
+      const near = clamp((4.6 - this.radius) / 3.2, 0, 1)
+      this.fill.intensity = near * near * (this.nightMix > 0.5 ? 9 : 13)
+      this.fill.position.copy(this.camera.position)
+    }
     if (animated || this.dirty || camChanged || fading || lightChanged) {
       this.renderer.render(this.scene, this.camera)
       this.updateHotspots()

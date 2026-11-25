@@ -89,7 +89,7 @@ if (phone.hasTouch) {
   const after = await page.screenshot()
   check('dragging rotates the room', Buffer.compare(before, after) !== 0)
 }
-await page.locator('button.hotspot[data-id="computer"]').tap({ force: true, timeout: 8000 }).catch(() => page.locator('button.hotspot[data-id="computer"]').click({ force: true }))
+await page.locator('button.hotspot[data-id="computer"]').tap({ force: true, timeout: 8000 }).catch(() => page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click()))
 check('tapping the computer opens the CRT menu', await page.locator('.crt-item').first().isVisible())
 
 // ---- Web Atelier on a phone: edit, undo, local persistence
@@ -126,7 +126,7 @@ await page.locator('.insp-thumb').waitFor({ timeout: 10000 }).then(
 
 // ---- export a website ZIP and a backup; both download and unzip
 await page.locator('.at-bar button').first().click()
-await page.locator('button.hotspot[data-id="computer"]').click({ force: true })
+await page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
 await page.locator('.crt-item', { hasText: 'Move my home' }).click()
 await page.getByRole('button', { name: 'Skip' }).click({ timeout: 4000 }).catch(() => {})
 const [d1] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download website ZIP' }).click()])
