@@ -392,6 +392,18 @@ const en = {
   'move.allBtn': 'Download private backup',
   'move.restore': 'Restore a backup',
   'move.import': 'Import a website ZIP',
+  'draw.title': 'Draw',
+  'draw.canvas': 'Drawing canvas. Draw with a mouse, finger or pen.',
+  'draw.color': 'Colour',
+  'draw.width': 'Line width',
+  'draw.glow': 'Glow',
+  'draw.smooth': 'Smooth lines',
+  'draw.shapes': 'Shapes',
+  'draw.heart': 'Heart',
+  'draw.star': 'Star',
+  'draw.flower': 'Flower',
+  'draw.clear': 'Clear',
+  'draw.use': 'Use this drawing',
 } as const
 
 export type AtelierKey = keyof typeof en
@@ -787,6 +799,18 @@ const zh: Record<AtelierKey, string> = {
   'move.allBtn': '下载私人备份',
   'move.restore': '恢复备份',
   'move.import': '导入网站 ZIP',
+  'draw.title': '涂鸦',
+  'draw.canvas': '画板。可用鼠标、手指或触控笔书写。',
+  'draw.color': '颜色',
+  'draw.width': '线条粗细',
+  'draw.glow': '发光',
+  'draw.smooth': '平滑线条',
+  'draw.shapes': '形状',
+  'draw.heart': '爱心',
+  'draw.star': '星星',
+  'draw.flower': '花',
+  'draw.clear': '清空',
+  'draw.use': '使用这幅涂鸦',
 }
 
 export function ta(key: AtelierKey | string, vars?: Record<string, string | number>): string {

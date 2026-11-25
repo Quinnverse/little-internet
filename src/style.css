@@ -562,3 +562,12 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .boo-input { display: flex; gap: 8px; margin: 8px 0 12px; }
 .boo-input input { flex: 1; }
 .boo-voice { margin-top: 8px; }
+
+/* Draw pad (V5) */
+.drawpad { display: grid; gap: 10px; }
+.drawpad-canvas { width: 100%; aspect-ratio: 4 / 3; border-radius: 12px; background: #fffaf0; border: 1px solid rgba(0,0,0,.15); touch-action: none; cursor: crosshair; }
+.drawpad-canvas.dark { background: #1d1b2e; }
+.drawpad-tools { display: grid; gap: 8px; }
+.swatches { display: flex; flex-wrap: wrap; gap: 6px; }
+.swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(0,0,0,.2); cursor: pointer; padding: 0; }
+.swatch.on { outline: 3px solid var(--accent, #c0603a); outline-offset: 2px; }
