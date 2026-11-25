@@ -547,3 +547,18 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .stars button svg, .icon-btn.star svg { fill: none; }
 .stars button.on svg, .icon-btn.star.on svg { fill: currentColor; }
 .stars button { display: grid; place-items: center; }
+
+/* Boo chat */
+.boo-chat { display: grid; gap: 10px; max-height: min(46dvh, 420px); overflow: auto; padding: 4px 2px 8px; overscroll-behavior: contain; }
+.boo-turn { max-width: 94%; padding: 10px 12px; border-radius: 16px; background: var(--card); border: 1px solid var(--line); }
+.boo-turn p { margin: 0 0 6px; }
+.boo-turn p:last-child { margin-bottom: 0; }
+.boo-me { justify-self: end; background: var(--accent-soft); border-color: transparent; }
+.boo-proposal { margin-top: 8px; padding: 10px; border: 1.5px dashed var(--accent); border-radius: 12px; background: #fff7ef; }
+.boo-proposal.is-confirmed { border-style: solid; border-color: var(--ok); background: #f0f8f2; }
+.boo-proposal.is-cancelled { opacity: 0.6; }
+.boo-affected { margin: 6px 0 10px; padding-left: 1.1em; font-size: 0.9rem; max-height: 140px; overflow: auto; }
+.boo-chips { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0; }
+.boo-input { display: flex; gap: 8px; margin: 8px 0 12px; }
+.boo-input input { flex: 1; }
+.boo-voice { margin-top: 8px; }

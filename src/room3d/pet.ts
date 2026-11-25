@@ -8,10 +8,10 @@ const GHOST_TINT: Record<string, string> = {
   lilac: '#e0d3f6',
 }
 
-export type PetState = 'idle' | 'sleep' | 'react' | 'greet'
+export type PetState = 'idle' | 'sleep' | 'react' | 'greet' | 'observe'
 
 /** Places the pet likes to be (floor coordinates). */
-const SPOTS: Record<string, [number, number]> = {
+export const SPOTS: Record<string, [number, number]> = {
   rug: [2.9, 3.2],
   desk: [2.6, 1.9],
   bed: [4.5, 3.5],
@@ -185,6 +185,21 @@ export class Pet {
     if (state === 'react') this.hop = 1
   }
 
+  /**
+   * Walk over and keep the owner company at a spot (the desk while they write, the shelf while they read).
+   * Gives up after `seconds`, or at once if the owner nudges the pet. Local rule, no randomness needed.
+   */
+  attend(spot: keyof typeof SPOTS, seconds = 8) {
+    if (this.frozen || this.still) return
+    this.goTo(spot)
+    this.state = 'observe'
+    this.stateT = 0
+    this.observeFor = seconds
+    this.idleFor = 0
+  }
+
+  private observeFor = 0
+
   nudge() {
     this.idleFor = 0
     if (this.state === 'sleep') this.set('idle')
@@ -235,6 +250,9 @@ export class Pet {
         this.nextMove = 4 + Math.random() * 5
       }
       if (this.idleFor > 40 && !this.still) this.set('sleep')
+    } else if (this.state === 'observe') {
+      this.idleFor = 0 // a pet that is keeping company does not doze off
+      if (this.stateT > this.observeFor) this.set('idle')
     } else if (this.state === 'react' && this.stateT > 1.5) {
       this.set('idle')
     } else if (this.state === 'greet' && !moving && this.stateT > 3) {

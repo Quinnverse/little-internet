@@ -173,6 +173,12 @@ export function freeSlotsFor(room: Room, kind: MemoryKind, ignoreId?: string): s
   return out
 }
 
+/** How many keepsake spots (shelves, desk, sill, wall) are still empty. */
+export function freeSlotsAll(room: Room): number {
+  const taken = new Set(room.memory.map((m) => m.slot))
+  return SLOTS.filter((x) => !taken.has(x)).length
+}
+
 export function autoSlot(room: Room, kind: MemoryKind): string | undefined {
   return freeSlotsFor(room, kind)[0]
 }

@@ -106,6 +106,9 @@ export function Home(props: { ctx: Ctx }) {
 
   const open = (p: Panel, focus?: string) => {
     if (focus) view?.focus(focus)
+    // Boo walks over to keep you company where you are working.
+    const spot = focus && ({ diary: 'desk', computer: 'desk', voice: 'desk', shelf: 'shelf', window: 'window', door: 'door' } as Record<string, 'desk' | 'shelf' | 'window' | 'door'>)[focus]
+    if (spot) view?.pet.attend(spot, 12)
     setPanel(p)
   }
 
@@ -207,6 +210,7 @@ export function Home(props: { ctx: Ctx }) {
   }
 
   const endDecorate = () => {
+    view?.pet.set('react') // Boo is pleased with the new look
     setDecorating(false)
     setSelected(null)
     history.current = []
@@ -273,7 +277,17 @@ export function Home(props: { ctx: Ctx }) {
         <Journal ctx={ctx} onClose={close} {...(panel.archive ? { initialKind: panel.archive } : {})} />
       )}
       {panel?.kind === 'voice' && <VoiceSheet ctx={ctx} onClose={close} />}
-      {panel?.kind === 'pet' && <OwnerGhost ctx={ctx} onClose={close} />}
+      {panel?.kind === 'pet' && (
+        <OwnerGhost
+          ctx={ctx}
+          onClose={close}
+          onWrite={() => view?.pet.attend('desk', 15)}
+          onDecorate={() => {
+            setPanel(null)
+            startDecorate()
+          }}
+        />
+      )}
       {panel?.kind === 'computer' && <ComputerSheet onClose={close} onChoose={onComputer} />}
       {panel?.kind === 'publishing' && <Website ctx={ctx} onClose={close} onPreview={() => setPreviewing('published')} />}
       {panel?.kind === 'door' && <DoorSheet ctx={ctx} onClose={close} onPreview={() => setPreviewing('published')} onAtelier={() => { setPanel(null); setAtelier(true) }} />}

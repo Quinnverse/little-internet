@@ -89,6 +89,39 @@ await page.locator('.batch-bar').getByRole('button', { name: 'Just for me' }).cl
 await page.getByRole('button', { name: 'Select', exact: true }).click()
 await page.locator('.sheet-head button[aria-label="Close"]').last().click()
 
+// ---- Boo 2.0: a continuous conversation in free text; changes need a click
+await page.locator('button.hotspot[data-id="pet"]').evaluate((el) => el.click())
+const boo = async (msg) => {
+  await page.getByLabel(/^Ask .* something/).fill(msg)
+  await page.getByRole('button', { name: 'Ask', exact: true }).click()
+  await page.waitForTimeout(250)
+}
+await boo('hello')
+await boo('find my notes about the lighthouse')
+const lastTurn = page.locator('.boo-boo').last()
+check('boo: finds a record from a free-text question', (await lastTurn.textContent()).includes('Harbor lights'))
+await boo('make these private')
+check('boo: proposes a change and lists what it would touch', (await page.locator('.boo-proposal').last().textContent()).includes('Harbor lights'))
+const stillPublic = await page.evaluate(async () => {
+  const req = indexedDB.open('little-internet')
+  return await new Promise((res) => { req.onsuccess = () => { const db = req.result; const g = db.transaction('kv').objectStore('kv').get('project'); g.onsuccess = () => res(g.result.posts.find((p) => p.title === 'Harbor lights').visibility) } })
+})
+check('boo: nothing changes before the owner confirms', stillPublic === 'public')
+await page.getByRole('button', { name: 'Not now' }).click()
+await boo('make these private')
+await page.getByRole('button', { name: /^Yes, change/ }).click()
+await page.waitForTimeout(400)
+const nowPrivate = await page.evaluate(async () => {
+  const req = indexedDB.open('little-internet')
+  return await new Promise((res) => { req.onsuccess = () => { const db = req.result; const g = db.transaction('kv').objectStore('kv').get('project'); g.onsuccess = () => res(g.result.posts.find((p) => p.title === 'Harbor lights').visibility) } })
+})
+check('boo: confirming applies the change', nowPrivate === 'private')
+// make it public again for the website steps below
+await page.locator('.sheet-head button[aria-label="Close"]').last().click()
+await page.getByRole('button', { name: 'Journal', exact: true }).click()
+await page.locator('.entry', { hasText: 'Harbor lights' }).locator('.entry-door').click()
+await page.locator('.sheet-head button[aria-label="Close"]').last().click()
+
 // ---- 1-3: CRT → Decorate my website
 await page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
 await page.locator('.crt-item', { hasText: 'Decorate my website' }).click()
