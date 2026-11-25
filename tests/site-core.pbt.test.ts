@@ -17,7 +17,7 @@ const dec = new TextDecoder()
 const ALLOWED_TAGS = new Set([
   'html', 'head', 'meta', 'title', 'link', 'script', 'body', 'div', 'header', 'p', 'a', 'main',
   'section', 'img', 'h1', 'h2', 'ul', 'li', 'time', 'footer', 'nav', 'article', 'figure', 'iframe', 'br',
-  'audio', 'span', 'svg', 'rect', 'form', 'input', 'textarea', 'button', 'figcaption', 'strong',
+  'audio', 'span', 'svg', 'rect', 'form', 'input', 'textarea', 'button', 'figcaption', 'strong', 'dl', 'dt', 'dd',
 ])
 const ALLOWED_ATTRS = new Set([
   'lang', 'charset', 'name', 'content', 'http-equiv', 'rel', 'href', 'type', 'title', 'class', 'id', 'src',

@@ -1,4 +1,5 @@
 import fc from 'fast-check'
+import { FIELD_KEYS, POST_KINDS, TAG_PATTERN } from '../src/core/archive.ts'
 import {
   BORDERS,
   DIVIDERS,
@@ -128,8 +129,12 @@ const postBaseArb: fc.Arbitrary<PostBase> = fc.record(
     createdAt: isoArb,
     visibility: fc.constantFrom('public' as const, 'private' as const),
     video: videoArb,
+    kind: fc.constantFrom(...POST_KINDS),
+    tags: fc.uniqueArray(fc.stringMatching(/^[a-z0-9\u4e00-\u9fa5]{1,10}$/).filter((t) => TAG_PATTERN.test(t)), { maxLength: 4 }),
+    fields: fc.dictionary(fc.constantFrom(...FIELD_KEYS), lineArb(60), { maxKeys: 3 }),
+    starred: fc.boolean(),
   },
-  { requiredKeys: ['id', 'slug', 'title', 'body', 'createdAt', 'visibility'] },
+  { requiredKeys: ['id', 'slug', 'title', 'body', 'createdAt', 'visibility', 'kind', 'tags', 'fields', 'starred'] },
 )
 
 const recordingArb: fc.Arbitrary<Recording> = fc.record(

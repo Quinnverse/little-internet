@@ -1,5 +1,6 @@
 // Pure editor commands. Every data change in the UI goes through one of these and is
 // then validated by `parseProject` in the store (Requirement 3.1).
+import type { PostKind } from '../core/archive.ts'
 import { designAssetRefs, starterDesign, type GuestNote, type SiteDesign, type StyleId } from '../core/design.ts'
 import type { DesignOp } from '../core/designOps.ts'
 import type {
@@ -96,6 +97,10 @@ export type NewPostInput = {
   body: string
   imageIds: string[]
   video?: VideoEmbed
+  kind?: PostKind
+  tags?: string[]
+  fields?: Post['fields']
+  starred?: boolean
 }
 
 /** New entries are ALWAYS private (Requirement 4.1). */
@@ -112,6 +117,10 @@ export const addPost =
       visibility: 'private',
       imageIds: input.imageIds,
       ...(input.video ? { video: input.video } : {}),
+      kind: input.kind ?? 'diary',
+      tags: input.tags ?? [],
+      fields: input.fields ?? {},
+      starred: input.starred ?? false,
     }
     return { ...p, posts: [post, ...p.posts] }
   }
@@ -121,6 +130,10 @@ export type PostPatch = {
   body?: string
   imageIds?: string[]
   video?: VideoEmbed | null
+  kind?: PostKind
+  tags?: string[]
+  fields?: Post['fields']
+  starred?: boolean
 }
 
 /** Slug never changes after creation, so public URLs stay stable. */
@@ -138,10 +151,37 @@ export const updatePost =
           ...(patch.title !== undefined ? { title: patch.title } : {}),
           ...(patch.body !== undefined ? { body: patch.body } : {}),
           ...(patch.imageIds !== undefined ? { imageIds: patch.imageIds } : {}),
+          ...(patch.kind !== undefined ? { kind: patch.kind } : {}),
+          ...(patch.tags !== undefined ? { tags: patch.tags } : {}),
+          ...(patch.fields !== undefined ? { fields: patch.fields } : {}),
+          ...(patch.starred !== undefined ? { starred: patch.starred } : {}),
           ...(video ? { video } : {}),
         }
       }),
     })
+
+/** Batch operations on several records at once (Life Archive selection). Each is one undoable change. */
+export const setManyVisibility =
+  (ids: readonly string[], visibility: Post['visibility']): Command =>
+  (p) => {
+    const set = new Set(ids)
+    return { ...p, posts: p.posts.map((post) => (set.has(post.id) ? { ...post, visibility } : post)) }
+  }
+
+export const addTagToMany =
+  (ids: readonly string[], tag: string): Command =>
+  (p) => {
+    const set = new Set(ids)
+    return { ...p, posts: p.posts.map((post) => (set.has(post.id) && !post.tags.includes(tag) && post.tags.length < 12 ? { ...post, tags: [...post.tags, tag] } : post)) }
+  }
+
+export const deleteMany =
+  (ids: readonly string[]): Command =>
+  (p) => ids.reduce((acc, id) => deletePost(id)(acc), p)
+
+export const toggleStar =
+  (id: string): Command =>
+  (p) => ({ ...p, posts: p.posts.map((post) => (post.id === id ? { ...post, starred: !post.starred } : post)) })
 
 export const setVisibility =
   (id: string, visibility: Post['visibility']): Command =>

@@ -16,8 +16,8 @@ const project = (slug: string, extra: Partial<Project> = {}): Project => ({
   ghost: { enabled: true, name: 'Boo', color: 'white' },
   web: { draft: starterDesign('retro', { title: 'Moon', lang: 'en' }), guestbook: [] },
   posts: [
-    { id: 'p1', slug: 'public-one', title: 'Hello', body: 'hi', createdAt: '2026-01-01T00:00:00.000Z', visibility: 'public', imageIds: [] },
-    { id: 'p2', slug: 'secret-one', title: 'TOPSECRETTITLE', body: 'TOPSECRETBODY', createdAt: '2026-01-02T00:00:00.000Z', visibility: 'private', imageIds: [] },
+    { id: 'p1', slug: 'public-one', title: 'Hello', body: 'hi', createdAt: '2026-01-01T00:00:00.000Z', visibility: 'public', imageIds: [], kind: 'diary', tags: [], fields: {}, starred: false },
+    { id: 'p2', slug: 'secret-one', title: 'TOPSECRETTITLE', body: 'TOPSECRETBODY', createdAt: '2026-01-02T00:00:00.000Z', visibility: 'private', imageIds: [], kind: 'diary', tags: [], fields: {}, starred: false },
   ],
   links: [],
   webring: {},

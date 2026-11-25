@@ -196,6 +196,10 @@ describe('visitor ghost (ghost.js)', () => {
 
 const postArb = (createdAt: fc.Arbitrary<string>): fc.Arbitrary<Post> =>
   fc.record({
+    kind: fc.constant('diary' as const),
+    tags: fc.constant([] as string[]),
+    fields: fc.constant({} as Post['fields']),
+    starred: fc.constant(false),
     id: fc.stringMatching(/^[a-z0-9]{1,8}$/),
     slug: fc.constant('x'),
     title: fc.oneof(lineArb(60), fc.constantFrom('海边的一天', 'Sand & SEA')),
@@ -255,8 +259,8 @@ describe('owner memories', () => {
 
   it('finds Chinese text and ignores case', () => {
     const posts = [
-      { id: 'a', slug: 'a', title: '海边', body: '今天去了海边，沙子很暖。', createdAt: '2025-11-23T10:00:00.000Z', visibility: 'private' as const, imageIds: [] },
-      { id: 'b', slug: 'b', title: 'Work', body: 'Deadline stress again.', createdAt: '2026-11-20T10:00:00.000Z', visibility: 'private' as const, imageIds: [] },
+      { id: 'a', slug: 'a', title: '海边', body: '今天去了海边，沙子很暖。', createdAt: '2025-11-23T10:00:00.000Z', visibility: 'private' as const, imageIds: [], kind: 'diary' as const, tags: [], fields: {}, starred: false },
+      { id: 'b', slug: 'b', title: 'Work', body: 'Deadline stress again.', createdAt: '2026-11-20T10:00:00.000Z', visibility: 'private' as const, imageIds: [], kind: 'diary' as const, tags: [], fields: {}, starred: false },
     ]
     expect(askMemories(posts, '沙子').map((m) => m.post.id)).toEqual(['a'])
     expect(askMemories(posts, 'STRESS')[0]!.excerpt).toContain('stress')

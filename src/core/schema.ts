@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { FIELD_KEYS, MAX_TAGS, POST_KINDS, TAG_PATTERN } from './archive.ts'
 import { designFromLegacy, designIssues, WebStateSchema, type WebState } from './design.ts'
 import { defaultRoom, migrateRoomInput, RoomSchema, roomIssues, type Room } from './room.ts'
 import { httpUrl, id, isoDate, line, text } from './validators.ts'
@@ -50,6 +51,11 @@ export const PostSchema = z.object({
   visibility: z.enum(['public', 'private']),
   imageIds: z.array(id).max(12),
   video: VideoSchema.optional(),
+  // Life Archive (additive; older saves load as diary entries without tags).
+  kind: z.enum(POST_KINDS).default('diary'),
+  tags: z.array(z.string().regex(TAG_PATTERN)).max(MAX_TAGS).default([]),
+  fields: z.partialRecord(z.enum(FIELD_KEYS), text(1000)).default({}),
+  starred: z.boolean().default(false),
 })
 
 export const LinkSchema = z.object({

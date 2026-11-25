@@ -7,6 +7,7 @@ import { publicProjection, type DesignChoice } from './privacy.ts'
 import { generateFeed } from './rss.ts'
 import { toStored } from './storage.ts'
 import { assetPath, isCanonicalHttpUrl, MIME_EXT, recordingPath, type Asset, type Post, type Project } from './schema.ts'
+import { archiveLabel, defFor, fieldText, filledFields } from './archive.ts'
 import { pageWidgets, type SiteDesign, type SitePage, type SiteWidget } from './design.ts'
 import { designCss } from './siteCss.ts'
 import { spriteSvg } from './pixels.ts'
@@ -391,6 +392,16 @@ ${ringNav}<p><a href="${prefix}feed.xml">${h(T('rss'))}</a> · ${h(T('madeWith')
     }
   }
 
+  /** Structured fields of a record (book, author, rating, place…) as a small definition list. */
+  function postFields(p: Post): string {
+    const rows = filledFields(p)
+    if (!rows.length) return ''
+    const items = rows
+      .map((f) => `<dt>${h(archiveLabel(`f.${f.key}`, pub.site.lang))}</dt><dd>${h(fieldText(defFor(p.kind, f.key)!, f.value, pub.site.lang))}</dd>`)
+      .join('')
+    return `<dl class="fields">${items}</dl>\n`
+  }
+
   function post(p: Post): string {
     const prefix = '../'
     const images = p.imageIds
@@ -406,8 +417,9 @@ ${ringNav}<p><a href="${prefix}feed.xml">${h(T('rss'))}</a> · ${h(T('madeWith')
 <p class="back"><a href="${prefix}index.html">← ${h(T('home'))}</a></p>
 <article>
 <h1>${h(p.title)}</h1>
-<p class="date"><time datetime="${p.createdAt}">${p.createdAt.slice(0, 10)}</time></p>
-${paragraphs(p.body)}
+<p class="date"><time datetime="${p.createdAt}">${p.createdAt.slice(0, 10)}</time>${p.kind !== 'diary' ? ` · <span class="kind">${h(archiveLabel(`kind.${p.kind}`, pub.site.lang))}</span>` : ''}</p>
+${postFields(p)}${paragraphs(p.body)}
+${p.tags.length ? `<p class="tags">${p.tags.map((tg) => `<span>#${h(tg)}</span>`).join(' ')}</p>` : ''}
 ${images}
 ${video}
 </article>

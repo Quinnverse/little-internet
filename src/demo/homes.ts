@@ -161,6 +161,10 @@ function badgePng(b: WebsiteButton): Uint8Array {
 // ---------------------------------------------------------------------------- building blocks
 
 type PostSpec = {
+  kind?: import('../core/archive.ts').PostKind
+  tags?: string[]
+  fields?: import('../core/schema.ts').Post['fields']
+  starred?: boolean
   id: string
   date: string
   title: string
@@ -175,7 +179,7 @@ function withPosts(posts: PostSpec[]): Command {
   for (const p of posts) {
     const ids = (p.photos ?? []).map((_, i) => `${p.id}-img${i}`)
     ;(p.photos ?? []).forEach((data, i) => cmds.push(addAsset({ id: ids[i]!, mime: 'image/png', data })))
-    cmds.push(addPost({ id: p.id, createdAt: `${p.date}T09:00:00.000Z`, title: p.title, body: p.body, imageIds: ids }))
+    cmds.push(addPost({ id: p.id, createdAt: `${p.date}T09:00:00.000Z`, title: p.title, body: p.body, imageIds: ids, ...(p.kind ? { kind: p.kind } : {}), tags: p.tags ?? [], fields: p.fields ?? {}, starred: p.starred ?? false }))
     if (p.public) cmds.push(setVisibility(p.id, 'public'))
     if (p.keepsake) cmds.push(setPostObject(p.id, p.keepsake, `${p.id}-obj`))
   }
@@ -251,10 +255,10 @@ function bookNook(baseUrl: string): Project {
   let p = createProject({ title: DEMO_TITLES[slug], slug, style: 'literary', ghostName: 'Page', ghostColor: 'peach' })
   p = { ...p, site: { ...p.site, tagline: 'Reading slowly, writing in the margins.', demo: true } }
   p = withPosts([
-    { id: 'bn-p1', date: '2026-11-02', public: true, keepsake: 'book', title: 'On rereading Middlemarch', body: 'Third time through. At twenty I read it for the plot, at thirty for Dorothea, and now, I think, for the narrator, who forgives everyone a little more each chapter.\n\nA line I copied onto the inside of the cover: the growing good of the world is partly dependent on unhistoric acts.', photos: [bookCover('#7a2e22', '#e7c98b', 1)] },
-    { id: 'bn-p2', date: '2026-11-09', public: true, keepsake: 'candle', title: 'A rainy Sunday and a short book', body: 'Rain all afternoon. I finished a slim novel in one sitting, which almost never happens any more. Tea went cold twice.\n\nThere is a particular quiet that comes after closing a book you loved. I tried not to fill it.' },
-    { id: 'bn-p3', date: '2026-11-15', public: true, title: 'Reading notes: To the Lighthouse', body: 'Part two, “Time Passes”, is ten pages long and covers ten years. The house is the main character there. Dust, a shawl coming loose, the sea air getting in.\n\nI want to write a diary entry like that one day: nothing happens, and everything does.', photos: [bookCover('#2e4a5a', '#f2e6c8', 2)] },
-    { id: 'bn-p4', date: '2026-11-20', public: true, keepsake: 'flower', title: 'Pressed flowers in an old atlas', body: 'Found a violet pressed between Portugal and Spain in a secondhand atlas. Someone, some spring, decided that page was the right place. I left it there.' },
+    { id: 'bn-p1', date: '2026-11-02', public: true, keepsake: 'book', kind: 'reading', tags: ['victorian', 'reread'], starred: true, fields: { book: 'Middlemarch', author: 'George Eliot', status: 'reading', rating: '5', quote: 'the growing good of the world is partly dependent on unhistoric acts' }, title: 'On rereading Middlemarch', body: 'Third time through. At twenty I read it for the plot, at thirty for Dorothea, and now, I think, for the narrator, who forgives everyone a little more each chapter.\n\nA line I copied onto the inside of the cover: the growing good of the world is partly dependent on unhistoric acts.', photos: [bookCover('#7a2e22', '#e7c98b', 1)] },
+    { id: 'bn-p2', date: '2026-11-09', public: true, keepsake: 'candle', tags: ['rain'], fields: { mood: 'quiet', weather: 'rain' }, title: 'A rainy Sunday and a short book', body: 'Rain all afternoon. I finished a slim novel in one sitting, which almost never happens any more. Tea went cold twice.\n\nThere is a particular quiet that comes after closing a book you loved. I tried not to fill it.' },
+    { id: 'bn-p3', date: '2026-11-15', public: true, kind: 'reading', tags: ['modernism'], fields: { book: 'To the Lighthouse', author: 'Virginia Woolf', status: 'finished', rating: '4' }, title: 'Reading notes: To the Lighthouse', body: 'Part two, “Time Passes”, is ten pages long and covers ten years. The house is the main character there. Dust, a shawl coming loose, the sea air getting in.\n\nI want to write a diary entry like that one day: nothing happens, and everything does.', photos: [bookCover('#2e4a5a', '#f2e6c8', 2)] },
+    { id: 'bn-p4', date: '2026-11-20', public: true, keepsake: 'flower', kind: 'collection', tags: ['pressed-flowers'], fields: { item: 'A pressed violet', where: 'a secondhand atlas' }, title: 'Pressed flowers in an old atlas', body: 'Found a violet pressed between Portugal and Spain in a secondhand atlas. Someone, some spring, decided that page was the right place. I left it there.' },
     { id: 'bn-p5', date: '2026-11-22', public: false, title: 'A letter I am not sending', body: 'This one stays in the drawer.' },
   ])(p)
   const home = 'bn-home'
@@ -312,10 +316,10 @@ function bySea(baseUrl: string): Project {
   let p = createProject({ title: DEMO_TITLES[slug], slug, style: 'scrapbook', ghostName: 'Kelp', ghostColor: 'mint' })
   p = { ...p, site: { ...p.site, tagline: 'Postcards from a slow year of small trips.', demo: true } }
   p = withPosts([
-    { id: 'sea-p1', date: '2026-10-28', public: true, keepsake: 'shell', title: 'First swim of the trip', body: 'Cold enough to shout. Warm enough to stay in for ten minutes. Found a striped shell on the way back and carried it in my pocket all evening.', photos: [seaPhoto(['#8cc8f0', '#fbe2c0'], '#2f8fb0', '#e9d3a6', [360, 120, '#fff4c8'], 3)] },
-    { id: 'sea-p2', date: '2026-11-03', public: true, keepsake: 'postcard', title: 'A postcard I wrote to myself', body: 'Bought a postcard of the harbour, wrote “remember the bakery on the corner” on it and mailed it home. It arrived before I did.', photos: [seaPhoto(['#f6a07a', '#ffd9a8'], '#3a6f9a', '#d9b98a', [120, 150, '#ffe7a0'], 5)] },
-    { id: 'sea-p3', date: '2026-11-10', public: true, keepsake: 'photo', title: 'The lighthouse at dusk', body: 'We walked to the end of the pier just as the light came on. Two flashes, a pause, two flashes.', photos: [seaPhoto(['#2a2a5a', '#e98a7a'], '#24486a', '#b89a74', [240, 160, '#ffd27a'], 9)] },
-    { id: 'sea-p4', date: '2026-11-18', public: true, title: 'Tide tables and toast', body: 'Breakfast by the window, reading the tide table like a timetable for the day. Low tide at 11:40 means rock pools.', photos: [seaPhoto(['#bfe3ff', '#e8f1ef'], '#4aa3b8', '#efdcb2', [420, 80, '#ffffff'], 11)] },
+    { id: 'sea-p1', date: '2026-10-28', public: true, keepsake: 'shell', kind: 'travel', tags: ['coast'], starred: true, fields: { place: 'a cold bay', from: '2026-10-27', to: '2026-10-30' }, title: 'First swim of the trip', body: 'Cold enough to shout. Warm enough to stay in for ten minutes. Found a striped shell on the way back and carried it in my pocket all evening.', photos: [seaPhoto(['#8cc8f0', '#fbe2c0'], '#2f8fb0', '#e9d3a6', [360, 120, '#fff4c8'], 3)] },
+    { id: 'sea-p2', date: '2026-11-03', public: true, keepsake: 'postcard', kind: 'collection', tags: ['postcards'], fields: { item: 'Harbour postcard', where: 'the corner shop' }, title: 'A postcard I wrote to myself', body: 'Bought a postcard of the harbour, wrote “remember the bakery on the corner” on it and mailed it home. It arrived before I did.', photos: [seaPhoto(['#f6a07a', '#ffd9a8'], '#3a6f9a', '#d9b98a', [120, 150, '#ffe7a0'], 5)] },
+    { id: 'sea-p3', date: '2026-11-10', public: true, keepsake: 'photo', kind: 'photo', tags: ['lighthouse', 'dusk'], fields: { place: 'the end of the pier' }, title: 'The lighthouse at dusk', body: 'We walked to the end of the pier just as the light came on. Two flashes, a pause, two flashes.', photos: [seaPhoto(['#2a2a5a', '#e98a7a'], '#24486a', '#b89a74', [240, 160, '#ffd27a'], 9)] },
+    { id: 'sea-p4', date: '2026-11-18', public: true, kind: 'memo', tags: ['tides'], fields: { due: '2026-11-19' }, title: 'Tide tables and toast', body: 'Breakfast by the window, reading the tide table like a timetable for the day. Low tide at 11:40 means rock pools.', photos: [seaPhoto(['#bfe3ff', '#e8f1ef'], '#4aa3b8', '#efdcb2', [420, 80, '#ffffff'], 11)] },
     { id: 'sea-p5', date: '2026-11-21', public: false, title: 'Money worries', body: 'Private note.' },
   ])(p)
   const home = 'sea-home'
@@ -362,8 +366,8 @@ function midnight(baseUrl: string): Project {
   let p = createProject({ title: DEMO_TITLES[slug], slug, style: 'retro', ghostName: 'Byte', ghostColor: 'lilac' })
   p = { ...p, site: { ...p.site, tagline: '~ best viewed after midnight at 800×600 ~', demo: true } }
   p = withPosts([
-    { id: 'mid-p1', date: '2026-10-31', public: true, keepsake: 'cassette', title: 'Mixtape #12: songs for debugging', body: 'Side A is for when it compiles. Side B is for when it does not. I recorded it off the radio, so there is a weather report in the middle of track four.' },
-    { id: 'mid-p2', date: '2026-11-06', public: true, keepsake: 'ticket', title: 'I finished my tiny game!', body: 'It is a 2-minute platformer about a ghost delivering mail. 14 levels, one boss (a spam filter). Made over five weekends with a lot of tea.', photos: [nightPixel(4)] },
+    { id: 'mid-p1', date: '2026-10-31', public: true, keepsake: 'cassette', kind: 'collection', tags: ['music', 'tape'], starred: true, fields: { item: 'Mixtape #12', where: 'recorded off the radio' }, title: 'Mixtape #12: songs for debugging', body: 'Side A is for when it compiles. Side B is for when it does not. I recorded it off the radio, so there is a weather report in the middle of track four.' },
+    { id: 'mid-p2', date: '2026-11-06', public: true, keepsake: 'ticket', tags: ['gamedev'], fields: { mood: 'proud' }, title: 'I finished my tiny game!', body: 'It is a 2-minute platformer about a ghost delivering mail. 14 levels, one boss (a spam filter). Made over five weekends with a lot of tea.', photos: [nightPixel(4)] },
     { id: 'mid-p3', date: '2026-11-14', public: true, keepsake: 'candle', title: 'Why I hand-make my homepage', body: 'Every pixel on this page is mine. The star background, the spinning globe, the broken guestbook from 2006 that I rebuilt. A homepage is a room you can rearrange whenever you like.' },
     { id: 'mid-p4', date: '2026-11-23', public: false, title: 'Job interview nerves', body: 'Private.' },
   ])(p)

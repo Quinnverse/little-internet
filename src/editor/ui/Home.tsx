@@ -25,7 +25,7 @@ import { Sheet } from './common.tsx'
 type Panel =
   | null
   | { kind: 'entry'; post?: Post }
-  | { kind: 'journal' }
+  | { kind: 'journal'; archive?: import('../../core/archive.ts').PostKind }
   | { kind: 'voice' }
   | { kind: 'pet' }
   | { kind: 'computer' }
@@ -133,7 +133,8 @@ export function Home(props: { ctx: Ctx }) {
       case 'pet':
         return open({ kind: 'pet' }, 'pet')
       case 'shelf':
-        return open({ kind: 'journal' }, 'shelf')
+        // The shelf is where reading notes live; the Journal button opens the whole archive.
+        return open({ kind: 'journal', archive: 'reading' }, 'shelf')
       case 'window':
         return open({ kind: 'light' })
       case 'door':
@@ -269,7 +270,7 @@ export function Home(props: { ctx: Ctx }) {
 
       {panel?.kind === 'entry' && <EntrySheet ctx={ctx} post={panel.post} onClose={close} />}
       {panel?.kind === 'journal' && (
-        <Journal ctx={ctx} onClose={close} />
+        <Journal ctx={ctx} onClose={close} {...(panel.archive ? { initialKind: panel.archive } : {})} />
       )}
       {panel?.kind === 'voice' && <VoiceSheet ctx={ctx} onClose={close} />}
       {panel?.kind === 'pet' && <OwnerGhost ctx={ctx} onClose={close} />}
