@@ -22,10 +22,10 @@ static host). Device emulation is not a real-device test.
 | 15 | Offline / other host keeps decoration | PASS | e2e static host, platform requests blocked: 0 |
 | 16 | Restore backup restores layout | PASS | e2e fresh browser, 15/15 widgets |
 | 17 | Webring to a differently styled site | PASS | e2e Midnight → Book Nook, different bg + font |
-| – | Close the Door | PASS (server) | `tests/server.test.ts`; UI not in e2e yet |
+| – | Close the Door / reopen | PASS | e2e: site + RSS 404, removed from webring, reopen republishes; `tests/server.test.ts` |
 | – | Demo homes, Try a demo | PASS | `tests/demo.test.ts`, e2e demo copy on phone |
 | – | Real devices / Safari | NOT_TESTED | |
 | – | Real users | NOT_TESTED | |
-| – | Production deploy | NOT_TESTED | no change made to any server |
+| – | Production deploy | NOT_TESTED | owner deploys with `deploy/README.md`; image layout smoke-tested locally |
 | – | Kiro execution | KIRO_EXECUTION_PENDING | tasks in `.kiro/specs/web-atelier/tasks.md` |
 | – | Figma | NOT UPDATED | no Figma write access in this environment |

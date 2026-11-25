@@ -162,6 +162,23 @@ const postGone = (await fetch(`${url}posts/harbor-lights.html`)).status
 check('…and its old page URL is gone', postGone === 404, String(postGone))
 await page.keyboard.press('Escape')
 
+// ---- Close the Door (from the door in the room), then open it again
+await page.locator('button.hotspot[data-id="door"]').click({ force: true })
+await page.locator('.door-state.is-open').waitFor({ timeout: 15000 })
+page.once('dialog', (d) => d.accept())
+await page.getByRole('button', { name: 'Close the door' }).click()
+await page.locator('.door-state.is-closed').waitFor({ timeout: 15000 })
+const closedPage = await fetch(url)
+const closedRss = await fetch(`${url}feed.xml`)
+const ringNow = await (await fetch(`${APP}api/ring`)).json()
+check('closing the door takes the website and RSS offline', closedPage.status === 404 && closedRss.status === 404, `${closedPage.status}/${closedRss.status}`)
+check('closed page says the door is closed, with no content', (await closedPage.text()).includes('door is closed'))
+check('closed home is not in the webring directory', !ringNow.homes.some((h) => h.slug === 'pixel-harbor'))
+await page.getByRole('button', { name: 'Open the door again' }).click()
+await page.locator('.door-state.is-open').waitFor({ timeout: 20000 })
+check('opening the door publishes the site again', (await fetch(url)).status === 200)
+await page.keyboard.press('Escape')
+
 // ---- 14-15: export the website and open it offline on another host
 await page.locator('button.hotspot[data-id="computer"]').click({ force: true })
 await page.locator('.crt-item', { hasText: 'Move my home' }).click()

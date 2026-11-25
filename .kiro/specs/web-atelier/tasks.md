@@ -23,7 +23,7 @@
 
 ## Verified (this branch)
 - `npm test`: unit + property tests, including W1, W2, E5, server door/webring.
-- `npm run e2e:atelier`: 30 checks in headless Chromium.
+- `npm run e2e:atelier`: 34 checks in headless Chromium.
 
 ## Not verified
 - Real iPhone/Android devices, Safari, real users, production deployment, Figma.
