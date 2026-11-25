@@ -436,7 +436,10 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .atelier.is-narrow .at-body { grid-template-columns: 1fr; }
 .atelier.is-narrow .hide-sm { display: none; }
 .atelier.is-narrow .at-bar { flex-wrap: nowrap; gap: 4px; padding-left: 8px; padding-right: 8px; }
-.atelier.is-narrow .at-page { max-width: 120px; flex: 1; }
+.atelier.is-narrow .at-page { max-width: 140px; min-width: 0; flex: 1 1 auto; }
+.atelier.is-narrow .at-device-toggle { display: none; }
+.atelier.is-narrow .at-bar .btn-small { padding: 6px 10px; flex: none; }
+.atelier.is-narrow .at-bar .icon-btn { min-width: 40px; }
 .atelier.is-narrow .at-stage { padding: 8px; }
 .atelier.is-narrow .at-phone .at-device { border-width: 6px; border-radius: 22px; height: 100%; }
 .atelier.is-narrow .at-note { display: none; }

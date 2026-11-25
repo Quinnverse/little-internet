@@ -186,6 +186,8 @@ const SITE_HEADERS: Record<string, string> = {
     "default-src 'none'; img-src 'self' data:; media-src 'self'; style-src 'self'; script-src 'self'; connect-src 'self'; " +
     "frame-src https://www.youtube-nocookie.com https://player.vimeo.com; base-uri 'none'; form-action 'none'; frame-ancestors 'self'",
   'Cross-Origin-Opener-Policy': 'same-origin',
+  // Sandboxed pages have an opaque origin; the 3D room loads public images as textures (CORS).
+  'Access-Control-Allow-Origin': '*',
 }
 
 function clean(s: unknown, max: number): string {

@@ -17,6 +17,17 @@ const check = (name, ok, extra = '') => {
   results.push({ name, ok: !!ok })
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? `  (${extra})` : ''}`)
 }
+/** The visitor 3D room overlays the page after loading; skip it and wait until it is gone. */
+async function skipRoom(pg) {
+  const room = pg.locator('.li-room')
+  try {
+    await room.waitFor({ timeout: 20000 })
+  } catch {
+    return
+  }
+  await pg.getByRole('button', { name: /Skip to website/ }).click({ timeout: 10000 }).catch(() => {})
+  await room.waitFor({ state: 'detached', timeout: 10000 }).catch(() => {})
+}
 const shot = (page, name) => page.screenshot({ path: join(SHOTS, `${name}.png`) })
 
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
@@ -117,7 +128,7 @@ await page.locator('.atelier .sheet-backdrop').click({ position: { x: 5, y: 5 } 
 const visitor = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 const vp = await visitor.newPage()
 await vp.goto(url)
-await vp.getByRole('button', { name: /Skip to website/ }).click({ timeout: 8000 }).catch(() => {})
+await skipRoom(vp)
 await vp.locator('.site-title').waitFor()
 const vbg = await vp.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
 const vtext = await vp.locator('body').textContent()
@@ -136,6 +147,7 @@ await vp.locator('form[data-gb]').first().locator('textarea').fill('Lovely light
 await vp.locator('form[data-gb]').first().locator('button').click()
 await vp.getByText('Thank you').waitFor({ timeout: 8000 })
 check('visitor can sign the guestbook', true)
+await visitor.close()
 
 // ---- 13: privacy change updates the live site
 await page.locator('.atelier').getByRole('button', { name: /Back home/ }).click()
@@ -174,7 +186,7 @@ if (SITE_DIR) {
   })
   const op = await offline.newPage()
   await op.goto(`${STATIC}index.html`)
-  await op.getByRole('button', { name: /Skip to website/ }).click({ timeout: 8000 }).catch(() => {})
+  await skipRoom(op)
   const obg = await op.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
   check('exported site keeps the decoration on another static host', obg === 'rgb(58, 11, 74)', obg)
   check('guestbook in the export is read-only with a clear note', (await op.locator('[data-gb-status]').first().textContent()).includes('saved copy'))
@@ -216,7 +228,44 @@ await fp.getByRole('button', { name: 'Decorate my website' }).click()
 await fp.locator('.atelier').waitFor()
 const restored = await fp.frameLocator('.at-frame').locator('[data-w]').count()
 check('backup restores the website layout in a fresh browser', restored > 0 && (widgetCount < 0 || restored <= widgetCount), `${restored}/${widgetCount}`)
-await fp.getByRole('button', { name: 'Journal', exact: true }).count()
+await fresh.close()
+await owner.close()
+
+// ---- 17: Webring to a differently decorated home (demo homes seeded by e2e-atelier.sh)
+const walker = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+const wp = await walker.newPage()
+await wp.goto(`${APP}@the-midnight-internet/`)
+await skipRoom(wp)
+const bg1 = await wp.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
+const f1 = await wp.locator('.site-title').evaluate((e) => getComputedStyle(e).fontFamily)
+await Promise.all([wp.waitForURL(/@the-book-nook\//, { waitUntil: 'commit' }), wp.locator('.t-webring a', { hasText: 'Next' }).first().click()])
+await skipRoom(wp)
+const bg2 = await wp.locator('body').evaluate((b) => getComputedStyle(b).backgroundColor)
+const f2 = await wp.locator('.site-title').evaluate((e) => getComputedStyle(e).fontFamily)
+check('webring Next leads to another real home with a different design', bg1 !== bg2 && f1 !== f2, `${bg1} → ${bg2}`)
+check('demo homes are labelled as demos', (await wp.locator('.demo-banner').count()) === 1)
+await wp.goto(`${APP}ring/`)
+check('webring directory lists the three demo homes', (await wp.locator('li').count()) >= 3)
+await walker.close()
+
+// ---- Try a demo home: a private copy that can be decorated
+const tryCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+const tp = await tryCtx.newPage()
+await tp.goto(APP)
+await tp.getByRole('button', { name: 'Try a demo home' }).click()
+await tp.getByRole('button', { name: 'Somewhere by the Sea' }).click()
+await tp.locator('.home').waitFor()
+await tp.getByRole('button', { name: 'Decorate my website' }).click()
+await tp.locator('.atelier').waitFor()
+await tp.frameLocator('.at-frame').locator('[data-w]').first().waitFor()
+check('demo copy opens in Web Atelier on a phone', (await tp.frameLocator('.at-frame').locator('[data-w]').count()) > 5)
+await tp.screenshot({ path: join(SHOTS, 'atelier-phone-demo.png') })
+const barOverflow = await tp.locator('.at-bar').evaluate((b) => b.scrollWidth - b.clientWidth)
+const pub = await tp.getByRole('button', { name: 'Publish', exact: true }).boundingBox()
+check('phone Atelier bar fits; Publish is fully on screen', barOverflow <= 0 && pub && pub.x + pub.width <= 390, `${barOverflow}`)
+await tp.getByRole('tab', { name: 'Style' }).click()
+await tp.screenshot({ path: join(SHOTS, 'atelier-phone-drawer.png') })
+await tryCtx.close()
 
 await browser.close()
 const failed = results.filter((r) => !r.ok)

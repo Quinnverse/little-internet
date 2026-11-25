@@ -33,3 +33,5 @@ dist-ssr
 /assets/refs
 /assets/blender/__pycache__
 .e2e-atelier/
+.demo-run/
+data/

@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync } from 'node:fs'
 import type { AddressInfo } from 'node:net'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
-import { strToU8, zipSync } from 'fflate'
+import { strToU8, unzipSync, zipSync } from 'fflate'
 import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { exportSite } from '../src/core/exportZip.ts'
 import { starterDesign } from '../src/core/design.ts'
@@ -141,5 +141,64 @@ describe('server', () => {
       codes.push(r.status)
     }
     expect(codes).toContain(429)
+  })
+
+  const auth = (key: string) => ({ Authorization: `Bearer ${key}` })
+
+  it('refuses a site.json that carries private entries or is not a valid project', async () => {
+    const files = unzipSync(exportSite(project('leak')))
+    const meta = JSON.parse(new TextDecoder().decode(files['site.json']!))
+    meta.posts.push({ ...meta.posts[0], id: 'x9', slug: 'x9', visibility: 'private', title: 'LEAK' })
+    const leaked = zipSync({ ...files, 'site.json': strToU8(JSON.stringify(meta)) })
+    expect((await put('leak', KEY_A, leaked)).status).toBe(400)
+    const broken = zipSync({ ...files, 'site.json': strToU8('{"schemaVersion":2,"site":{"slug":"leak"}}') })
+    expect((await put('leak', KEY_A, broken)).status).toBe(400)
+    const fakeImage = zipSync({ ...files, 'assets/fake.png': strToU8('<svg onload=alert(1)>') })
+    expect((await put('leak', KEY_A, fakeImage)).status).toBe(400)
+  })
+
+  it('serves published pages in a CSP sandbox', async () => {
+    const csp = (await fetch(`${base}/@moon/`)).headers.get('content-security-policy') ?? ''
+    expect(csp.startsWith('sandbox')).toBe(true)
+    expect(csp).not.toContain('allow-same-origin')
+  })
+
+  it('webring: only the owner joins; prev/next/random walk real homes; directory lists them', async () => {
+    for (const s of ['ring-a', 'ring-b', 'ring-c']) expect((await put(s, KEY_A, exportSite(project(s)))).status).toBe(200)
+    expect((await fetch(`${base}/api/sites/ring-a/ring`, { method: 'PUT', headers: auth(KEY_B) })).status).toBe(403)
+    for (const s of ['ring-a', 'ring-b', 'ring-c']) {
+      const r = await fetch(`${base}/api/sites/${s}/ring`, { method: 'PUT', headers: auth(KEY_A) })
+      expect(r.status).toBe(200)
+      expect((await r.json()).links.next).toMatch(new RegExp(`/ring/${s}/next$`))
+    }
+    const hop = async (from: string, dir: string) => (await fetch(`${base}/ring/${from}/${dir}`, { redirect: 'manual' })).headers.get('location')
+    expect(await hop('ring-a', 'next')).toBe('/@ring-b/')
+    expect(await hop('ring-c', 'next')).toBe('/@ring-a/')
+    expect(await hop('ring-a', 'prev')).toBe('/@ring-c/')
+    for (let i = 0; i < 5; i++) expect(['/@ring-b/', '/@ring-c/']).toContain(await hop('ring-a', 'random'))
+    const dir = await (await fetch(`${base}/api/ring`)).json()
+    expect(dir.homes.map((h: { slug: string }) => h.slug)).toEqual(['ring-a', 'ring-b', 'ring-c'])
+    expect(await (await fetch(`${base}/ring/`)).text()).toContain('ring-b')
+    expect((await fetch(`${base}/api/sites/ring-b/ring`, { method: 'DELETE', headers: auth(KEY_A) })).status).toBe(200)
+    expect(await hop('ring-a', 'next')).toBe('/@ring-c/')
+  })
+
+  it('closing the door takes everything offline and drops the home from the webring', async () => {
+    expect((await fetch(`${base}/api/sites/ring-c/door`, { method: 'POST', headers: { ...auth(KEY_B), 'Content-Type': 'application/json' }, body: '{"open":false}' })).status).toBe(403)
+    const r = await fetch(`${base}/api/sites/ring-c/door`, { method: 'POST', headers: { ...auth(KEY_A), 'Content-Type': 'application/json' }, body: '{"open":false}' })
+    expect(r.status).toBe(200)
+    for (const path of ['/@ring-c/', '/@ring-c/index.html', '/@ring-c/feed.xml', '/@ring-c/site.json', '/@ring-c/style.css']) {
+      const res = await fetch(`${base}${path}`)
+      expect(res.status, path).toBe(404)
+      expect(await res.text()).not.toContain('Hello')
+    }
+    expect((await fetch(`${base}/api/sites/ring-c/messages/approved`)).status).toBe(404)
+    expect((await fetch(`${base}/api/sites/ring-c/messages`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: '{"text":"hi"}' })).status).toBe(404)
+    const dir = await (await fetch(`${base}/api/ring`)).json()
+    expect(dir.homes.map((h: { slug: string }) => h.slug)).not.toContain('ring-c')
+    expect((await (await fetch(`${base}/api/sites/ring-c/status`, { headers: auth(KEY_A) })).json()).open).toBe(false)
+    // Publishing again opens the door.
+    expect((await put('ring-c', KEY_A, exportSite(project('ring-c')))).status).toBe(200)
+    expect((await fetch(`${base}/@ring-c/`)).status).toBe(200)
   })
 })

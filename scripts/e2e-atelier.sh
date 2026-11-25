@@ -11,4 +11,5 @@ PORT=4173 DATA_DIR="$E2E_DIR/data" APP_DIR="$(pwd)/dist" node server/index.ts 2>
 node scripts/static-server.mjs "$SITE_DIR" 4174 >/dev/null & SITE_PID=$!
 trap 'kill $APP_PID $SITE_PID 2>/dev/null || true' EXIT
 for _ in $(seq 100); do curl -sf -o /dev/null http://127.0.0.1:4173/ && break; sleep 0.1; done
+SERVER=http://127.0.0.1:4173 KEYS="$E2E_DIR/demo-keys.json" node scripts/seed-demo.mjs
 node scripts/e2e-atelier.mjs

@@ -78,7 +78,7 @@ html{-webkit-text-size-adjust:100%}
 body{margin:0;color:var(--fg);font-family:var(--font);font-size:var(--size);line-height:1.55;overflow-wrap:anywhere}
 a{color:var(--link)}
 img{max-width:100%}
-.wrap{max-width:var(--maxw);margin:0 auto;padding:20px 16px 32px}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:20px 16px 32px;overflow-x:clip}
 .site-header{text-align:var(--halign);margin-bottom:18px}
 .site-title{font-family:var(--hfont);font-size:clamp(24px,7vw,var(--title));line-height:1.1;font-weight:700;margin:0}
 .site-title a{color:var(--fg);text-decoration:none}
@@ -107,6 +107,8 @@ img{max-width:100%}
 .entry-title{display:block;font-weight:700;color:var(--link)}
 .entry time,.gb-list time{font-size:.8em;opacity:.75}
 .entry p{margin:4px 0 0;opacity:.85}
+.with-excerpts li{display:flow-root}
+.with-excerpts .entry img{float:right;width:96px;height:96px;max-height:none;margin:2px 0 6px 12px;object-fit:cover}
 .gallery{display:grid;grid-template-columns:repeat(auto-fill,minmax(120px,1fr));gap:10px}
 .gallery img{width:100%;aspect-ratio:1;object-fit:cover;display:block}
 .books li{padding:6px 0 6px 12px;border-left:4px solid var(--accent);margin:6px 0}
