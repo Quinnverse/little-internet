@@ -505,3 +505,10 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .demo-links li { padding: 6px 0; border-top: 1px dashed #e7cf8f; }
 .demo-links li:first-child { border-top: 0; }
 .demo-links a { font-weight: 700; }
+
+/* Narrow screens: only the two main name tags up front; the rest appear on tap/focus. */
+@media (max-width: 599px) {
+  .home.show-labels .hotspot:not(.hotspot-small):not([data-id='diary']):not([data-id='computer']) .hot-tip { opacity: 0; }
+  .home.show-labels .hotspot:not(.hotspot-small):not([data-id='diary']):not([data-id='computer']):hover .hot-tip,
+  .home.show-labels .hotspot:not(.hotspot-small):not([data-id='diary']):not([data-id='computer']):focus-visible .hot-tip { opacity: 1; }
+}

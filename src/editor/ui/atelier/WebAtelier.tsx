@@ -89,7 +89,7 @@ export function WebAtelier(props: { ctx: Ctx; onClose: () => void }) {
   const [isNarrow, setIsNarrow] = useState(narrow())
   const [tab, setTab] = useState<Tab>('add')
   const [drawer, setDrawer] = useState(false)
-  const [device, setDevice] = useState<'desktop' | 'phone'>(narrow() ? 'phone' : 'desktop')
+  const [device, setDevice] = useState<'desktop' | 'phone'>(typeof window !== 'undefined' && window.innerWidth < 600 ? 'phone' : 'desktop')
   const [badge, setBadge] = useState(false)
   const [publishing, setPublishing] = useState(false)
   const [visitor, setVisitor] = useState(false)
