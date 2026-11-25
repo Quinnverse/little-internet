@@ -88,7 +88,7 @@ starter styles.
 TypeScript, Preact, Three.js, Blender (Python), Vite, Node.js, SQLite, zod, fast-check, Playwright, Kiro.
 
 ## Links **[OWNER]**
-Live app: https://little.quinnverse.tech (after deploy). Repo: https://github.com/Quinnverse/little-internet.
+Live app: https://resurrection.quinnverse.tech (deployed, live-check 44/44). Repo: https://github.com/Quinnverse/little-internet.
 Video: (record per `docs/submission/DEMO_SCRIPT.md`; under 3 minutes).
 
 ## Submission checklist

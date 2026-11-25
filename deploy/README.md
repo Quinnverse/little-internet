@@ -1,5 +1,15 @@
 # Deploying to https://little.quinnverse.tech
 
+> **Live deployment note (2026-11-25):** the actual contest URL is
+> **https://resurrection.quinnverse.tech**, not `little.quinnverse.tech`
+> (that hostname is NXDOMAIN). The live site runs the merged `main` (PR #2
+> included) via the **existing** deployment: container `little-internet-app`
+> on `127.0.0.1:18081`, nginx vhost `/etc/nginx/conf.d/resurrection.conf`
+> serving `/opt/little-internet/dist`. `BASE=https://resurrection.quinnverse.tech
+> node scripts/live-check.mjs` passed **44/44** from an overseas exit. The
+> isolated `li-v3` / `little.quinnverse.tech` procedure below was NOT used;
+> treat it as an alternative greenfield path only.
+
 **Status: written and smoke-tested without Docker, never built or run in a container.** The
 sandbox it was written in cannot run containers. What was verified: the exact file layout the image
 copies, installed with production dependencies only, starts, passes `/healthz`, serves the app and

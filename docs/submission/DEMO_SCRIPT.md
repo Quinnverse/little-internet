@@ -4,7 +4,7 @@ Record from the **deployed** app on a real desktop and a real phone. Only show w
 features listed under "Honest limits". Do not read out numbers you have not measured.
 
 ## Before recording (reset)
-1. Demo homes: `SERVER=https://little.quinnverse.tech KEYS=~/.li-demo-keys.json node scripts/seed-demo.mjs`
+1. Demo homes: `SERVER=https://resurrection.quinnverse.tech KEYS=~/.li-demo-keys.json node scripts/seed-demo.mjs`
    (re-publishes the same three sites; any guestbook notes stay).
 2. Fresh browser profile or **Settings → Delete this home from this device** (this is the reset for a demo copy).
 3. Pick a second device (phone) for the visitor, on mobile data if possible.
