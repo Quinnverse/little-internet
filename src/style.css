@@ -599,3 +599,14 @@ button.mail-row { cursor: pointer; }
 .people { display: grid; gap: 10px; }
 .dock-btn { position: relative; }
 .dock-btn .badge-count { position: absolute; top: -4px; right: -4px; margin: 0; }
+
+/* Letter editor needs more room than the docked 520px panel on wide screens */
+@media (min-width: 900px) {
+  .sheet:has(.letter-editor), .sheet:has(.letter-send) { width: min(980px, calc(100vw - 32px)); max-width: none; }
+}
+/* On phones the paper stays visible while the tools scroll beneath it */
+@media (max-width: 819px) {
+  .letter-stage { position: sticky; top: 0; z-index: 2; background: var(--paper); padding-bottom: 6px; }
+  .letter-paper { width: min(100%, calc(30dvh * 1000 / 1300)); margin: 0 auto; }
+  .sheet:has(.letter-editor) { max-height: 92dvh; }
+}

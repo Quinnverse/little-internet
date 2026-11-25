@@ -241,7 +241,7 @@ export const SPRITES: Record<StickerId | 'construction', Sprite> = {
     ],
   },
   sparkle: {
-    palette: { y: '#fff27a', w: '#ffffff', c: '#9ff3ff' },
+    palette: { y: '#e9a400', w: '#fff1a8', c: '#2fa6cf' },
     rows: [
       '.......y........',
       '.......y........',

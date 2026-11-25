@@ -1,0 +1,38 @@
+import { mkdirSync } from 'node:fs'
+import { chromium } from 'playwright'
+const BASE = (process.env.BASE ?? 'http://127.0.0.1:4176').replace(/\/+$/, '') + '/'
+const OUT = process.env.SHOTS ?? '.shots-letter'
+mkdirSync(OUT, { recursive: true })
+const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+for (const [name, vp, mobile] of [['desktop', { width: 1280, height: 860 }, false], ['phone', { width: 390, height: 844 }, true]]) {
+  const ctx = await browser.newContext({ viewport: vp, isMobile: mobile, hasTouch: mobile, locale: 'en-US' })
+  await ctx.addInitScript(() => localStorage.setItem('li-flat', '1'))
+  const page = await ctx.newPage()
+  page.on('pageerror', (e) => console.log('pageerror', e.message))
+  await page.goto(BASE)
+  await page.locator('.setup').waitFor()
+  await page.getByPlaceholder('Moon’s little home').fill('Shot ' + name + Math.random().toString(36).slice(2, 6))
+  await page.getByRole('button', { name: 'Move in' }).click()
+  await page.locator('.home').waitFor()
+  await page.getByRole('button', { name: 'Letters' }).click()
+  await page.getByRole('dialog').getByRole('button', { name: 'Write', exact: true }).waitFor()
+  await page.waitForFunction(() => !document.querySelector('[role=dialog] .btn-primary.btn-small[disabled]'))
+  await page.screenshot({ path: `${OUT}/${name}-hub.png` })
+  await page.getByRole('dialog').getByRole('button', { name: 'Write', exact: true }).click()
+  await page.getByRole('button', { name: 'Thanks' }).or(page.getByRole('button', { name: 'Thank you' })).first().click()
+  await page.getByRole('button', { name: 'Draw' }).waitFor()
+  await page.getByRole('button', { name: 'sparkle' }).click()
+  await page.getByRole('button', { name: 'shell' }).click()
+  await page.screenshot({ path: `${OUT}/${name}-editor.png` })
+  await page.getByRole('button', { name: 'Draw' }).click()
+  const cv = page.locator('.drawpad-canvas')
+  await cv.waitFor()
+  const bb = await cv.boundingBox()
+  await page.mouse.move(bb.x + bb.width * 0.2, bb.y + bb.height * 0.5)
+  await page.mouse.down()
+  for (let i = 0; i <= 30; i++) await page.mouse.move(bb.x + bb.width * (0.2 + i * 0.02), bb.y + bb.height * (0.5 + 0.25 * Math.sin(i / 4)))
+  await page.mouse.up()
+  await page.screenshot({ path: `${OUT}/${name}-draw.png` })
+  await ctx.close()
+}
+await browser.close()
