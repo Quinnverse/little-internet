@@ -201,4 +201,38 @@ describe('server', () => {
     expect((await put('ring-c', KEY_A, exportSite(project('ring-c')))).status).toBe(200)
     expect((await fetch(`${base}/@ring-c/`)).status).toBe(200)
   })
+
+  it('Task A (server): after an entry is made private and the site republished, its page, photo and RSS item are gone', async () => {
+    const png = new Uint8Array([137, 80, 78, 71, 13, 10, 26, 10, 0, 0, 0, 0])
+    const withPhoto = (visibility: 'public' | 'private'): Project => {
+      const base = project('privacy')
+      return {
+        ...base,
+        assets: [{ id: 'pic', mime: 'image/png', data: png }],
+        posts: base.posts.map((x) => (x.id === 'p1' ? { ...x, title: 'Zebra crossing notes', visibility, imageIds: ['pic'] } : x)),
+      }
+    }
+    expect((await put('privacy', KEY_A, exportSite(withPhoto('public')))).status).toBe(200)
+    expect((await fetch(`${base}/@privacy/posts/public-one.html`)).status).toBe(200)
+    expect((await fetch(`${base}/@privacy/assets/pic.png`)).status).toBe(200)
+    expect(await (await fetch(`${base}/@privacy/feed.xml`)).text()).toContain('Zebra crossing notes')
+
+    expect((await put('privacy', KEY_A, exportSite(withPhoto('private')))).status).toBe(200)
+    for (const path of ['/posts/public-one.html', '/assets/pic.png']) expect((await fetch(`${base}/@privacy${path}`)).status, path).toBe(404)
+    expect(await (await fetch(`${base}/@privacy/feed.xml`)).text()).not.toContain('Zebra')
+    const html = await (await fetch(`${base}/@privacy/`)).text()
+    expect(html).not.toContain('public-one')
+    expect(html).not.toContain('Zebra')
+  })
+
+  it('Task B (server): every file in the uploaded ZIP is served byte for byte', async () => {
+    const zip = exportSite(project('bytes'))
+    expect((await put('bytes', KEY_A, zip)).status).toBe(200)
+    const files = unzipSync(zip)
+    for (const [name, data] of Object.entries(files)) {
+      const res = await fetch(`${base}/@bytes/${name}`)
+      expect(res.status, name).toBe(200)
+      expect(new Uint8Array(await res.arrayBuffer()), name).toEqual(data)
+    }
+  })
 })
