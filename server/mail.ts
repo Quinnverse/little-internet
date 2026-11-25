@@ -40,6 +40,7 @@ export function mailSchema(db: DatabaseSync): void {
     CREATE TABLE IF NOT EXISTS mail (
       id TEXT PRIMARY KEY, sender TEXT NOT NULL, recipient TEXT NOT NULL, client_id TEXT NOT NULL,
       created_at TEXT NOT NULL, payload TEXT NOT NULL, summary TEXT NOT NULL DEFAULT '',
+      shareable INTEGER NOT NULL DEFAULT 0,
       read_at TEXT, recipient_deleted INTEGER NOT NULL DEFAULT 0, sender_deleted INTEGER NOT NULL DEFAULT 0,
       UNIQUE (sender, client_id)
     );
@@ -68,7 +69,7 @@ export async function handleMail(d: MailDeps, req: IncomingMessage, res: ServerR
     unblock: d.db.prepare('DELETE FROM blocks WHERE blocker = ? AND blocked = ?'),
     listBlocked: d.db.prepare('SELECT blocked FROM blocks WHERE blocker = ? ORDER BY blocked'),
     byClient: d.db.prepare('SELECT id, created_at FROM mail WHERE sender = ? AND client_id = ?'),
-    insertMail: d.db.prepare('INSERT INTO mail (id, sender, recipient, client_id, created_at, payload, summary) VALUES (?, ?, ?, ?, ?, ?, ?)'),
+    insertMail: d.db.prepare('INSERT INTO mail (id, sender, recipient, client_id, created_at, payload, summary, shareable) VALUES (?, ?, ?, ?, ?, ?, ?, ?)'),
     inbox: d.db.prepare('SELECT id, sender, created_at, summary, read_at FROM mail WHERE recipient = ? AND recipient_deleted = 0 AND created_at > ? ORDER BY created_at, id LIMIT 200'),
     inboxCount: d.db.prepare('SELECT COUNT(*) AS n FROM mail WHERE recipient = ? AND recipient_deleted = 0'),
     outbox: d.db.prepare('SELECT id, recipient, created_at, summary, read_at, recipient_deleted FROM mail WHERE sender = ? AND sender_deleted = 0 ORDER BY created_at DESC LIMIT 100'),
@@ -189,7 +190,7 @@ export async function handleMail(d: MailDeps, req: IncomingMessage, res: ServerR
       const id = randomUUID()
       const at = now()
       const summary = typeof b.summary === 'string' ? b.summary.replace(/[\u0000-\u001f]/g, ' ').slice(0, 80) : ''
-      q.insertMail.run(id, me, to, clientId, at, payload, summary)
+      q.insertMail.run(id, me, to, clientId, at, payload, summary, b.shareable === true ? 1 : 0)
       return d.json(res, 201, { id, deliveredAt: at }), true
     }
     // GET /mail?since=ISO   inbox (metadata only)
@@ -205,10 +206,10 @@ export async function handleMail(d: MailDeps, req: IncomingMessage, res: ServerR
     }
     // GET /mail/:id   the letter itself (recipient, or the sender's own copy)
     if (parts.length === 5 && MSG_ID.test(parts[4]!) && req.method === 'GET') {
-      const m = q.one.get(parts[4]!) as { id: string; sender: string; recipient: string; created_at: string; payload: string; recipient_deleted: number; sender_deleted: number } | undefined
+      const m = q.one.get(parts[4]!) as { id: string; sender: string; recipient: string; created_at: string; payload: string; shareable: number; recipient_deleted: number; sender_deleted: number } | undefined
       const mine = m && ((m.recipient === me && !m.recipient_deleted) || (m.sender === me && !m.sender_deleted))
       if (!m || !mine) throw new E(404, 'Not found')
-      return d.json(res, 200, { id: m.id, from: m.sender, to: m.recipient, createdAt: m.created_at, letter: JSON.parse(m.payload) }, { 'Cache-Control': 'no-store' }), true
+      return d.json(res, 200, { id: m.id, from: m.sender, to: m.recipient, createdAt: m.created_at, shareable: m.shareable === 1, letter: JSON.parse(m.payload) }, { 'Cache-Control': 'no-store' }), true
     }
     if (parts.length === 6 && MSG_ID.test(parts[4]!) && parts[5] === 'read' && req.method === 'POST') {
       q.markRead.run(now(), parts[4]!, me)

@@ -5,6 +5,7 @@ import { designAssetRefs, starterDesign, type GuestNote, type SiteDesign, type S
 import type { DesignOp } from '../core/designOps.ts'
 import type {
   Asset,
+  Gift,
   GHOST_COLORS,
   Lang,
   Link,
@@ -55,6 +56,7 @@ export function createProject(input: NewProjectInput): Project {
     posts: [],
     links: [],
     webring: {},
+    gifts: [],
     room: defaultRoom(),
     assets: [],
     recordings: [],
@@ -164,6 +166,7 @@ export const updatePost =
 export const setManyVisibility =
   (ids: readonly string[], visibility: Post['visibility']): Command =>
   (p) => {
+    assertShareable(p, ids, visibility)
     const set = new Set(ids)
     return { ...p, posts: p.posts.map((post) => (set.has(post.id) ? { ...post, visibility } : post)) }
   }
@@ -183,9 +186,23 @@ export const toggleStar =
   (id: string): Command =>
   (p) => ({ ...p, posts: p.posts.map((post) => (post.id === id ? { ...post, starred: !post.starred } : post)) })
 
+/** A gift from someone else may become public only if the sender allowed it. */
+function assertShareable(p: Project, ids: readonly string[], visibility: Post['visibility']): void {
+  if (visibility !== 'public') return
+  for (const id of ids) {
+    const post = p.posts.find((x) => x.id === id)
+    if (post?.kind === 'gift' && !p.gifts.some((g) => g.postId === id && g.shareable)) {
+      throw new Error('This gift came from a friend who did not allow sharing it publicly')
+    }
+  }
+}
+
 export const setVisibility =
   (id: string, visibility: Post['visibility']): Command =>
-  (p) => ({ ...p, posts: p.posts.map((post) => (post.id === id ? { ...post, visibility } : post)) })
+  (p) => {
+    assertShareable(p, [id], visibility)
+    return { ...p, posts: p.posts.map((post) => (post.id === id ? { ...post, visibility } : post)) }
+  }
 
 /** Website components keep pointing at content; a deleted entry simply drops out of them. */
 function forgetPost(d: SiteDesign, id: string): SiteDesign {
@@ -205,6 +222,7 @@ export const deletePost =
     collectGarbage({
       ...p,
       posts: p.posts.filter((post) => post.id !== id),
+      gifts: p.gifts.filter((g) => g.postId !== id),
       web: {
         ...p.web,
         draft: forgetPost(p.web.draft, id),
@@ -213,6 +231,51 @@ export const deletePost =
       // A memory object lives and dies with its entry.
       room: { ...p.room, memory: p.room.memory.filter((m) => m.postId !== id) },
     })
+
+// ------------------------------------------------------------------ gifts
+
+export type NewGift = {
+  postId: string
+  giftId: string
+  assetId: string
+  png: Uint8Array
+  mailId?: string
+  from: string
+  fromTitle: string
+  receivedAt: string
+  shareable: boolean
+  letter: Gift['letter']
+  title: string
+  body: string
+  slug?: string
+}
+
+/**
+ * Keeps a received letter: one private Life Archive record (kind gift, cover = the letter as a picture) plus the
+ * letter itself. Keeping the same server message twice does nothing. Nothing is ever made public here.
+ */
+export const keepGift =
+  (g: NewGift): Command =>
+  (p) => {
+    if (g.mailId && p.gifts.some((x) => x.mailId === g.mailId)) return p
+    return compose(
+      addAsset({ id: g.assetId, mime: 'image/png', data: g.png }),
+      addPost({
+        id: g.postId,
+        createdAt: g.receivedAt,
+        title: g.title,
+        body: g.body,
+        imageIds: [g.assetId],
+        kind: 'gift',
+        fields: { sender: g.fromTitle || g.from },
+        tags: ['gift'],
+      }),
+      (q) => ({
+        ...q,
+        gifts: [...q.gifts, { id: g.giftId, postId: g.postId, ...(g.mailId ? { mailId: g.mailId } : {}), from: g.from, receivedAt: g.receivedAt, shareable: g.shareable, letter: g.letter }],
+      }),
+    )(p)
+  }
 
 // ------------------------------------------------------------------ website design (Web Atelier)
 

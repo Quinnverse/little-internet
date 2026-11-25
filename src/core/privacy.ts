@@ -16,7 +16,7 @@ export function chosenDesign(p: Project, which: DesignChoice = 'published') {
  * friend's badge. The draft design is never included when the published one is used.
  */
 export function publicProjection(p: Project, which: DesignChoice = 'published'): Project {
-  const posts = p.posts.filter((post) => post.visibility === 'public')
+  const posts = p.posts.filter((post) => post.visibility === 'public' && (post.kind !== 'gift' || p.gifts.some((g) => g.postId === post.id && g.shareable)))
   const publicPostIds = new Set(posts.map((post) => post.id))
   const design = publicDesign(chosenDesign(p, which), { publicPostIds })
 
@@ -26,6 +26,9 @@ export function publicProjection(p: Project, which: DesignChoice = 'published'):
   for (const l of p.links) if (l.buttonAssetId) usedAssets.add(l.buttonAssetId)
   const assets = p.assets.filter((a) => usedAssets.has(a.id))
 
+  // A gift is public only when its record is public AND the sender allowed sharing. Both must hold.
+  const gifts = p.gifts.filter((g) => g.shareable && publicPostIds.has(g.postId))
+  const shareableIds = new Set(gifts.map((g) => g.postId))
   const recordings = p.recordings.filter((r) => r.visibility === 'public')
   // Skin and decor carry no personal text and stay. Memory objects follow their post.
   const publicRecordingIds = new Set(recordings.map((r) => r.id))
@@ -43,5 +46,6 @@ export function publicProjection(p: Project, which: DesignChoice = 'published'):
     ...(at ? { published: { design, at } } : {}),
     guestbook: p.web.guestbook,
   }
-  return { ...p, posts, assets, recordings, room, web }
+  void shareableIds
+  return { ...p, posts, gifts, assets, recordings, room, web }
 }

@@ -29,6 +29,7 @@ const KIND_ICONS: Record<PostKind, IconName> = {
   memo: 'note',
   photo: 'photo',
   travel: 'globe',
+  gift: 'mail',
 }
 
 /**

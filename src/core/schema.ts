@@ -1,5 +1,6 @@
 import { z } from 'zod'
 import { FIELD_KEYS, MAX_TAGS, POST_KINDS, TAG_PATTERN } from './archive.ts'
+import { LetterSchema } from './letter.ts'
 import { designFromLegacy, designIssues, WebStateSchema, type WebState } from './design.ts'
 import { defaultRoom, migrateRoomInput, RoomSchema, roomIssues, type Room } from './room.ts'
 import { httpUrl, id, isoDate, line, text } from './validators.ts'
@@ -57,6 +58,23 @@ export const PostSchema = z.object({
   fields: z.partialRecord(z.enum(FIELD_KEYS), text(1000)).default({}),
   starred: z.boolean().default(false),
 })
+
+/**
+ * A received gift. The Life Archive record (`postId`, kind 'gift') is what the owner searches, tags, frames and
+ * deletes; this holds the letter itself and where it came from. `shareable` is the SENDER's permission: only
+ * when it is true may the owner make the gift public (website). Default for any gift is private.
+ */
+export const GiftSchema = z.object({
+  id,
+  postId: id,
+  /** Server message id this came from (so receiving twice never duplicates). */
+  mailId: z.string().regex(/^[0-9a-f-]{36}$/).optional(),
+  from: z.string().regex(/^[a-z0-9](?:[a-z0-9-]{0,30}[a-z0-9])?$/),
+  receivedAt: isoDate,
+  shareable: z.boolean(),
+  letter: LetterSchema,
+})
+export type Gift = z.infer<typeof GiftSchema>
 
 export const LinkSchema = z.object({
   id,
@@ -130,6 +148,8 @@ const ProjectShape = {
   posts: z.array(PostSchema).max(2000),
   links: z.array(LinkSchema).max(100),
   webring: WebringSchema,
+  // Heart Mail (V5): received gifts. Older saves have none.
+  gifts: z.array(GiftSchema).max(300).default([]),
   // Added with the 3D home: older saves have no room and load with the default one.
   room: z.preprocess(migrateRoomInput, RoomSchema).default(() => defaultRoom()),
 }
@@ -141,6 +161,7 @@ type Refinable = {
   posts: z.infer<typeof PostSchema>[]
   links: z.infer<typeof LinkSchema>[]
   assets: { id: string }[]
+  gifts: z.infer<typeof GiftSchema>[]
 }
 
 function checkReferences(p: Refinable, ctx: z.RefinementCtx): void {
@@ -182,6 +203,17 @@ function checkReferences(p: Refinable, ctx: z.RefinementCtx): void {
       }
     }
   }
+  // Gifts: unique, tied to a real archive record of kind 'gift', and never public unless the sender allowed it.
+  dup('gift id', p.gifts.map((g) => g.id))
+  dup('gift record', p.gifts.map((g) => g.postId))
+  const postById = new Map(p.posts.map((x) => [x.id, x]))
+  for (const g of p.gifts) {
+    const post = postById.get(g.postId)
+    if (!post) ctx.addIssue({ code: 'custom', message: `gift ${g.id} has no archive record` })
+    else if (post.kind !== 'gift') ctx.addIssue({ code: 'custom', message: `gift ${g.id} record is not a gift` })
+    else if (post.visibility === 'public' && !g.shareable) ctx.addIssue({ code: 'custom', message: `gift ${g.id} is public but the sender did not allow sharing` })
+  }
+  for (const x of p.posts) if (x.kind === 'gift' && !p.gifts.some((g) => g.postId === x.id)) ctx.addIssue({ code: 'custom', message: `gift record ${x.id} has no gift` })
   for (const issue of roomIssues(p.room)) ctx.addIssue({ code: 'custom', message: issue })
   for (const m of p.room.memory) {
     if (!postIds.has(m.postId)) {

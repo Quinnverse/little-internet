@@ -7,6 +7,7 @@ import { publicProjection, type DesignChoice } from './privacy.ts'
 import { generateFeed } from './rss.ts'
 import { toStored } from './storage.ts'
 import { assetPath, isCanonicalHttpUrl, MIME_EXT, recordingPath, type Asset, type Post, type Project } from './schema.ts'
+import { letterToSvg } from './letter.ts'
 import { archiveLabel, defFor, fieldText, filledFields } from './archive.ts'
 import { pageWidgets, type SiteDesign, type SitePage, type SiteWidget } from './design.ts'
 import { designCss } from './siteCss.ts'
@@ -402,6 +403,12 @@ ${ringNav}<p><a href="${prefix}feed.xml">${h(T('rss'))}</a> · ${h(T('madeWith')
     return `<dl class="fields">${items}</dl>\n`
   }
 
+  /** A public gift shows its letter as an inline SVG (the sender allowed sharing; private gifts never get here). */
+  function giftLetter(p: Post): string {
+    const g = p.kind === 'gift' ? pub.gifts.find((x) => x.postId === p.id) : undefined
+    return g ? `<figure class="gift-letter" role="img" aria-label="${h(p.title)}">${letterToSvg(g.letter, { width: 520 })}</figure>\n` : ''
+  }
+
   function post(p: Post): string {
     const prefix = '../'
     const images = p.imageIds
@@ -418,7 +425,7 @@ ${ringNav}<p><a href="${prefix}feed.xml">${h(T('rss'))}</a> · ${h(T('madeWith')
 <article>
 <h1>${h(p.title)}</h1>
 <p class="date"><time datetime="${p.createdAt}">${p.createdAt.slice(0, 10)}</time>${p.kind !== 'diary' ? ` · <span class="kind">${h(archiveLabel(`kind.${p.kind}`, pub.site.lang))}</span>` : ''}</p>
-${postFields(p)}${paragraphs(p.body)}
+${postFields(p)}${giftLetter(p)}${paragraphs(p.body)}
 ${p.tags.length ? `<p class="tags">${p.tags.map((tg) => `<span>#${h(tg)}</span>`).join(' ')}</p>` : ''}
 ${images}
 ${video}

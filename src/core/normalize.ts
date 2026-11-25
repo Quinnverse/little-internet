@@ -19,6 +19,7 @@ export function normalize(p: Project): Project {
     },
     assets: [...p.assets].sort((a, b) => cmp(a.id, b.id)),
     links: [...p.links],
+    gifts: [...p.gifts].sort((a, b) => cmp(a.id, b.id)),
     room: normalizeRoom(p.room),
     recordings: [...p.recordings].sort((a, b) => cmp(b.createdAt, a.createdAt) || cmp(a.id, b.id)),
   }

@@ -12,6 +12,15 @@ import { embedSrc } from '../src/core/video.ts'
 import { markedProjectArb, PRIVATE_MARK, projectArb } from './arbitraries.ts'
 
 const RUNS = { numRuns: 150 }
+
+// Inline SVG letters (public gifts) live inside <figure class="gift-letter">. They get their own strict lists.
+const SVG_TAGS = new Set(['svg', 'g', 'path', 'rect', 'circle', 'line', 'text', 'tspan', 'image', 'defs', 'filter', 'fegaussianblur', 'femerge', 'femergenode', 'animate'])
+const SVG_ATTRS = new Set([
+  'xmlns', 'xmlns:xlink', 'viewbox', 'width', 'height', 'transform', 'fill', 'stroke', 'stroke-width', 'stroke-linecap', 'stroke-linejoin',
+  'stroke-dasharray', 'stroke-dashoffset', 'd', 'cx', 'cy', 'r', 'x', 'y', 'x1', 'y1', 'x2', 'y2', 'opacity', 'font-size', 'font-family', 'text-anchor',
+  'dy', 'xml:space', 'filter', 'id', 'shape-rendering', 'stddeviation', 'result', 'in', 'preserveaspectratio', 'href', 'attributename', 'from', 'to', 'dur', 'begin',
+])
+const SAFE_IMAGE = /^data:image\/(jpeg|png);base64,[A-Za-z0-9+/=]+$/
 const dec = new TextDecoder()
 
 const ALLOWED_TAGS = new Set([
@@ -74,6 +83,19 @@ describe('site core properties', () => {
           const doc = dom.window.document
           for (const el of doc.querySelectorAll('*')) {
             const tag = el.tagName.toLowerCase()
+            if (el.closest('figure.gift-letter') && tag !== 'figure') {
+              expect(SVG_TAGS.has(tag), `${path}: unexpected <${tag}> in a gift letter`).toBe(true)
+              for (const attr of el.getAttributeNames()) {
+                expect(SVG_ATTRS.has(attr.toLowerCase()), `${path}: unexpected ${attr} in a gift letter`).toBe(true)
+                expect(attr.toLowerCase().startsWith('on')).toBe(false)
+                if (attr === 'href') expect(tag === 'image' && SAFE_IMAGE.test(el.getAttribute(attr)!)).toBe(true)
+              }
+              continue
+            }
+            if (el.tagName.toLowerCase() === 'figure' && el.classList.contains('gift-letter')) {
+              expect(el.getAttributeNames().sort()).toEqual(['aria-label', 'class', 'role'])
+              continue
+            }
             expect(ALLOWED_TAGS.has(tag), `${path}: unexpected <${tag}>`).toBe(true)
             for (const attr of el.getAttributeNames()) {
               expect(ALLOWED_ATTRS.has(attr), `${path}: unexpected attribute ${attr}`).toBe(true)

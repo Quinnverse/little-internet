@@ -405,6 +405,13 @@ export const projectArb: fc.Arbitrary<Project> = fc
         room,
         posts: bases.map((p, i) => ({ ...p, imageIds: images[i]! })),
       }))
+      .map((proj) => {
+        // Gift records need their gift. Public gifts are only valid when the sender allowed sharing.
+        const gifts = proj.posts
+          .filter((x) => x.kind === 'gift')
+          .map((x, i) => ({ id: `g${i}`, postId: x.id, from: 'a-friend', receivedAt: '2026-11-20T10:00:00.000Z', shareable: x.visibility === 'public' ? true : i % 2 === 0, letter: { v: 1 as const, paper: 'cream' as const, items: [{ t: 'seal' as const, id: 's1', x: 500, y: 500, rot: 0, scale: 1, color: '#aa2233' }] } }))
+        return { ...proj, gifts }
+      })
   })
 
 export const PRIVATE_MARK = 'qqprivatemark'

@@ -6,7 +6,7 @@ import type { Post } from './schema.ts'
  * Every record is still private by default, still one data source for Home, Journal and Web.
  */
 
-export const POST_KINDS = ['diary', 'reading', 'collection', 'outfit', 'memo', 'photo', 'travel'] as const
+export const POST_KINDS = ['diary', 'reading', 'collection', 'outfit', 'memo', 'photo', 'travel', 'gift'] as const
 export type PostKind = (typeof POST_KINDS)[number]
 
 export const FIELD_KEYS = [
@@ -16,6 +16,7 @@ export const FIELD_KEYS = [
   'occasion', 'pieces', // outfit
   'due', 'done', // memo
   'place', 'from', 'to', // photo / travel
+  'sender', // gift
 ] as const
 export type FieldKey = (typeof FIELD_KEYS)[number]
 
@@ -36,6 +37,7 @@ export const KIND_FIELDS: Record<PostKind, readonly FieldDef[]> = {
   memo: [{ key: 'due', type: 'date' }, { key: 'done', type: 'yesno' }],
   photo: [{ key: 'place', type: 'line' }],
   travel: [{ key: 'place', type: 'line' }, { key: 'from', type: 'date' }, { key: 'to', type: 'date' }],
+  gift: [{ key: 'sender', type: 'line' }],
 }
 
 export const MAX_TAGS = 12
@@ -61,6 +63,7 @@ const L: Record<string, [string, string]> = {
   'kind.memo': ['Memo', '备忘'],
   'kind.photo': ['Photo', '照片'],
   'kind.travel': ['Travel', '旅行'],
+  'kind.gift': ['Gift', '礼物'],
   'f.mood': ['Mood', '心情'],
   'f.weather': ['Weather', '天气'],
   'f.book': ['Book', '书名'],
@@ -77,6 +80,7 @@ const L: Record<string, [string, string]> = {
   'f.place': ['Place', '地点'],
   'f.from': ['From', '开始'],
   'f.to': ['To', '结束'],
+  'f.sender': ['From', '来自'],
   'c.reading': ['Reading', '在读'],
   'c.finished': ['Finished', '读完'],
   'c.paused': ['Paused', '搁置'],

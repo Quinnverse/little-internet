@@ -21,6 +21,7 @@ const project = (slug: string, extra: Partial<Project> = {}): Project => ({
   ],
   links: [],
   webring: {},
+  gifts: [],
   room: defaultRoom(),
   assets: [],
   recordings: [],
