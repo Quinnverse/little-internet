@@ -326,8 +326,8 @@ export const SPRITES: Record<StickerId | 'construction', Sprite> = {
   },
 }
 
-/** Inline SVG for a sprite. Output contains only fixed markup and #rrggbb colours. */
-export function spriteSvg(name: keyof typeof SPRITES, cls = 'px'): string {
+/** The <rect> elements of a sprite on a 16×16 grid (no wrapper). Fixed markup and #rrggbb colours only. */
+export function spriteRects(name: keyof typeof SPRITES): string {
   const s = SPRITES[name]
   const rects: string[] = []
   s.rows.forEach((row, y) => {
@@ -345,5 +345,10 @@ export function spriteSvg(name: keyof typeof SPRITES, cls = 'px'): string {
       x += run
     }
   })
-  return `<svg class="${cls}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${rects.join('')}</svg>`
+  return rects.join('')
+}
+
+/** Inline SVG for a sprite. Output contains only fixed markup and #rrggbb colours. */
+export function spriteSvg(name: keyof typeof SPRITES, cls = 'px'): string {
+  return `<svg class="${cls}" viewBox="0 0 16 16" shape-rendering="crispEdges" aria-hidden="true" focusable="false">${spriteRects(name)}</svg>`
 }
