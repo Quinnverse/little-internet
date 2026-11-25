@@ -21,6 +21,8 @@ import { ta } from '../i18nAtelier.ts'
 import { hasKey, savedServer, siteStatus, siteUrl } from '../publish.ts'
 import { LIGHTS } from '../../core/room.ts'
 import { Sheet } from './common.tsx'
+import { PEOPLE_ON, PeopleSheet } from './PeopleSheet.tsx'
+import { flushOutbox, inbox as fetchInbox } from '../people.ts'
 
 type Panel =
   | null
@@ -35,6 +37,7 @@ type Panel =
   | { kind: 'move' }
   | { kind: 'settings' }
   | { kind: 'light' }
+  | { kind: 'people' }
 
 const ASSIST_KEY = 'li-assist'
 const assistPref = () => {
@@ -66,6 +69,43 @@ export function Home(props: { ctx: Ctx }) {
   // Quiet by default: names and markers show on hover/focus, or when the owner asks (Hints button or Settings).
   const [assistAlways, setAssistAlways] = useState(assistPref())
   const [peek, setPeek] = useState(false)
+  // Letters: the server is contacted only after the owner has opened People once on this device.
+  const [unread, setUnread] = useState(0)
+  const lastUnread = useRef<number | null>(null)
+  useEffect(() => {
+    let on = false
+    try {
+      on = localStorage.getItem(PEOPLE_ON) === '1'
+    } catch {
+      /* ignore */
+    }
+    if (!on) return
+    const slug = ctx.project.site.slug
+    let stop = false
+    const tick = async () => {
+      if (document.visibilityState !== 'visible') return
+      try {
+        await flushOutbox(slug, savedServer())
+        const n = (await fetchInbox(slug, savedServer())).mail.filter((m) => m.unread).length
+        if (stop) return
+        // Boo reacts only to a letter that really arrived on the server.
+        if (lastUnread.current !== null && n > lastUnread.current) {
+          view?.pet.set('react')
+          ctx.toast(ta('mail.arrived'))
+        }
+        lastUnread.current = n
+        setUnread(n)
+      } catch {
+        /* offline: keep the last known count, no false news */
+      }
+    }
+    void tick()
+    const id = window.setInterval(tick, 25_000)
+    return () => {
+      stop = true
+      window.clearInterval(id)
+    }
+  }, [ctx.project.site.slug, view])
   const data = useMemo(() => toHomeData(ctx.project), [ctx.project])
   const history = useRef<Project[]>([])
   const [undoable, setUndoable] = useState(0)
@@ -267,6 +307,7 @@ export function Home(props: { ctx: Ctx }) {
           <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} text />
           <DockBtn icon="sofa" label={t('hud.decorate')} onClick={startDecorate} text />
           <DockBtn icon="palette" label={ta('crt.decorate')} onClick={() => setAtelier(true)} />
+          <DockBtn icon="mail" label={ta('mail.dock')} onClick={() => open({ kind: 'people' })} badge={unread} />
         </nav>
       )}
 
@@ -317,6 +358,7 @@ export function Home(props: { ctx: Ctx }) {
           }}
         />
       )}
+      {panel?.kind === 'people' && <PeopleSheet ctx={ctx} onClose={close} onUnread={setUnread} />}
       {panel?.kind === 'light' && <LightSheet ctx={ctx} onClose={close} />}
       {previewing && <Preview project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
       {atelier && (
@@ -332,11 +374,12 @@ export function Home(props: { ctx: Ctx }) {
   )
 }
 
-function DockBtn(props: { icon: IconName; label: string; onClick: () => void; text?: boolean }) {
+function DockBtn(props: { icon: IconName; label: string; onClick: () => void; text?: boolean; badge?: number }) {
   return (
     <button type="button" class={`dock-btn${props.text ? ' dock-text' : ''}`} onClick={props.onClick} aria-label={props.label} title={props.label}>
       <Icon name={props.icon} size={20} />
       {props.text && <span>{props.label}</span>}
+      {!!props.badge && <span class="badge-count" aria-label={ta('mail.unread', { n: props.badge })}>{props.badge}</span>}
     </button>
   )
 }

@@ -571,3 +571,31 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .swatches { display: flex; flex-wrap: wrap; gap: 6px; }
 .swatch { width: 28px; height: 28px; border-radius: 50%; border: 2px solid rgba(0,0,0,.2); cursor: pointer; padding: 0; }
 .swatch.on { outline: 3px solid var(--accent, #c0603a); outline-offset: 2px; }
+
+/* Letter Atelier and Heart Mail (V5) */
+.letter-editor { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 820px) { .letter-editor { grid-template-columns: minmax(280px, 380px) 1fr; align-items: start; } }
+.letter-stage { display: grid; gap: 6px; }
+.letter-paper { position: relative; width: 100%; aspect-ratio: 1000 / 1300; border-radius: 6px; box-shadow: 0 6px 22px rgba(60,30,10,.25); overflow: hidden; touch-action: none; user-select: none; }
+.letter-svg { position: absolute; inset: 0; pointer-events: none; }
+.letter-svg svg, .letter-preview svg { width: 100%; height: auto; display: block; }
+.letter-hit { position: absolute; cursor: grab; border-radius: 4px; outline: 1px dashed transparent; touch-action: none; }
+.letter-hit:hover { outline-color: rgba(192,96,58,.5); }
+.letter-hit.on, .letter-hit:focus-visible { outline: 2px solid var(--accent, #c0603a); background: rgba(192,96,58,.08); }
+.letter-tools { display: grid; gap: 10px; }
+.letter-sel { display: grid; gap: 8px; padding: 10px; border-radius: 12px; background: rgba(0,0,0,.04); }
+.sticker-btn { width: 42px; height: 42px; display: grid; place-items: center; border-radius: 10px; border: 1px solid rgba(0,0,0,.15); background: #fff; cursor: pointer; }
+.letter-send { display: grid; gap: 14px; grid-template-columns: minmax(0, 1fr); }
+@media (min-width: 720px) { .letter-send { grid-template-columns: 300px 1fr; align-items: start; } }
+.letter-preview { border-radius: 6px; box-shadow: 0 6px 22px rgba(60,30,10,.25); overflow: hidden; max-width: 380px; }
+.letter-send-form { display: grid; gap: 10px; }
+.mail-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.mail-row { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px 12px; border-radius: 12px; border: 1px solid rgba(0,0,0,.1); background: rgba(255,255,255,.7); text-align: left; font: inherit; color: inherit; }
+button.mail-row { cursor: pointer; }
+.mail-row.unread { border-color: var(--accent, #c0603a); background: #fff3ea; }
+.mail-main { flex: 1; display: grid; min-width: 0; }
+.mail-main .small { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.badge-count { display: inline-block; min-width: 20px; padding: 0 6px; margin-left: 6px; border-radius: 10px; background: var(--accent, #c0603a); color: #fff; font-size: 12px; line-height: 20px; text-align: center; }
+.people { display: grid; gap: 10px; }
+.dock-btn { position: relative; }
+.dock-btn .badge-count { position: absolute; top: -4px; right: -4px; margin: 0; }

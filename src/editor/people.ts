@@ -81,7 +81,7 @@ export const sendMail = (slug: string, server: string, to: string, clientId: str
 
 /** Letters waiting to be (re)sent, kept on this device only until the server confirms delivery. */
 const OUTBOX = 'mail-outbox'
-export type Pending = { clientId: string; to: string; letter: Letter; summary: string; shareable: boolean; createdAt: string; error?: string }
+export type Pending = { clientId: string; to: string; letter: Letter; summary: string; shareable: boolean; createdAt: string; error?: string; retry?: boolean }
 export const loadOutbox = async (): Promise<Pending[]> => (await idbGet<Pending[]>(OUTBOX)) ?? []
 export const saveOutbox = (list: Pending[]) => idbSet(OUTBOX, list)
 
@@ -89,4 +89,47 @@ export const saveOutbox = (list: Pending[]) => idbSet(OUTBOX, list)
 export function newClientId(): string {
   const b = crypto.getRandomValues(new Uint8Array(16))
   return [...b].map((x) => x.toString(36).padStart(2, '0')).join('').slice(0, 22)
+}
+
+export type Delivery = { ok: true; duplicate: boolean } | { ok: false; error: string; retry: boolean }
+
+/**
+ * Tries to deliver one pending letter. Success is reported only when the server answered 2xx.
+ * Offline and server errors (5xx) keep the letter in the outbox for a retry; refusals (4xx) stay visible
+ * with the server's reason and are never retried automatically.
+ */
+export async function deliver(slug: string, server: string, p: Pending): Promise<Delivery> {
+  try {
+    const r = await sendMail(slug, server, p.to, p.clientId, p.letter, p.summary, p.shareable)
+    return { ok: true, duplicate: !!r.duplicate }
+  } catch (e) {
+    const status = e instanceof PeopleError ? e.status : 0
+    const msg = e instanceof Error ? e.message : String(e)
+    return { ok: false, error: msg, retry: status === 0 || status >= 500 || status === 429 }
+  }
+}
+
+/** Queues a letter in the outbox, tries to deliver it, and leaves it queued unless the server accepted it. */
+export async function sendQueued(slug: string, server: string, p: Pending): Promise<Delivery> {
+  await saveOutbox([...(await loadOutbox()).filter((x) => x.clientId !== p.clientId), p])
+  const r = await deliver(slug, server, p)
+  const rest = (await loadOutbox()).filter((x) => x.clientId !== p.clientId)
+  await saveOutbox(r.ok ? rest : [...rest, { ...p, error: r.error, retry: r.retry }])
+  return r
+}
+
+/** Retries letters that are still queued because of network trouble. */
+export async function flushOutbox(slug: string, server: string): Promise<number> {
+  let sentCount = 0
+  for (const p of await loadOutbox()) {
+    if (p.error && p.retry === false) continue
+    const r = await deliver(slug, server, p)
+    if (r.ok) {
+      sentCount++
+      await saveOutbox((await loadOutbox()).filter((x) => x.clientId !== p.clientId))
+    } else {
+      await saveOutbox((await loadOutbox()).map((x) => (x.clientId === p.clientId ? { ...x, error: r.error, retry: r.retry } : x)))
+    }
+  }
+  return sentCount
 }

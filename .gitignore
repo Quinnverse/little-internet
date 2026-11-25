@@ -42,3 +42,5 @@ deploy/.previous-image
 .stab-data/
 .stability/
 .v4shots/
+.e2e-mail/
+.e2e-mail-data/
