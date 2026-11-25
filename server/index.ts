@@ -14,6 +14,7 @@ import { DatabaseSync } from 'node:sqlite'
 import { brotliCompressSync, constants as zc, gzipSync } from 'node:zlib'
 import { unzipSync } from 'fflate'
 import { StoredProjectSchema } from '../src/core/schema.ts'
+import { handleMail, mailSchema } from './mail.ts'
 
 export type AppOptions = {
   dataDir: string
@@ -216,6 +217,7 @@ export function createApp(opts: AppOptions): {
     );
     CREATE INDEX IF NOT EXISTS messages_slug ON messages(slug, created_at);
   `)
+  mailSchema(db)
   // Columns added with Web Atelier (door, webring, directory). Older databases gain them here.
   const cols = new Set((db.prepare('PRAGMA table_info(sites)').all() as { name: string }[]).map((c) => c.name))
   const addCol = (name: string, def: string) => {
@@ -436,6 +438,35 @@ export function createApp(opts: AppOptions): {
       // GET /api/ring — the public webring directory (only open homes that joined)
       if (parts[1] === 'ring' && parts.length === 2 && req.method === 'GET') {
         return json(res, 200, { homes: ringList() }, { 'Cache-Control': 'no-cache' })
+      }
+      if (parts[1] === 'people') {
+        const done = await handleMail(
+          {
+            db,
+            json,
+            readBody,
+            HttpError,
+            allow,
+            owner,
+            exists: (s) => !!site(s),
+            titleOf: (s) => site(s)?.title ?? '',
+            ip: ipOf,
+            claimIdentity: (s, key) => {
+              const row = site(s)
+              if (row) {
+                const a = sha(key)
+                const b = Buffer.from(row.key_hash)
+                return a.length === b.length && timingSafeEqual(a, b)
+              }
+              claim.run(s, sha(key), new Date().toISOString(), '', '', 0, 0, null)
+              return true
+            },
+          },
+          req,
+          res,
+          parts,
+        )
+        if (done) return
       }
       if (parts[1] !== 'sites' || !parts[2] || !SLUG.test(parts[2])) throw new HttpError(404, 'Not found')
       const slug = parts[2]
