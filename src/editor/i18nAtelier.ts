@@ -2,11 +2,16 @@ import { getLang } from './i18n.ts'
 
 /** UI words for Web Atelier, the door, the walk, the badge editor and Move My Home (en / zh). */
 const en = {
+  'reset.title': 'Start over',
+  'reset.button': 'Delete this home from this device',
+  'reset.body': 'Removes your entries, room and website from this device only, so you can start fresh or reset a demo copy. A website you already published stays online until you close the door. Download a private backup first if you may want it back.',
+  'reset.confirm': 'Delete everything on this device? This cannot be undone. Your published website (if any) stays online until you close the door.',
   'setup.more': 'Address, house and pet (optional)',
   'setup.style': 'Website style',
   'setup.styleHint': 'Only a starting point. You can change everything later in Web Atelier.',
   'demo.pitch': 'Not ready to move in? Explore a fully decorated demo home first. It is your own copy and stays on this device.',
   'demo.try': 'Try a demo home',
+  'demo.visit': 'Look around first: three published demo homes (fictional owners)',
   'demo.pick': 'Pick a demo home',
   'demo.badge': 'Demo home',
   'demo.copyNote': 'This is your private copy of a demo home. Nothing you change here affects the public demo sites.',
@@ -322,11 +327,16 @@ const en = {
 export type AtelierKey = keyof typeof en
 
 const zh: Record<AtelierKey, string> = {
+  'reset.title': '重新开始',
+  'reset.button': '从这台设备删除这个家',
+  'reset.body': '只会清除这台设备上的日记、房间和网站，方便你重新开始或重置示范副本。已经发布的网站会继续在线，直到你关门。以后可能想找回的话，请先下载私人备份。',
+  'reset.confirm': '删除这台设备上的所有内容？此操作无法撤销。已发布的网站（如有）会继续在线，直到你关门。',
   'setup.more': '地址、房屋和宠物（可选）',
   'setup.style': '网站风格',
   'setup.styleHint': '只是一个起点。之后在网站装修室里，一切都可以改。',
   'demo.pitch': '还没想好搬进来？先逛逛一个装修好的示范家园。那是你自己的副本，只保存在这台设备上。',
   'demo.try': '试试示范家园',
+  'demo.visit': '先逛逛：三个已发布的示范家园（主人是虚构的）',
   'demo.pick': '选一个示范家园',
   'demo.badge': '示范家园',
   'demo.copyNote': '这是示范家园的私人副本。你在这里做的修改不会影响公开的示范网站。',

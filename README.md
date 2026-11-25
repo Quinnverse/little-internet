@@ -1,115 +1,112 @@
 # Little Internet
 
-**Your world, your web.** A small 3D home that remembers your life, and a personal website you can take with you.
+**The internet used to feel like a place. Let's make it feel like home again.**
+Build a home. Build a website. Build your own little internet.
 
-Kiroween 2026, **Resurrection** category. What it brings back is the GeoCities-era personal homepage (a plot of
-the web you decorate and own, friend links, a guestbook) and the answering machine. What is new is a lit 3D room
-in the browser, memories that become objects, and a site you can export and keep running without us.
+Kiroween 2026, **Resurrection** category. What comes back is the **GeoCities-era personal homepage**: a plot of
+the web you decorate by hand and own, with a guestbook, friend links, 88×31 badges and a **webring** you walk without
+an algorithm. What is new: a lit 3D room in the browser, a visual website editor (not a template picker), life entries
+that can become objects on a shelf, private-by-default publishing, and a site you can export and run without us.
 
 ![Home on a phone](docs/screens/home-phone.png)
+![Web Atelier on a phone](docs/screens/atelier/atelier-phone-drawer.png)
 
-## How it works
+## Try it in one minute
 
-You open the app and you are in your house, with a pet. Things in the room are real:
+Open the app. No account. On the first screen either **look at three published demo homes** (fictional owners, each
+a different style) or press **Try a demo home** to get your own private copy to decorate, write in, publish and
+export. A copy lives on your device and has a different address, so it can never overwrite the public demos.
 
-| In the room | What it does |
-|---|---|
-| Diary on the desk | Write an entry (private by default). Optionally pick a keepsake for it. |
-| Keepsakes (shell, candle, photo frame, cassette, ...) | Objects **you** choose for an entry. Tap one to reopen the entry. |
-| Computer | Your website: preview as a visitor, publish, download, friends, webring, guestbook inbox. |
-| Answering machine | Record or choose your own voice. Mark one as the welcome message. |
-| Pet | Remembers what you wrote ("on this day", "when did I last write about..."), on your device only. |
-| Window | Day, night, or follow your clock. |
-| Front door | Preview what a visitor sees. |
+| Demo home | Owner (fictional) | Website | Room |
+|---|---|---|---|
+| The Book Nook | a reader who keeps notes | Literary: serif, long reading, bookshelf | sage walls, walnut floor, bookcase |
+| Somewhere by the Sea | a slow traveller | Scrapbook: paper, tape, polaroids, postcards | villa, sky walls, daylight |
+| The Midnight Internet | a hobbyist who hand-makes a homepage | Retro: tiled sky, window frames, badges, guestbook, webring | plum walls, checker floor, night |
 
-The same entries also live in a plain **Journal** list (search, visibility), because writing should not need
-hunting for a desk. One data model, three views: Home (3D), Journal (list), Web (generated site).
+They are ordinary projects built with the same data model, editor, publisher and renderer as yours.
 
-**Decorate**: house style (cabin or villa), wall colour, floor, light, furniture on a 6x6 floor, undo.
-**English and Chinese**, switchable at any time.
+## One world, three views, two ateliers
 
-### A visitor's first minute
+- **Home** (3D room): tap the diary, the answering machine, the shelf, the door, the computer.
+- **Journal**: the same entries as a plain, searchable list.
+- **Web**: your public website, generated from the same entries.
+- **Home Atelier** decorates the room. **Web Atelier** decorates the website: add, remove, drag to reorder and resize
+  components (Welcome, About, Diary, Photo gallery, Bookshelf, Memory collection, Audio welcome, Boo, Guestbook,
+  Cool links, Webring, 88×31 badge, Text, Image/GIF, Stickers, Dividers, Under construction); change background colour,
+  tiled patterns or an uploaded image, fonts, colours, borders, corners, shadows; add pages; set favicon and a
+  scrolling welcome banner; undo/redo; desktop and phone preview; save a draft; publish when ready.
+- Layout is a responsive column grid (not free absolute positioning), so a site cannot overflow a phone screen.
+- Starter styles are only starting points: Retro Internet, Scrapbook, Literary Journal, Blank Canvas.
 
-Open a published link. You are standing outside the house, at night or in daylight. Ring the doorbell, the door
-opens, the pet runs to greet you, you step in. The owner's welcome message is **offered, never autoplayed**.
-Tap a keepsake to read the public entry it belongs to. Leave a note in the guestbook; the owner reads it first.
-Without JavaScript or WebGL the same page is a normal static website. "Skip to website" is always there.
+## Neighbours without an algorithm
 
-![Visitor at the door](docs/screens/visitor-door.png)
-![Welcome message in the room](docs/screens/visitor-welcome.png)
+Join the **webring** on purpose. **Prev / Next / Random** link real published homes in join order (`/ring/`), with no
+ranking and no recommendations. Make your own **88×31 badge** (real PNG, copyable HTML). Saving a neighbour's badge is
+one-way: it does not follow anyone and grants no access.
 
-## Principles (enforced by tests)
+## Privacy and ownership
 
-- **Private by default.** Every entry, recording and keepsake starts private. Nothing rewards publishing.
-- **Private content never leaves the device.** The server only ever receives the public-projection site ZIP.
-  Property tests plant marker strings in private entries and check no exported file contains them.
-- **Take it with you.** Edit, Publish, Export, Run independently on another host, Re-import. This chain is checked
-  end to end in a real browser. Exports include the 3D room runtime (`room.js`, no CDN, no platform URL).
-- **No generated content from your text.** You pick the keepsake. The app never reads private text to decide.
+- **Private by default.** Every entry, recording and keepsake starts private. Publishing is always an explicit act.
+- **Draft vs published.** Editing never changes what visitors see until you press Publish. Hidden components are never
+  published. A diary component only ever shows entries that are public.
+- **Close the Door.** Deletes the published copy from the server: page, media, RSS, guestbook and webring entry. It
+  cannot recall copies others already downloaded, and the app says so.
+- **Move my home.** Website ZIP (HTML, CSS, JS, RSS, public media, 3D room runtime; opens offline and on any static host),
+  and a private backup of everything (never upload it). The public 3D home is part of the website ZIP; a separate
+  3D-only package is **not built**.
+- Published pages are served in a CSP `sandbox`, so a user's site cannot read the editor's data or keys.
+- No user-written HTML, JavaScript or iframes (video embeds are limited to YouTube/Vimeo ids).
 
 ## Run it
 
 ```bash
 npm install
-npm run build                # builds the visitor runtime, typechecks, builds the app
-npm run server               # app + publishing + guestbook on http://localhost:8787
-npm run dev                  # Vite dev server (publishing needs the server; set its address in the Computer panel)
-npm test                     # 88 unit and property tests, including the server
-npm run e2e                  # builds, starts server + a plain static host, drives headless Chromium (56 checks)
-                             # first time: npx playwright install chromium-headless-shell
+npm run build              # visitor runtime, typecheck, app
+npm run server             # app + publishing + webring on http://localhost:8787 (Node 22.18+)
+SERVER=http://localhost:8787 KEYS=./data/demo-keys.json node scripts/seed-demo.mjs   # publish the 3 demo homes
+npm test                   # unit + property tests
+npm run e2e:atelier        # builds, starts the server and a plain static host, drives headless Chromium
+                           # first time: npx playwright install chromium
+BROWSER=webkit BASE=http://localhost:8787 node scripts/e2e-browser.mjs   # cross-browser smoke (WebKit/Firefox/Chromium)
+BASE=https://your.host node scripts/live-check.mjs                       # acceptance check of a deployment
 ```
 
-Server settings (environment): `PORT`, `DATA_DIR`, `APP_DIR`, `HOST`, `TRUST_PROXY=1` behind a proxy.
-Needs Node 22.18+ (runs TypeScript directly, uses `node:sqlite`).
+Deploying to a server: [deploy/README.md](deploy/README.md) (status: written, not yet built in Docker).
 
-### Backend
+## Status (honest)
 
-`server/index.ts`: serves published sites at `/@slug/`, stores guestbook notes.
-A slug is claimed by the first publisher's key (created in the browser, never in a backup; the server keeps only
-its SHA-256). Uploads are validated (paths, extensions, sizes, matching `site.json`). Guestbook notes are plain text,
-length limited, rate limited, and **pending until the owner approves them**.
+| Area | State |
+|---|---|
+| Tests | 135 unit and property tests; 36 headless-Chromium end-to-end checks; 17-check cross-browser smoke (Chromium) |
+| Safari / WebKit | **Not tested**: the WebKit build cannot start in the dev sandbox. Run `scripts/e2e-browser.mjs` with `BROWSER=webkit` |
+| Real phones | **Not tested.** Checklist: [docs/REAL_DEVICE_CHECKLIST.md](docs/REAL_DEVICE_CHECKLIST.md) |
+| Real users | **Not tested.** None were run. A task script exists on branch `feat/online-publish-r1` (`docs/user-testing/`) |
+| Production | **Not deployed** from this repo yet. Owner deploys with `deploy/README.md` |
+| Figma | **Not updated** (no write access); screenshots in `docs/screens/` are from the running product |
+| Kiro | Specs, steering, one hook and mutation-checked property tests; see [docs/KIRO_TASKS.md](docs/KIRO_TASKS.md) |
+| Pixel World, Midnight Garden styles; separate 3D-only export; voice guestbook | not built |
+| Chinese strings | written without a native review |
 
-## 3D models (Blender)
+## 3D models
 
-Every object in the room, the pet and both houses are low-poly models built in **Blender 5 from code**
-(`assets/blender/build_props.py`, 59 models, reviewed in `assets/review/`). 42 of them form the kit the app uses:
-they are quantized (about 950 KB) and embedded in the app and in the exported `room.js`, so a published site still needs
-no CDN. Hotspots come from `hs_*` empties in the models, the computer screen shows a small homepage, lit materials
-(`emissive_*`) follow day and night, and the pet ghost plays its three clips (idle, move, sleep).
-
-If a model is missing, the app falls back to the same objects drawn in code (`src/room3d/builders.ts`).
-
-**Cost:** the visitor runtime `room.js` is about 2.1 MB (about 630 KB gzipped): three.js plus the models.
-
-### Hunyuan3D-2 (experiment, not shipped)
-
-`scripts/assets/` can turn a reference picture into a mesh with the public Hunyuan3D-2 Space (shape only; its
-text-to-3D and texture stages are off) and simplify it. It produced a bookcase (`assets/hunyuan/bookcase.glb`), but the
-app now uses the Blender version, so **no AI-generated model ships**. Hunyuan3D-2's license excludes the EU, UK and
-South Korea; check it before reusing that file.
+Every object in the room, the pet and both houses are low-poly models built in **Blender from code**
+(`assets/blender/build_props.py`). 42 of them form the kit the app uses (about 950 KB quantized, embedded in the app
+and in `room.js`, so a published site needs no CDN). If a model is missing, the app falls back to the same objects
+drawn in code (`src/room3d/builders.ts`). **No AI-generated model ships.** An earlier Hunyuan3D-2 experiment output
+was removed from the repository because that model's licence excludes the EU, UK and South Korea.
+Pixel stickers, demo photos and 88×31 badges are drawn in code (`src/core/pixels.ts`, `src/demo/`).
 
 ## Layout
 
 ```
-src/core/       pure TypeScript: schema, room rules, privacy projection, generator, ZIP, RSS
-src/room3d/     Three.js room, exterior, pet, props (shared by the app and the visitor runtime)
-src/runtime/    ghost.js and room-entry.ts (built to room.bundle.js, shipped in exports as room.js)
-src/editor/     the app: commands, store, i18n, UI
-server/         publishing and guestbook
-scripts/        e2e, asset pipeline, dev screenshots
-.kiro/          steering (product, tech, security) and specs, including specs/room3d
-docs/kiro-log.md  what happened while building, including what did not work
+src/core/       pure TypeScript: schema (v2), design model, privacy projection, renderer, CSS, ZIP, RSS
+src/editor/     the app: commands, store, i18n, UI, Web Atelier (ui/atelier/)
+src/room3d/     Three.js room, pet, props          src/runtime/  scripts shipped inside published sites
+src/demo/       the three demo homes + seeding      server/       publish, door, webring, guestbook
+deploy/         Docker, nginx, backup/restore       scripts/      e2e, live check, seeding, screenshots
+.kiro/          steering, specs (web-atelier, room3d, site-core, ...), hooks
 ```
-
-## Known limits
-
-- Phone browsers differ in WebGL speed. "Simple view" (Settings) swaps the 3D room for the same objects as cards.
-- Guestbook works only on the platform copy; exported copies on other hosts hide it by design.
-- Furniture is a small set (7 decor kinds, 8 keepsake kinds, 2 house styles). No shop, no forum, no town.
-- Ambient occlusion is not baked into the models yet, so the live room looks flatter than the Cycles renders.
-- Chinese strings were written without a native review.
-- Embedded videos and friend links point to other sites and can change after export.
 
 ## License
 
-MIT, see [LICENSE](./LICENSE).
+MIT, see [LICENSE](./LICENSE). Third-party licences and asset provenance: [docs/LICENSES.md](docs/LICENSES.md).

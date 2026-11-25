@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'preact/hooks'
+import { useEffect, useMemo, useState } from 'preact/hooks'
 import { HOUSES, defaultRoom, type House } from '../../core/room.ts'
 import { GHOST_COLORS, SITE_SLUG_PATTERN, type Project, type Result } from '../../core/schema.ts'
 import type { HomeData } from '../../room3d/view.ts'
@@ -8,6 +8,7 @@ import { DEMO_IDS, DEMO_TITLES, demoCopy } from '../../demo/homes.ts'
 import { getLang, setLang, t, useLang, type Key } from '../i18n.ts'
 import { suggestSiteSlug } from '../ids.ts'
 import { ta } from '../i18nAtelier.ts'
+import { ringHomes, siteUrl, type RingHome } from '../publish.ts'
 import { Field, GhostIcon } from './common.tsx'
 import { Icon } from './icons.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
@@ -22,6 +23,11 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
   const [house, setHouse] = useState<House>('cabin')
   const [style, setStyle] = useState<StyleId>('retro')
   const [demos, setDemos] = useState(false)
+  const [live, setLive] = useState<RingHome[]>([])
+  // Published demo homes on this server (real addresses, same webring that visitors walk).
+  useEffect(() => {
+    ringHomes('').then((h) => setLive(h.filter((x) => x.demo)), () => undefined)
+  }, [])
   const [petName, setPetName] = useState('Boo')
   const [petColor, setPetColor] = useState<(typeof GHOST_COLORS)[number]>('white')
   const [error, setError] = useState<string | null>(null)
@@ -63,6 +69,19 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
         </div>
 
         <div class="card demo-card">
+          {live.length > 0 && (
+            <div class="demo-links">
+              <p><strong>{ta('demo.visit')}</strong></p>
+              <ul>
+                {live.map((h) => (
+                  <li key={h.slug}>
+                    <a href={siteUrl(h.slug, '')} target="_blank" rel="noopener">{h.title}</a>
+                    <span class="muted small"> · {h.tagline}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           <p>{ta('demo.pitch')}</p>
           {!demos ? (
             <button type="button" class="btn btn-block" onClick={() => setDemos(true)}>{ta('demo.try')}</button>

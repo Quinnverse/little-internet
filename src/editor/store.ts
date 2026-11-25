@@ -3,6 +3,9 @@ import { parseProject, type Project, type Result } from '../core/schema.ts'
 import type { Command } from './commands.ts'
 import { idbGet, idbSet } from './idb.ts'
 
+/** Set while the owner is deleting this device's copy, so a late autosave cannot bring it back. */
+export const resetState = { on: false }
+
 const KEY = 'project'
 
 export type StoreState =
@@ -51,6 +54,7 @@ export function useProjectStore(): Store {
   const scheduleSave = useCallback((p: Project) => {
     window.clearTimeout(timer.current)
     timer.current = window.setTimeout(() => {
+      if (resetState.on) return
       idbSet(KEY, p).then(
         () => setSaveError(null),
         (e) => setSaveError(`Could not save on this device: ${String(e)}`),
@@ -61,7 +65,7 @@ export function useProjectStore(): Store {
   // Flush pending save when the page is hidden (mobile browsers may kill it).
   useEffect(() => {
     const flush = () => {
-      if (document.visibilityState === 'hidden' && current.current) {
+      if (document.visibilityState === 'hidden' && current.current && !resetState.on) {
         window.clearTimeout(timer.current)
         idbSet(KEY, current.current).catch(() => {})
       }

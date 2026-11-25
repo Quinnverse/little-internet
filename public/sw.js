@@ -1,17 +1,29 @@
 // Little Internet editor service worker.
 // 1. Serves the live preview (generated site files) from Cache Storage under ./preview/.
-// 2. Keeps the editor usable offline after the first visit (network first, cache fallback).
+// 2. Keeps the editor app shell usable offline after the first visit (network first, cache fallback).
+// It must NEVER touch the API, published sites (/@slug/), the webring or health checks: those can hold
+// owner-only data (guestbook inbox) or content that a closed door has to make unreachable.
 const PREVIEW_CACHE = 'li-preview'
-const SHELL_CACHE = 'li-shell-v1'
+const SHELL_CACHE = 'li-shell-v2'
+const NEVER = /(^|\/)(api|ring)(\/|$)|\/healthz$|\/@[a-z0-9-]+(\/|$)/
 
 self.addEventListener('install', () => self.skipWaiting())
-self.addEventListener('activate', (event) => event.waitUntil(self.clients.claim()))
+self.addEventListener('activate', (event) =>
+  event.waitUntil(
+    // Older versions cached everything, API responses included. Drop those caches.
+    caches
+      .keys()
+      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('li-shell-') && k !== SHELL_CACHE).map((k) => caches.delete(k))))
+      .then(() => self.clients.claim()),
+  ),
+)
 
 self.addEventListener('fetch', (event) => {
   const req = event.request
   if (req.method !== 'GET') return
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
+  if (NEVER.test(url.pathname)) return
 
   const scope = new URL(self.registration.scope)
   const previewBase = new URL('preview/', scope)

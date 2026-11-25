@@ -1,6 +1,10 @@
 import { useState } from 'preact/hooks'
 import { GHOST_COLORS, SITE_SLUG_PATTERN } from '../../core/schema.ts'
 import { compose, updateGhost, updateSite } from '../commands.ts'
+import { idbDelete } from '../idb.ts'
+import { resetState } from '../store.ts'
+import { ta } from '../i18nAtelier.ts'
+import { Icon } from './icons.tsx'
 import { setLang, t, useLang, type Key } from '../i18n.ts'
 import { Field, GhostIcon, run, Sheet, type Ctx } from './common.tsx'
 
@@ -77,6 +81,27 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
         <input type="checkbox" checked={ghost.enabled} onChange={(e) => run(ctx, updateGhost({ enabled: e.currentTarget.checked }))} />
         <span>{t('settings.petOn')}</span>
       </label>
+      <h3>{ta('reset.title')}</h3>
+      <div class="card card-warn">
+        <p class="small">{ta('reset.body')}</p>
+        <button
+          type="button"
+          class="btn btn-danger btn-block"
+          onClick={async () => {
+            if (!confirm(ta('reset.confirm'))) return
+            resetState.on = true
+            try {
+              await idbDelete('project')
+              window.location.replace(window.location.pathname)
+            } catch (e) {
+              resetState.on = false
+              ctx.toast(String(e), 'error')
+            }
+          }}
+        >
+          <Icon name="trash" size={18} /> {ta('reset.button')}
+        </button>
+      </div>
       <label class="switch-row">
         <input type="checkbox" checked={props.flat} onChange={(e) => props.setFlat(e.currentTarget.checked)} />
         <span>
