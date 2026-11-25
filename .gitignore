@@ -35,3 +35,5 @@ dist-ssr
 .e2e-atelier/
 .demo-run/
 data/
+.img-test/
+deploy/.previous-image

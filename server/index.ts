@@ -554,6 +554,11 @@ export function createApp(opts: AppOptions): {
       throw new HttpError(404, 'Not found')
     }
 
+    if (path === '/healthz') {
+      db.prepare('SELECT 1').get()
+      return json(res, 200, { status: 'ok', sites: (db.prepare('SELECT COUNT(*) AS n FROM sites').get() as { n: number }).n })
+    }
+
     if (req.method !== 'GET' && req.method !== 'HEAD') throw new HttpError(405, 'Method not allowed')
 
     // Webring: /ring/ (directory) and /ring/:slug/prev|next|random (redirects, like the old CGI rings)

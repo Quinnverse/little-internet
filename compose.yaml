@@ -1,0 +1,15 @@
+# Little Internet on its own subdomain. Binds only 127.0.0.1:18090; the host's nginx terminates HTTPS.
+name: little-internet
+services:
+  app:
+    build: .
+    image: little-internet:${TAG:-local}
+    restart: unless-stopped
+    environment:
+      PUBLIC_BASE_URL: ${PUBLIC_BASE_URL:-https://little.quinnverse.tech}
+    ports:
+      - "127.0.0.1:${PORT:-18090}:8787"
+    volumes:
+      - little-internet-v3:/data
+volumes:
+  little-internet-v3:
