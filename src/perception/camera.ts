@@ -23,6 +23,7 @@ export const cameraSupported = () => typeof navigator !== 'undefined' && !!navig
 export class CameraSession {
   private epoch=0
   private face: import('./face.ts').FaceTracker|null=null
+  private lastVideoTime = -1
   private lastFace=0
   private stream: MediaStream | null = null
   private tracker: HandTracker | null = null
@@ -45,6 +46,8 @@ export class CameraSession {
     onEvent: (e: PerceptionEvent) => void
     onState: (s: CamState, message?: string) => void
     onHint?: (h: CamHint) => void
+    preferCPU?: boolean
+    hands?: boolean
     onFace?: (cue:import('./face.ts').FaceCue)=>void
     onFrame?: (hands: readonly Hand[]) => void
   }
@@ -62,6 +65,7 @@ export class CameraSession {
   async start(): Promise<void> {
     if (this.running) return
     const epoch=++this.epoch
+    this.lastVideoTime = -1
     this.cb.onState('asking')
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false })
@@ -79,9 +83,11 @@ export class CameraSession {
       this.video.playsInline = true
       await this.video.play()
       if(epoch!==this.epoch)return
-      const tracker=await createHandTracker('VIDEO')
-      if(epoch!==this.epoch){tracker.close();return}
-      this.tracker=tracker
+      if (this.cb.hands !== false) {
+        const tracker = await createHandTracker('VIDEO', this.cb.preferCPU)
+        if (epoch !== this.epoch) { tracker.close(); return }
+        this.tracker = tracker
+      }
       if(this.cb.onFace){
         const {createFaceTracker}=await import('./face.ts')
         if(epoch!==this.epoch)return
@@ -126,13 +132,14 @@ export class CameraSession {
   }
 
   private tick() {
-    if (!this.running || !this.tracker) return
+    if (!this.running) return
     if (document.hidden) return
     const t0 = performance.now()
-    if (this.video.readyState >= 2 && this.video.videoWidth > 0) {
+    if (this.video.readyState >= 2 && this.video.videoWidth > 0 && this.video.currentTime !== this.lastVideoTime) {
+      this.lastVideoTime = this.video.currentTime
       let hands: Hand[] = []
       try {
-        hands = this.tracker.detect(this.video, t0)
+        hands = this.tracker?.detect(this.video, t0) ?? []
       } catch {
         hands = []
       }

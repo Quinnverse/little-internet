@@ -228,6 +228,15 @@ async function claim(d: MailDeps, req: IncomingMessage, res: ServerResponse, me:
   // Claiming is the same act as the first publish: the first key wins. Re-claiming needs that key.
   const m = /^Bearer ([0-9a-f]{64})$/.exec(String(req.headers.authorization ?? ''))
   if (!m) throw new d.HttpError(401, 'Missing or malformed key')
+  if (d.exists(me)) {
+    try {
+      d.owner(req, me)
+      d.json(res, 200, { slug: me })
+      return
+    } catch {
+      // Failed ownership checks still consume the same anti-abuse budget as new claims.
+    }
+  }
   if (!d.allow(`claim:${d.ip(req)}`, 20, 3600_000)) throw new d.HttpError(429, 'Too many requests')
   if (!d.claimIdentity(me, m[1]!)) throw new d.HttpError(403, 'That name is taken')
   d.json(res, 200, { slug: me })

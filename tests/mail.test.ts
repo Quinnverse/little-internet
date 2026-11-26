@@ -46,6 +46,11 @@ describe('Heart Mail between independent identities', () => {
     expect((await call('ana', 'GET', '/api/people/ana/mail', undefined, 'z'.repeat(64))).status).toBe(403)
   })
 
+  it('opening an existing mailbox repeatedly does not exhaust identity registration', async () => {
+    for (let i = 0; i < 24; i++) expect((await call('ana', 'PUT', '/api/people/ana')).status).toBe(200)
+    expect((await call('ben', 'PUT', '/api/people/ana')).status).toBe(403)
+  })
+
   it('H2: you can only send to someone who accepted you', async () => {
     expect((await send('ana', 'ben')).status).toBe(403) // not friends yet
     await call('ana', 'POST', '/api/people/ana/friends', { to: 'ben' })

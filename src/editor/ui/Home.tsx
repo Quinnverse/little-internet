@@ -77,17 +77,13 @@ export function Home(props: { ctx: Ctx }) {
   const [unread, setUnread] = useState(0)
   const lastUnread = useRef<number | null>(null)
   useEffect(() => {
-    let on = false
-    try {
-      on = localStorage.getItem(PEOPLE_ON) === '1'
-    } catch {
-      /* ignore */
-    }
-    if (!on) return
     const slug = ctx.project.site.slug
     let stop = false
+    let busy = false
     const tick = async () => {
-      if (document.visibilityState !== 'visible') return
+      if (document.visibilityState !== 'visible' || busy) return
+      try { if (localStorage.getItem(PEOPLE_ON) !== '1') return } catch { return }
+      busy = true
       try {
         await flushOutbox(slug, savedServer())
         const n = (await fetchInbox(slug, savedServer())).mail.filter((m) => m.unread).length
@@ -101,12 +97,16 @@ export function Home(props: { ctx: Ctx }) {
         setUnread(n)
       } catch {
         /* offline: keep the last known count, no false news */
-      }
+      } finally { busy = false }
     }
     void tick()
+    window.addEventListener('online', tick)
+    document.addEventListener('visibilitychange', tick)
     const id = window.setInterval(tick, 25_000)
     return () => {
       stop = true
+      window.removeEventListener('online', tick)
+      document.removeEventListener('visibilitychange', tick)
       window.clearInterval(id)
     }
   }, [ctx.project.site.slug, view])
@@ -281,10 +281,14 @@ export function Home(props: { ctx: Ctx }) {
       )}
 
       {perceive&&!panel&&!decorating&&<div class="home-perception">
-        <CameraControl mode="boo" immersive hint="Boo" onFace={cue=>view?.pet.faceCue(cue)} onAction={action=>{
+        <CameraControl mode="boo" immersive softwareRenderer={!!view?.softwareRenderer} hint="Boo" onFace={cue=>view?.pet.faceCue(cue)} onAction={action=>{
           if(action.kind==='cursor')view?.pet.follow(action.x,action.y)
           if(action.kind==='boo'){view?.pet.respond(action.reaction);if(action.reaction==='catch-heart')setCaught(true)}
         }}/>
+        {!caught && view && <button class="btn btn-small" onClick={()=>{
+          view.pet.respond('catch-heart')
+          setCaught(true)
+        }}>♡ {lang==='zh'?'递给 Boo 一颗心':'Give Boo a heart'}</button>}
         {caught&&<button class="btn" onClick={()=>{setCaught(false);setHeartLetter(true);open({kind:'people'})}}>♥ {lang==='zh'?'写一封爱心信':'Make a heart letter'}</button>}
       </div>}
       <header class="hud-top">
