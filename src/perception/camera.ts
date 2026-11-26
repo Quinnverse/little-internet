@@ -20,6 +20,8 @@ export const cameraSupported = () => typeof navigator !== 'undefined' && !!navig
  * only small perception events go out. `stop()` releases the camera (the browser's recording light goes out).
  * The loop slows itself down when the device is slow and pauses while the tab is hidden.
  */
+let activeCamera: CameraSession | null = null
+
 export class CameraSession {
   private epoch=0
   private face: import('./face.ts').FaceTracker|null=null
@@ -49,7 +51,7 @@ export class CameraSession {
     preferCPU?: boolean
     hands?: boolean
     onFace?: (cue:import('./face.ts').FaceCue)=>void
-    onFrame?: (hands: readonly Hand[]) => void
+    onFrame?: (hands: readonly Hand[], facePresent:boolean) => void
   }
 
   constructor(video: HTMLVideoElement, cb: CameraSession['cb'], sessionId: string) {
@@ -63,7 +65,9 @@ export class CameraSession {
   }
 
   async start(): Promise<void> {
-    if (this.running) return
+    if (activeCamera === this) return
+    activeCamera?.stop()
+    activeCamera = this
     const epoch=++this.epoch
     this.lastVideoTime = -1
     this.cb.onState('asking')
@@ -73,6 +77,7 @@ export class CameraSession {
       this.stream=stream
     } catch (e) {
       if(epoch!==this.epoch)return
+      activeCamera = null
       this.cb.onState('error', describeCameraError(e))
       return
     }
@@ -109,13 +114,17 @@ export class CameraSession {
 
   stop() {
     ++this.epoch
-    this.face?.close();this.face=null;this.canvas=null
+    if (activeCamera === this) activeCamera = null
+    this.canvas = null
     this.running = false
     window.clearTimeout(this.timer)
     document.removeEventListener('visibilitychange', this.onVis)
     this.stream?.getTracks().forEach((t) => t.stop())
     this.stream = null
+    this.video.pause()
     this.video.srcObject = null
+    try { this.face?.close() } catch { /* continue releasing the hand tracker */ }
+    this.face = null
     try {
       this.tracker?.close()
     } catch {
@@ -141,13 +150,15 @@ export class CameraSession {
       try {
         hands = this.tracker?.detect(this.video, t0) ?? []
       } catch {
-        hands = []
+        this.stop()
+        this.cb.onState('error', 'Hand tracking interrupted. Restart the camera to retry.')
+        return
       }
       if(this.face && t0-this.lastFace>=Math.max(80,this.ema*3)){
         this.lastFace=t0
         try{const cue=this.face.detect(this.video,t0);if(cue)this.cb.onFace?.(cue)}catch{this.stop();this.cb.onState('error','Face tracking interrupted. Start again to retry.');return}
       }
-      this.cb.onFrame?.(hands)
+      this.cb.onFrame?.(hands, this.face?.present ?? false)
       if (hands.length) this.sawHandAt = t0
       this.handsNow = hands.length
       for (const e of this.rec.feed({ t: t0, hands })) this.cb.onEvent(e)

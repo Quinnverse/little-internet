@@ -133,3 +133,11 @@ export async function flushOutbox(slug: string, server: string): Promise<number>
   }
   return sentCount
 }
+
+export async function converse(slug:string,messages:{role:string;content:string}[],sources:string) {
+  await claim(slug,'')
+  const key=await keyFor(slug)
+  const response=await fetch('/api/boo/'+encodeURIComponent(slug),{method:'POST',credentials:'same-origin',headers:{Authorization:'Bearer '+key,'Content-Type':'application/json'},body:JSON.stringify({messages,sources}),signal:AbortSignal.timeout(22000)})
+  if(!response.ok)throw Error('Model unavailable')
+  return (await response.json() as {answer:string}).answer
+}

@@ -109,6 +109,9 @@ export function LetterAtelier(props: {
   const [to, setTo] = useState(props.initialTo ?? '')
   const [shareable, setShareable] = useState(false)
   const [status, setStatus] = useState<{ kind: 'sending' | 'failed' | 'sent'; text: string } | null>(null)
+  const recordingEpoch = useRef(0)
+  const latestLetter = useRef(letter)
+  latestLetter.current = letter
   const rec = useRef<RecorderHandle | null>(null)
   const [recording, setRecording] = useState(false)
   const paperRef = useRef<HTMLDivElement>(null)
@@ -141,7 +144,12 @@ export function LetterAtelier(props: {
     const id = window.setTimeout(() => void (letterIsEmpty(letter) ? idbDelete(DRAFT) : idbSet(DRAFT, letter)).catch(() => {}), 500)
     return () => window.clearTimeout(id)
   }, [letter])
-  useEffect(() => () => rec.current?.cancel(), [])
+  useEffect(() => {
+    const stop = () => { recordingEpoch.current++; rec.current?.cancel(); rec.current=null; setRecording(false) }
+    const background = () => { if(document.hidden) stop() }
+    document.addEventListener('visibilitychange', background)
+    return () => { document.removeEventListener('visibilitychange', background); stop() }
+  }, [mode])
 
   const commit = (next: Letter) => {
     past.current.push(letter)
@@ -242,28 +250,23 @@ export function LetterAtelier(props: {
   }
 
   const toggleVoice = async () => {
-    if (recording) {
-      try {
-        const r = await rec.current!.stop()
-        rec.current = null
-        setRecording(false)
-        commit({ ...letter, voice: { mime: r.mime as 'audio/webm', data: voiceToDataUrl(r.mime, r.data), ms: Math.min(30_000, r.durationMs) } })
-      } catch (e) {
-        setRecording(false)
-        props.toast((e as Error).message, 'error')
-      }
-      return
+    const stop = async (handle: RecorderHandle) => {
+      rec.current = null
+      setRecording(false)
+      const result = await handle.stop()
+      commit({ ...latestLetter.current, voice: { mime:result.mime as 'audio/webm', data:voiceToDataUrl(result.mime,result.data), ms:result.durationMs } })
     }
     try {
-      const h = await startRecording(() => {})
-      rec.current = h
+      if (rec.current) return await stop(rec.current)
+      const epoch = ++recordingEpoch.current
+      const handle = await startRecording(() => {})
+      if (epoch !== recordingEpoch.current) { handle.cancel(); return }
+      rec.current = handle
       setRecording(true)
       window.setTimeout(() => {
-        if (rec.current === h) void toggleVoice()
+        if (rec.current === handle) void stop(handle).catch(e=>props.toast(describeMicError(e),'error'))
       }, VOICE_LIMIT_MS)
-    } catch (e) {
-      props.toast(describeMicError(e), 'error')
-    }
+    } catch (e) { props.toast(describeMicError(e),'error') }
   }
 
   const send = async (l: Letter = letter) => {
@@ -335,7 +338,7 @@ export function LetterAtelier(props: {
           <div class="letter-preview" dangerouslySetInnerHTML={{ __html: letterToSvg(letter, { width: 280 }) }} role="img" aria-label={letterSummary(letter, getLang()) || ta('let.title')} />
           <div class="letter-send-form">
             {props.friends.length === 0 ? (
-              <p class="muted">{ta('let.noFriends')}</p>
+              <div><p class="muted">{ta('let.noFriends')}</p><button class="btn" onClick={()=>props.toast(getLang()==='zh'?'Boo 收下了这封本地练习信。没有发送给好友。':'Boo received this local practice letter. No remote mail was sent.')}>{getLang()==='zh'?'给 Boo 练习（仅本机）':'Practice with Boo (local only)'}</button></div>
             ) : (
               <fieldset class="field">
                 <legend class="field-label">{ta('let.to')}</legend>
@@ -398,6 +401,7 @@ export function LetterAtelier(props: {
 
   return (
     <Sheet title={ta('let.title')} onClose={props.onClose} wide>
+      <p>{getLang()==='zh'?'选一张喜欢的信纸，写一句话，或者只放一颗爱心。':'Choose a paper you love, write one line, or just add a heart.'}</p>
       <div class="letter-editor" onKeyDown={onKey as unknown as (e: Event) => void}>
         <div class="letter-stage">
           <div class="letter-paper" ref={paperRef} onPointerDown={(e) => e.target === e.currentTarget && setSel(null)}>

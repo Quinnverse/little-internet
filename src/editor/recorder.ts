@@ -35,7 +35,9 @@ export async function startRecording(onAutoStop: (r: Promise<Recorded>) => void)
   }
   const stream = await navigator.mediaDevices.getUserMedia({ audio: { echoCancellation: true, noiseSuppression: true } })
   const type = CANDIDATES.find((t) => MediaRecorder.isTypeSupported?.(t))
-  const recorder = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 64_000 } : undefined)
+  let recorder: MediaRecorder
+  try { recorder = new MediaRecorder(stream, type ? { mimeType: type, audioBitsPerSecond: 64_000 } : undefined) }
+  catch(error) { stream.getTracks().forEach(track=>track.stop()); throw error }
   const chunks: Blob[] = []
   recorder.addEventListener('dataavailable', (e) => e.data.size && chunks.push(e.data))
   const startedAt = performance.now()
@@ -66,7 +68,7 @@ export async function startRecording(onAutoStop: (r: Promise<Recorded>) => void)
 
   const timer = window.setTimeout(() => onAutoStop(stop()), MAX_RECORDING_MS)
   recorder.addEventListener('stop', () => window.clearTimeout(timer), { once: true })
-  recorder.start(1000)
+  try { recorder.start(1000) } catch(error) { window.clearTimeout(timer); release(); throw error }
 
   return {
     startedAt,

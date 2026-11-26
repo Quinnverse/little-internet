@@ -1,6 +1,6 @@
 /** Local motion cues only. No face embeddings, persistence or emotion inference. */
 export type FaceCue = 'smile' | 'blink' | 'left' | 'right'
-export type FaceTracker = { detect(video:HTMLVideoElement,time:number):FaceCue|null; close():void }
+export type FaceTracker = { readonly present:boolean; detect(video:HTMLVideoElement,time:number):FaceCue|null; close():void }
 export async function createFaceTracker():Promise<FaceTracker>{
  const {FaceLandmarker,FilesetResolver}=await import('@mediapipe/tasks-vision')
  const files=await FilesetResolver.forVisionTasks(new URL('vision/wasm',document.baseURI).href)
@@ -10,8 +10,10 @@ export async function createFaceTracker():Promise<FaceTracker>{
   outputFaceBlendshapes:true,outputFacialTransformationMatrixes:true,
  })
  let candidate:FaceCue|null=null,since=0,latched:FaceCue|null=null,last=0
- return {close:()=>model.close(),detect(video,time){
+ let present=false
+ return {get present(){return present},close:()=>model.close(),detect(video,time){
   const result=model.detectForVideo(video,time)
+  present=result.faceLandmarks.length>0
   const scores=new Map(result.faceBlendshapes[0]?.categories.map(v=>[v.categoryName,v.score]))
   const pair=(side:string)=>Math.min(scores.get(side+'Left')??0,scores.get(side+'Right')??0)
   const m=result.facialTransformationMatrixes[0]?.data

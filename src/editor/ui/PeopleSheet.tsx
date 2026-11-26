@@ -45,6 +45,7 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
   const server = savedServer()
   const [tab, setTab] = useState<Tab>(props.startTab ?? 'inbox')
   const [ready, setReady] = useState<'wait' | 'ok' | 'fail'>('wait')
+  const [attempt,setAttempt] = useState(0)
   const [err, setErr] = useState('')
   const [fr, setFr] = useState<Friends>({ friends: [], incoming: [], outgoing: [], blocked: [] })
   const [mail, setMail] = useState<MailItem[]>([])
@@ -97,7 +98,7 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
       alive.current = false
       window.clearInterval(id)
     }
-  }, [slug, server])
+  }, [slug, server, attempt])
 
   const guard = async (fn: () => Promise<unknown>, okMsg?: string) => {
     try {
@@ -258,7 +259,7 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
         {ready === 'wait' && <p class="muted" role="status">{ta('mail.connecting')}</p>}
         {err && (
           <p class="error small" role="alert">
-            {err} <button type="button" class="btn btn-small" onClick={() => void refresh()}>{ta('let.retry')}</button>
+            {err} <button type="button" class="btn btn-small" onClick={() => {setReady('wait');setAttempt(a=>a+1)}}>{ta('let.retry')}</button>
           </p>
         )}
         <div class="choice-row" role="tablist">
@@ -269,7 +270,7 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
               {k === 'friends' && fr.incoming.length > 0 && <span class="badge-count">{fr.incoming.length}</span>}
             </button>
           ))}
-          <button type="button" class="btn btn-primary btn-small" disabled={ready !== 'ok'} onClick={() => setWriting({})}>
+          <button type="button" class="btn btn-primary btn-small" onClick={() => setWriting({})}>
             <Icon name="pen" size={16} /> {ta('mail.write')}
           </button>
           <button type="button" class="btn btn-small" disabled={ready !== 'ok' || fr.friends.length === 0} onClick={() => setWriting({ letter: template('heart') })}>{ta('mail.sendHeart')}</button>
@@ -296,6 +297,8 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
 
         {tab === 'friends' && (
           <div class="friends">
+            <p>{getLang()==='zh'?'我的好友码':'My friend code'} <strong>@{slug}</strong></p>
+            <p class="muted small">{getLang()==='zh'?'把好友码发给朋友。朋友在自己的信箱输入此码并发送请求，你在此处点接受。':'Share this code. Your friend enters it in their mailbox and sends a request. Accept it here.'}</p>
             <form
               class="choice-row"
               onSubmit={async (e) => {

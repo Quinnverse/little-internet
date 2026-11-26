@@ -441,6 +441,16 @@ export function createApp(opts: AppOptions): {
       if (parts[1] === 'ring' && parts.length === 2 && req.method === 'GET') {
         return json(res, 200, { homes: ringList() }, { 'Cache-Control': 'no-cache' })
       }
+      if (parts[1] === 'boo' && parts.length === 3 && req.method === 'POST') {
+        const slug = parts[2]!
+        owner(req,slug)
+        if (process.env.BOO_CHAT_OWNER !== slug) throw new HttpError(503,'Boo model is not configured for this home')
+        if (!allow('boo:'+slug,20,60_000)) throw new HttpError(429,'Please try again shortly')
+        const data = JSON.parse((await readBody(req,48_000)).toString('utf8'))
+        const {chatWithBoo} = await import('./boo-chat.ts')
+        try {return json(res,200,{answer:await chatWithBoo(data)},{'Cache-Control':'no-store'})}
+        catch {throw new HttpError(503,'Model unavailable')}
+      }
       if (parts[1] === 'people') {
         const done = await handleMail(
           {

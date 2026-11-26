@@ -3,11 +3,11 @@ import { EMPTY_CONTEXT, understand, type BooAction, type BooCard, type BooContex
 import { getLang } from '../i18n.ts'
 import type { Post } from '../../core/schema.ts'
 import { addTagToMany, setManyVisibility, toggleStar } from '../commands.ts'
-import { loadModelSettings, rephrase, saveModelSettings, endpointAllowed, type ModelSettings } from '../booModel.ts'
+import { converse } from '../people.ts'
 import { t, useLang } from '../i18n.ts'
 import { ta } from '../i18nAtelier.ts'
 import { freeSlotsAll } from '../../core/room.ts'
-import { Field, GhostIcon, Sheet, type Ctx } from './common.tsx'
+import { GhostIcon, Sheet, type Ctx } from './common.tsx'
 import { EntrySheet } from './EntrySheet.tsx'
 import { Icon } from './icons.tsx'
 import { CameraControl } from './CameraControl.tsx'
@@ -45,7 +45,10 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [bctx, setBctx] = useState<BooContext>(EMPTY_CONTEXT)
-  const [settings, setSettings] = useState<ModelSettings>(() => loadModelSettings())
+  const [model,setModel] = useState(false)
+  const [share,setShare] = useState(false)
+  const [modelError,setModelError] = useState(false)
+  const chat = useRef<{role:string;content:string}[]>([])
   const [showVoice, setShowVoice] = useState(false)
   const end = useRef<HTMLDivElement>(null)
   const freeSlots = useMemo(() => freeSlotsAll(ctx.project.room), [ctx.project.room])
@@ -64,7 +67,15 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
     setBctx(out.ctx)
     setTurns((cur) => [...cur, { who: 'me', text: q }])
     setBusy(true)
-    const warm = settings.enabled ? await rephrase(settings, q, out.reply.text, out.reply.cards, name, lang) : out.reply.text
+    let warm = out.reply.text
+    setModelError(false)
+    if(model){
+      const messages=[...chat.current.slice(-10),{role:'user',content:q}]
+      try {
+        warm=await converse(ctx.project.site.slug,messages,share?out.reply.cards.slice(0,3).map(c=>c.title+' · '+c.date+' · '+c.excerpt).join('\n'):'')
+        chat.current=[...messages,{role:'assistant',content:warm}]
+      } catch {setModelError(true)}
+    }
     setBusy(false)
     setTurns((cur) => [...cur, { who: 'boo', text: warm, cards: out.reply.cards, proposal: out.reply.proposal, chips: out.reply.chips, open: out.reply.open }])
     if (out.reply.open === 'write') props.onWrite?.()
@@ -88,13 +99,6 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
 
   const chips = turns.length === 0 ? understand({ text: 'help', ctx: EMPTY_CONTEXT, posts, lang, now: new Date(), name }).reply.chips : (turns[turns.length - 1]!.chips ?? [])
 
-  const updateSettings = (patch: Partial<ModelSettings>) => {
-    const next = { ...settings, ...patch }
-    setSettings(next)
-    saveModelSettings(next)
-  }
-  const badEndpoint = settings.endpoint !== '' && !endpointAllowed(settings.endpoint)
-
   return (
     <Sheet title={name} onClose={props.onClose}>
       <div class="owner-ghost-head">
@@ -104,7 +108,7 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
             <strong>{t('pet.hi', { name })}</strong>
           </p>
           <p class="muted small">
-            <Icon name="lock" size={13} /> {settings.enabled ? ta('boo.modelOn') : t('pet.local')}
+            <Icon name="lock" size={13} /> {model && !modelError ? (lang==='zh'?'模型对话':'Model chat') : t('pet.local')}
           </p>
         </div>
       </div>
@@ -178,6 +182,7 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
         </div>
       )}
 
+      {modelError && <p role="status">{lang==='zh'?'模型未连接，本条使用本地检索。':'Model unavailable. This reply used local search.'}</p>}
       <form
         class="boo-input"
         onSubmit={(e) => {
@@ -194,29 +199,8 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
       </button>
       {showVoice && (
         <div class="card boo-voice">
-          <p class="small">{ta('boo.voiceBody')}</p>
-          <label class="switch-row">
-            <input type="checkbox" checked={settings.enabled} onChange={(e) => updateSettings({ enabled: e.currentTarget.checked })} />
-            <span>{ta('boo.modelUse')}</span>
-          </label>
-          {settings.enabled && (
-            <>
-              <Field label={ta('boo.endpoint')} hint={badEndpoint ? ta('boo.endpointBad') : ta('boo.endpointHint')}>
-                <input value={settings.endpoint} inputMode="url" autocapitalize="off" aria-invalid={badEndpoint} placeholder="https://…/v1/chat/completions" onInput={(e) => updateSettings({ endpoint: e.currentTarget.value.trim() })} />
-              </Field>
-              <Field label={ta('boo.modelName')}>
-                <input value={settings.model} placeholder="model" onInput={(e) => updateSettings({ model: e.currentTarget.value.trim() })} />
-              </Field>
-              <Field label={ta('boo.apiKey')} hint={ta('boo.apiKeyHint')}>
-                <input type="password" value={settings.apiKey} autocomplete="off" onInput={(e) => updateSettings({ apiKey: e.currentTarget.value })} />
-              </Field>
-              <label class="switch-row">
-                <input type="checkbox" checked={settings.sendRecordText} onChange={(e) => updateSettings({ sendRecordText: e.currentTarget.checked })} />
-                <span>{ta('boo.sendRecords')}</span>
-              </label>
-              <p class="muted small">{settings.sendRecordText ? ta('boo.sendsRecords') : ta('boo.sendsQuestionOnly')}</p>
-            </>
-          )}
+          <label><input type="checkbox" checked={model} onChange={e=>{chat.current=[];setModel(e.currentTarget.checked);setModelError(false)}}/>{lang==='zh'?'将对话发送给主人配置的模型':'Send this conversation to the configured model'}</label>
+          {model && <label><input type="checkbox" checked={share} onChange={e=>{chat.current=[];setShare(e.currentTarget.checked)}}/>{lang==='zh'?'允许发送匹配档案的标题、日期和摘录':'Include matched archive titles, dates and excerpts'}</label>}
         </div>
       )}
     </Sheet>

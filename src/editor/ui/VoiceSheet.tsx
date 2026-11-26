@@ -31,7 +31,13 @@ export function VoiceSheet(props: { ctx: Ctx; onClose: () => void }) {
     const timer = window.setInterval(() => setElapsed(performance.now() - rec.startedAt), 200)
     return () => window.clearInterval(timer)
   }, [rec])
-  useEffect(() => () => recRef.current?.cancel(), [])
+  const epoch = useRef(0)
+  useEffect(() => {
+    const stop = () => { epoch.current++; recRef.current?.cancel(); recRef.current=null; setRec(null) }
+    const background = () => { if(document.hidden) stop() }
+    document.addEventListener('visibilitychange', background)
+    return () => { document.removeEventListener('visibilitychange', background); stop() }
+  }, [])
 
   const save = (r: Recorded) => {
     const id = randomId()
@@ -57,7 +63,11 @@ export function VoiceSheet(props: { ctx: Ctx; onClose: () => void }) {
     setError(null)
     if (recordings.length >= 20) return setError(t('voice.full'))
     try {
-      setRec(await startRecording((p) => finish(p)))
+      const attempt = ++epoch.current
+      const handle = await startRecording(p=>finish(p))
+      if (attempt !== epoch.current) {handle.cancel();return}
+      recRef.current=handle
+      setRec(handle)
     } catch (e) {
       setError(describeMicError(e))
     }
