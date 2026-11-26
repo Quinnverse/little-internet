@@ -23,6 +23,7 @@ import { LIGHTS } from '../../core/room.ts'
 import { Sheet } from './common.tsx'
 import { PEOPLE_ON, PeopleSheet } from './PeopleSheet.tsx'
 import {CameraControl} from './CameraControl.tsx'
+import { LivingClock } from './LivingClock.tsx'
 import { flushOutbox, inbox as fetchInbox } from '../people.ts'
 
 type Panel =
@@ -70,6 +71,10 @@ export function Home(props: { ctx: Ctx }) {
   // Quiet by default: names and markers show on hover/focus, or when the owner asks (Hints button or Settings).
   const [assistAlways, setAssistAlways] = useState(assistPref())
   const [peek, setPeek] = useState(false)
+  // The walking hint greets you once per device, then steps aside like a good host.
+  const [showHint, setShowHint] = useState(() => {
+    try { return localStorage.getItem('li-walk-hint') !== 'done' } catch { return true }
+  })
   // Letters: the server is contacted only after the owner has opened People once on this device.
   const [perceive,setPerceive]=useState(false)
   const [caught,setCaught]=useState(false)
@@ -110,6 +115,14 @@ export function Home(props: { ctx: Ctx }) {
       window.clearInterval(id)
     }
   }, [ctx.project.site.slug, view])
+  useEffect(() => {
+    if (!showHint) return
+    const id = window.setTimeout(() => {
+      setShowHint(false)
+      try { localStorage.setItem('li-walk-hint', 'done') } catch { /* ignore */ }
+    }, 9000)
+    return () => window.clearTimeout(id)
+  }, [showHint])
   const data = useMemo(() => toHomeData(ctx.project), [ctx.project])
   const history = useRef<Project[]>([])
   const [undoable, setUndoable] = useState(0)
@@ -295,6 +308,7 @@ export function Home(props: { ctx: Ctx }) {
         <div class="home-title">
           <h1>{ctx.project.site.title}</h1>
           {ctx.project.site.tagline && <p>{ctx.project.site.tagline}</p>}
+          <LivingClock />
         </div>
         <div class="hud-actions">
           <button class="round" aria-label="Boo perception" aria-pressed={perceive} onClick={()=>setPerceive(!perceive)}><Icon name="eye" size={18}/></button>
@@ -307,7 +321,7 @@ export function Home(props: { ctx: Ctx }) {
         </div>
       </header>
 
-      {!decorating && !flatMode && <p class="hud-hint">{t('hud.hint')}</p>}
+      {!decorating && !flatMode && showHint && <p class="hud-hint">{t('hud.hint')}</p>}
 
       {!decorating && (
         <nav class="dock" aria-label="Home">

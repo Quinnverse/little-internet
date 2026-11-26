@@ -159,6 +159,19 @@ input[type='checkbox'] { accent-color: var(--accent); }
 .home-title p { margin: 2px 0 0; font-size: 0.85rem; color: #6a5440; }
 .home:has(.scene.is-night) .home-title h1 { color: #fbefd8; text-shadow: 0 1px 8px rgba(0,0,0,.4); }
 .home:has(.scene.is-night) .home-title p { color: #d9c9ad; }
+.living-clock {
+  display: inline-flex; align-items: center; gap: 7px; margin-top: 7px;
+  padding: 4px 12px 4px 9px; border-radius: 999px; width: max-content;
+  background: rgba(255, 250, 240, 0.78); border: 1px solid rgba(255,255,255,.6);
+  backdrop-filter: blur(8px); box-shadow: 0 2px 10px rgba(60,35,20,.10);
+  font-size: 0.78rem; color: #6a5440; pointer-events: auto;
+}
+.lc-dot { width: 7px; height: 7px; border-radius: 50%; background: #e8a54b; box-shadow: 0 0 0 3px rgba(232,165,75,.18); }
+.lc-time { font-variant-numeric: tabular-nums; font-weight: 700; letter-spacing: .02em; color: #4a3224; }
+.lc-greet { opacity: .85; }
+.home:has(.scene.is-night) .living-clock { background: rgba(28, 22, 48, 0.72); color: #e8d8bd; border-color: rgba(255,255,255,.14); }
+.home:has(.scene.is-night) .lc-time { color: #fbefd8; }
+.home:has(.scene.is-night) .lc-dot { background: #9db4ff; box-shadow: 0 0 0 3px rgba(157,180,255,.2); }
 .hud-actions { display: flex; gap: 8px; pointer-events: auto; }
 .round {
   display: inline-grid; place-items: center; width: 44px; height: 44px; border-radius: 50%;

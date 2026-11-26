@@ -182,6 +182,13 @@ export class Pet {
     this.target.set(s[0], 0, s[1])
   }
 
+  /** Walk toward an arbitrary floor point (used to follow the owner's avatar). */
+  followTo(x: number, z: number) {
+    if (this.frozen || this.still) return
+    this.target.set(x, 0, z)
+    if (this.state === 'sleep') this.set('idle')
+  }
+
   set(state: PetState) {
     this.state = state
     this.stateT = 0

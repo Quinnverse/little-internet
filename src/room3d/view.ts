@@ -26,6 +26,7 @@ import { buildExterior, type Exterior } from './exterior.ts'
 import { kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
 import { getAnimations, getModel, kitReady } from './models.ts'
 import { Pet, type PetState } from './pet.ts'
+import { Avatar } from './avatar.ts'
 import { SLOT_POSES } from './slots.ts'
 
 export type HomeData = {
@@ -87,6 +88,9 @@ export class RoomView {
   readonly scene = new THREE.Scene()
   readonly camera = new THREE.PerspectiveCamera(32, 1, 0.04, 80)
   readonly pet: Pet
+  /** The owner's on-screen character. Walks where you tap; Boo follows. */
+  readonly avatar: Avatar
+  private followPet = true
   private opts: ViewOptions
   private root = new THREE.Group()
   private dynamic = new THREE.Group()
@@ -193,6 +197,8 @@ export class RoomView {
     this.pet = new Pet('white', opts.reduceMotion)
     if (kitReady()) this.pet.useModel(getModel('pet_ghost')!, getAnimations('pet_ghost'))
     this.scene.add(this.pet.group)
+    this.avatar = new Avatar(opts.reduceMotion)
+    this.scene.add(this.avatar.group)
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.34, 0.42, 36),
       new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0.95, depthWrite: false }),
@@ -235,6 +241,11 @@ export class RoomView {
       !prev || prev.house !== data.house || prev.wall !== data.wall || prev.floor !== data.floor || prev.welcome !== data.welcome || this.kitUsed !== kitReady()
     if (skinChanged) this.buildStatic(data)
     this.buildDynamic(data)
+    if (!prev) {
+      // Arrive near the front door with Boo close by.
+      this.avatar.place(2.5, 4.2)
+      this.pet.placeAt('rug')
+    }
     this.setNight(isNightNow(data.light), true)
     this.buildHotspots()
     this.dirty = true
@@ -528,6 +539,7 @@ export class RoomView {
     }
     this.root.visible = false
     this.dynamic.visible = false
+    this.avatar.group.visible = false
     this.mode = 'exterior'
     this.sun.position.set(-5, 10, 10)
     this.sun.target.position.set(0, 0, 0)
@@ -561,6 +573,8 @@ export class RoomView {
     this.mode = 'home'
     this.root.visible = true
     this.dynamic.visible = true
+    this.avatar.group.visible = true
+    this.avatar.place(2.5, 4.2)
     this.sun.position.set(8, 9, -8)
     this.sun.target.position.set(3, 0, 3)
     this.pet.frozen = false
@@ -799,7 +813,7 @@ export class RoomView {
 
   private hitId(e: PointerEvent): string | null {
     this.raycaster.setFromCamera(this.ndc(e), this.camera)
-    const roots = this.mode === 'exterior' ? [this.pet.group] : [...this.pickRoots.filter((r) => this.pickable(r)), this.pet.group]
+    const roots = this.mode === 'exterior' ? [this.pet.group] : [...this.pickRoots.filter((r) => this.pickable(r)), this.pet.group, this.avatar.group]
     const hits = this.raycaster.intersectObjects(roots, true)
     for (const h of hits) {
       let o: THREE.Object3D | null = h.object
@@ -828,19 +842,63 @@ export class RoomView {
 
   private tap(e: PointerEvent) {
     const id = this.hitId(e)
+    if (id === 'avatar') {
+      // Tapping your own character greets Boo — a small, harmless bit of company.
+      this.pet.nudge()
+      this.pet.respond('happy')
+      this.dirty = true
+      return
+    }
     if (id) {
       this.opts.onPick(id)
       return
     }
+    // A tap on bare floor is a walk command in explore mode, a placement in decorate mode.
+    this.raycaster.setFromCamera(this.ndc(e), this.camera)
+    const p = new THREE.Vector3()
+    if (!this.raycaster.ray.intersectPlane(this.floorPlane, p)) return
+    const x = Math.floor(p.x)
+    const z = Math.floor(p.z)
+    if (x < 0 || z < 0 || x >= FLOOR_SIZE || z >= FLOOR_SIZE) return
     if (this.decorMode && this.opts.onCell) {
-      this.raycaster.setFromCamera(this.ndc(e), this.camera)
-      const p = new THREE.Vector3()
-      if (this.raycaster.ray.intersectPlane(this.floorPlane, p)) {
-        const x = Math.floor(p.x)
-        const z = Math.floor(p.z)
-        if (x >= 0 && z >= 0 && x < FLOOR_SIZE && z < FLOOR_SIZE) this.opts.onCell(x, z)
+      this.opts.onCell(x, z)
+    } else if (this.mode === 'home' && !this.decorMode) {
+      this.walkTo(x, z)
+    }
+  }
+
+  /** Walk the avatar to a floor cell, nudging into a nearby free cell if it is reserved. */
+  walkTo(x: number, z: number) {
+    if (this.mode === 'exterior') return
+    let cx = x
+    let cz = z
+    if (isReservedCell(cx, cz)) {
+      // Spiral outward one ring for the closest walkable cell.
+      outer: for (let r = 1; r <= FLOOR_SIZE; r++) {
+        for (let dz = -r; dz <= r; dz++) {
+          for (let dx = -r; dx <= r; dx++) {
+            const nx = x + dx
+            const nz = z + dz
+            if (nx < 0 || nz < 0 || nx >= FLOOR_SIZE || nz >= FLOOR_SIZE) continue
+            if (!isReservedCell(nx, nz)) { cx = nx; cz = nz; break outer }
+          }
+        }
       }
     }
+    this.avatar.goTo(cx + 0.5, cz + 0.5)
+    this.followPet = true
+    this.dirty = true
+  }
+
+  /** Whether the owner's character is currently walking (for UI hints). */
+  get ownerWalking() {
+    return this.avatar.moving
+  }
+
+  /** Change the owner's outfit tone ('warm' or 'cool'). Purely local, no data leaves the device. */
+  setAvatarVariant(v: 'warm' | 'cool') {
+    this.avatar.setVariant(v)
+    this.dirty = true
   }
 
   // ---------------------------------------------------------------- lighting
@@ -959,11 +1017,22 @@ export class RoomView {
     }
 
     if (animated) {
+      this.avatar.update(dt, t)
       this.pet.update(dt, t)
+      // Boo follows the owner a beat behind, keeping a little personal space.
+      if (this.followPet && this.mode === 'home' && !this.pet.frozen) {
+        const a = this.avatar.position
+        const d = this.pet.position.distanceTo(a)
+        if (d > 1.15) {
+          const k = 1.15 / d
+          this.pet.followTo(a.x * k + this.pet.position.x * (1 - k), a.z * k + this.pet.position.z * (1 - k))
+        }
+      }
       if (this.led && this.data?.welcome) this.led.emissiveIntensity = 0.7 + (Math.sin(t * 3) + 1) * 0.5
       if (this.ring.visible) this.ring.scale.setScalar(1 + Math.sin(t * 5) * 0.05)
       for (const l of this.ctx.lamps) l.userData.flicker = l.distance < 2
     } else if (this.dirty) {
+      this.avatar.update(0.016, t)
       this.pet.update(0.016, t)
     }
 

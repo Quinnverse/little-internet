@@ -7,8 +7,8 @@ const en = {
   'corrupt.body': 'Nothing has been deleted. Download the raw data before trying anything else.',
   'corrupt.download': 'Download raw data',
 
-  'setup.hero': 'Your world, your web.',
-  'setup.sub': 'A small home that remembers your life. No account. Everything stays on this device until you open the door.',
+  'setup.hero': 'Come home.',
+  'setup.sub': 'A little place that remembers your life. Move in, and make it yours — no account, and nothing leaves this device until you open the door.',
   'setup.name': 'What is your home called?',
   'setup.namePh': 'Moon’s little home',
   'setup.address': 'Address',
@@ -79,7 +79,7 @@ const en = {
   'hud.reset': 'Reset view',
   'hud.settings': 'Settings',
   'hud.lang': 'Language',
-  'hud.hint': 'Drag to look around. Tap things to use them.',
+  'hud.hint': 'Tap the floor to walk · Boo follows you',
   'hud.flat': 'Simple view',
   'hud.flatHint': '3D is off. Everything is still here.',
 
@@ -272,8 +272,8 @@ const zh: Record<Key, string> = {
   'corrupt.body': '没有任何数据被删除。请先下载原始数据，再尝试其他操作。',
   'corrupt.download': '下载原始数据',
 
-  'setup.hero': '你的小世界，你的网。',
-  'setup.sub': '一间会记住你生活的小屋。无需账号，在你打开房门之前，一切只留在这台设备上。',
+  'setup.hero': '欢迎回家。',
+  'setup.sub': '一间会记住你生活的小屋。搬进来，把它变成你的样子——无需账号，打开房门之前，一切只留在这台设备上。',
   'setup.name': '你的小屋叫什么？',
   'setup.namePh': '小月的小屋',
   'setup.address': '地址',
@@ -344,7 +344,7 @@ const zh: Record<Key, string> = {
   'hud.reset': '重置视角',
   'hud.settings': '设置',
   'hud.lang': '语言',
-  'hud.hint': '拖动环顾四周，点击物件使用。',
+  'hud.hint': '点地板走过去 · Boo 会跟着你',
   'hud.flat': '简易视图',
   'hud.flatHint': '3D 已关闭，功能一个不少。',
 
