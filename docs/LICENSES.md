@@ -30,7 +30,7 @@ Run `npm ls --all` for transitive packages; a full SBOM scan has **not** been ru
 | Quoted line | One sentence from George Eliot's *Middlemarch* (1871, public domain) appears in a demo entry; book titles and authors are named only | public domain |
 | Fonts | Only system font stacks; no web fonts are loaded | n/a |
 | Hunyuan3D-2 bookcase | **Removed** from the repository (licence excludes EU, UK, South Korea). Still in git history; never used by the app | Do not reuse |
-| `截图合集.pdf` in the repo root | Owner-provided screenshots of unknown provenance | **Check or remove before submission** |
+| `截图合集.pdf` in the repo root | Owner-provided screenshots of unknown provenance | **Removed** from the branch; provenance was never established. Still in earlier git history; not shipped |
 
 ## GeoCities and historical sites
 The product is inspired by the culture of early personal homepages, webrings and 88×31 badges. No historical page,

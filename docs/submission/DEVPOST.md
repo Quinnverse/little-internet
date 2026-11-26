@@ -95,7 +95,7 @@ Video: (record per `docs/submission/DEMO_SCRIPT.md`; under 3 minutes).
 - [ ] Rules re-read on the official page; deadline and eligibility confirmed **[OWNER]**
 - [ ] PR #2 merged to the default branch (or the submitted branch is the one judges see) **[OWNER]**
 - [ ] Repo public, MIT licence visible, `.kiro/` at the root and not in `.gitignore` (checked: not ignored)
-- [ ] `截图合集.pdf` provenance checked or file removed (see docs/LICENSES.md) **[OWNER]**
+- [x] `截图合集.pdf` removed from the branch (provenance unknown; see docs/LICENSES.md)
 - [ ] Deployed; `scripts/live-check.mjs` passes from outside China; demo homes seeded **[OWNER]**
 - [ ] Real-device checklist done, results pasted into README status **[OWNER]**
 - [ ] Video recorded from the real product, under 3 minutes, public link added **[OWNER]**
