@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run Heart Mail tests when mail code changes",
+      "trigger": "PostFileSave",
+      "matcher": "server/mail\\.ts$|src/editor/people\\.ts$",
+      "action": {
+        "type": "command",
+        "command": "npx vitest --run tests/mail.test.ts >&2 || exit 1"
+      }
+    }
+  ]
+}

@@ -48,3 +48,4 @@ public/vision/wasm/
 .shot-data/
 .shots-letter/
 .probe/
+.e2e-camera/

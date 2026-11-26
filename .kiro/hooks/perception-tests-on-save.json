@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run gesture tests when perception code changes",
+      "trigger": "PostFileSave",
+      "matcher": "src/perception/.*\\.ts$",
+      "action": {
+        "type": "command",
+        "command": "npx vitest --run tests/perception.test.ts >&2 || exit 1"
+      }
+    }
+  ]
+}

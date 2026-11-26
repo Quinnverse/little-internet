@@ -1,0 +1,14 @@
+{
+  "version": "v1",
+  "hooks": [
+    {
+      "name": "Run gift and privacy tests when publishing code changes",
+      "trigger": "PostFileSave",
+      "matcher": "src/core/(privacy|schema|generate|letter)\\.ts$|src/editor/commands\\.ts$",
+      "action": {
+        "type": "command",
+        "command": "npx vitest --run tests/gifts.test.ts tests/cross-view.pbt.test.ts tests/web-privacy.pbt.test.ts >&2 || exit 1"
+      }
+    }
+  ]
+}
