@@ -26,6 +26,7 @@ import {CameraControl} from './CameraControl.tsx'
 import { LivingClock } from './LivingClock.tsx'
 import { BooBubble, type BubbleTone } from './BooBubble.tsx'
 import { FirstDay } from './FirstDay.tsx'
+import { DailyGoals } from './DailyGoals.tsx'
 import { Arrival } from './Arrival.tsx'
 import {
   completeGoal,
@@ -80,6 +81,12 @@ export function Home(props: { ctx: Ctx }) {
   const [decorating, setDecorating] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<RoomView | null>(null)
+  const [cameraMode, setCameraMode] = useState<'life' | 'layout'>('life')
+  const toggleCameraMode = () => {
+    const next = cameraMode === 'life' ? 'layout' : 'life'
+    setCameraMode(next)
+    view?.setCameraMode(next)
+  }
   const [flat, setFlat] = useState(() => flatPref() || sceneFailed())
   // Quiet by default: names and markers show on hover/focus, or when the owner asks (Hints button or Settings).
   const [assistAlways, setAssistAlways] = useState(assistPref())
@@ -408,6 +415,12 @@ export function Home(props: { ctx: Ctx }) {
           <LivingClock />
         </div>
         <div class="hud-actions">
+          <button type="button" class="round wide" onClick={toggleCameraMode}
+            aria-label={cameraMode === 'life' ? (lang === 'zh' ? '切换到布置视角' : 'Switch to layout view') : (lang === 'zh' ? '切换到生活视角' : 'Switch to life view')}
+            title={cameraMode === 'life' ? (lang === 'zh' ? '布置视角' : 'Layout view') : (lang === 'zh' ? '生活视角' : 'Life view')}>
+            <Icon name={cameraMode === 'life' ? 'home' : 'sofa'} size={17} />
+            <span class="cam-mode-text">{cameraMode === 'life' ? (lang === 'zh' ? '生活' : 'Life') : (lang === 'zh' ? '布置' : 'Layout')}</span>
+          </button>
           <button class="round" aria-label="Boo perception" aria-pressed={perceive} onClick={()=>setPerceive(!perceive)}><Icon name="eye" size={18}/></button>
           <button type="button" class="round" onClick={toggleLang} aria-label={t('hud.lang')} title={t('hud.lang')}>
             <Icon name="globe" size={18} /><span class="lang-text">{lang === 'en' ? '中文' : 'EN'}</span>
@@ -420,6 +433,9 @@ export function Home(props: { ctx: Ctx }) {
 
       {!arrival && !decorating && !atelier && !panel && !onboarding.dismissed && (
         <FirstDay onboarding={onboarding} onHide={() => updateOnboarding((o) => ({ ...o, dismissed: true }))} />
+      )}
+      {!arrival && !decorating && !atelier && !panel && (
+        <DailyGoals onboarding={onboarding} />
       )}
       {!arrival && booLine && !panel && (
         <BooBubble line={booLine} tone={booTone} onDone={() => setBooLine('')} />

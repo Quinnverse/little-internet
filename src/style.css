@@ -704,30 +704,16 @@ button.mail-row { cursor: pointer; }
 .fd-check { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #f0e3cd; }
 .fd-steps li.is-done .fd-check { background: #f6d99a; color: #8a5a2a; }
 .fd-complete { margin: 10px 2px 0; font-size: .8rem; color: #a5642a; font-weight: 600; }
-.fd-daily { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e1cfb4; }
-.fd-daily-title { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin-bottom: 7px; }
-.fd-daily-title span { font-size: .8rem; font-weight: 700; color: #6a4a30; }
-.fd-daily-title small { font-size: .66rem; color: #9c8a76; }
-.fd-goals { display: flex; flex-wrap: wrap; gap: 5px; }
-.fd-goal { display: inline-flex; align-items: center; gap: 4px; font-size: .7rem; padding: 4px 8px; border-radius: 99px; background: #f4e9d6; color: #7b6650; }
-.fd-goal.is-done { background: #dfecdb; color: #4d7a4a; }
 .fd-hide { margin-top: 10px; border: 0; background: transparent; color: #9c8a76; font-size: .72rem; cursor: pointer; padding: 0; }
 .home:has(.scene.is-night) .first-day { background: rgba(38,30,60,.92); border-color: rgba(255,255,255,.14); }
 .home:has(.scene.is-night) .fd-head strong,
 .home:has(.scene.is-night) .fd-steps li.is-next,
-.home:has(.scene.is-night) .fd-daily-title span { color: #f0e2c8; }
 .home:has(.scene.is-night) .fd-steps li { color: #efe0c4; }
 .home:has(.scene.is-night) .fd-steps li.is-done { color: #8f816e; }
 .home:has(.scene.is-night) .fd-check { background: rgba(255,255,255,.12); }
-.home:has(.scene.is-night) .fd-sub,
 .home:has(.scene.is-night) .fd-hide,
-.home:has(.scene.is-night) .fd-goal { color: #c3b39c; }
-.home:has(.scene.is-night) .fd-goal { background: rgba(255,255,255,.1); }
-.home:has(.scene.is-night) .fd-goal.is-done { background: rgba(120,160,110,.32); color: #d6ecc9; }
 .home:has(.scene.is-night) .fd-complete { color: #f0c175; }
 .home:has(.scene.is-night) .fd-progress { background: rgba(255,255,255,.16); }
-.home:has(.scene.is-night) .fd-sub,
-.home:has(.scene.is-night) .fd-daily-title small { color: #a99b88; }
 
 @media (max-width: 899px) {
   .first-day { top: auto; bottom: calc(84px + var(--safe-bottom)); right: 10px; left: 10px; width: auto; max-width: none; padding: 10px 12px; }
@@ -738,4 +724,82 @@ button.mail-row { cursor: pointer; }
 @media (prefers-reduced-motion: reduce) {
   .arrival, .boo-bubble, .fd-bar { animation: none; transition: none; }
   .ar-door, .ar-glow { animation: none; transform: rotateY(-45deg); opacity: 1; }
+}
+
+/* ---------------------------------------------------------------- cinematic polish */
+/* A soft vignette focuses the eye on the room, like a game's depth-of-field —
+   pure CSS so software-rendered 3D stays fast. Never eats pointer events. */
+.scene::after {
+  content: ''; position: absolute; inset: 0; pointer-events: none; z-index: 2;
+  background: radial-gradient(ellipse 78% 72% at 50% 46%, transparent 52%, rgba(28, 20, 14, .16) 100%);
+  mix-blend-mode: multiply;
+}
+.scene.is-night::after {
+  background: radial-gradient(ellipse 76% 70% at 50% 44%, transparent 46%, rgba(8, 6, 24, .42) 100%);
+  mix-blend-mode: normal;
+}
+/* The dock and panels float above the focus layer. */
+.dock, .hud-top, .hud-hint, .first-day, .daily-goals, .boo-bubble { z-index: 8; }
+
+/* Glass depth: panels now carry a soft inner light and a finer blur. */
+.first-day, .daily-goals {
+  backdrop-filter: blur(16px) saturate(1.15);
+  -webkit-backdrop-filter: blur(16px) saturate(1.15);
+  border: 1px solid rgba(255,255,255,.55);
+  box-shadow: 0 10px 34px rgba(40, 26, 16, .18), inset 0 1px 0 rgba(255,255,255,.5);
+}
+.home:has(.scene.is-night) .first-day,
+.home:has(.scene.is-night) .daily-goals {
+  border-color: rgba(255,255,255,.12);
+  background: rgba(30, 24, 48, .82);
+  box-shadow: 0 12px 38px rgba(0,0,0,.34), inset 0 1px 0 rgba(255,255,255,.07);
+}
+.home:has(.scene.is-night) .fd-sub { color: #c9b89f; }
+
+/* Daily goals — the gentle left-side counterweight. */
+.daily-goals {
+  position: absolute; z-index: 8; top: calc(96px + var(--safe-top)); left: 16px;
+  width: 210px; max-width: calc(100vw - 32px); padding: 10px 12px;
+  background: rgba(255, 250, 240, .9); border-radius: 16px; color: #5a4332;
+}
+.daily-goals.is-collapsed { width: auto; }
+.dg-head {
+  display: flex; align-items: center; gap: 8px; width: 100%;
+  border: 0; background: transparent; cursor: pointer; padding: 0; color: inherit;
+}
+.dg-t { font-weight: 700; font-size: .88rem; }
+.dg-count { margin-left: auto; font-size: .72rem; padding: 1px 7px; border-radius: 99px; background: rgba(224,138,93,.16); color: #a5642a; font-variant-numeric: tabular-nums; }
+.dg-sub { margin: 6px 0 8px; font-size: .68rem; color: #9c8a76; }
+.dg-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 4px; }
+.dg-list li {
+  display: flex; align-items: center; gap: 8px; font-size: .76rem;
+  padding: 5px 8px; border-radius: 10px; background: rgba(255,255,255,.5);
+  transition: background .2s ease, color .2s ease;
+}
+.dg-ico { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #f0e3cd; color: #9c6a3a; }
+.dg-list li.is-done { color: #4d7a4a; background: rgba(200, 224, 190, .42); }
+.dg-list li.is-done .dg-ico { background: #cfe2c2; color: #4d7a4a; }
+.dg-tick { margin-left: auto; color: #6f9a5e; }
+.home:has(.scene.is-night) .daily-goals { color: #eaddc4; }
+.home:has(.scene.is-night) .dg-sub { color: #a99b88; }
+.home:has(.scene.is-night) .dg-list li { background: rgba(255,255,255,.07); }
+.home:has(.scene.is-night) .dg-ico { background: rgba(255,255,255,.12); color: #e8c98a; }
+.home:has(.scene.is-night) .dg-count { background: rgba(232,193,138,.18); color: #f0c175; }
+.home:has(.scene.is-night) .dg-list li.is-done { background: rgba(120,160,110,.28); color: #d6ecc9; }
+
+/* Camera-mode pill in the top bar. */
+.round.wide { width: auto; min-width: 44px; padding: 0 11px; gap: 6px; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; }
+.cam-mode-text { font-size: .78rem; font-weight: 700; }
+.home:has(.scene.is-night) .round.wide { background: rgba(38, 30, 58, .86); color: #f0e2c8; border-color: rgba(255,255,255,.2); }
+
+@media (max-width: 899px) {
+  .daily-goals { top: calc(84px + var(--safe-top)); left: 10px; width: 150px; padding: 8px 10px; }
+  .dg-list li { font-size: .7rem; padding: 4px 6px; }
+  .dg-sub { display: none; }
+  .round.wide { min-width: 40px; padding: 0 8px; }
+  .cam-mode-text { display: none; }
+  /* Keep Boo's line in the room area, clear of the first-day card below. */
+  .boo-bubble { bottom: auto; top: 40%; max-width: calc(100% - 32px); padding: 6px 10px 6px 6px; }
+  .boo-bubble .bb-line { font-size: .82rem; }
+  .boo-bubble .bb-avatar { width: 32px; height: 32px; }
 }

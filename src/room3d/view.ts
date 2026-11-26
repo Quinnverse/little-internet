@@ -152,6 +152,10 @@ export class RoomView {
   private vAz = 0
   private baseRadius = 12
   private basePol = 1.0
+  /** 'life' = lower, closer, human-eye feel; 'layout' = higher isometric for arranging. */
+  private cameraMode: 'life' | 'layout' = 'life'
+  private get modePol() { return this.cameraMode === 'life' ? 1.12 : 0.92 }
+  private get modeRadiusFactor() { return this.cameraMode === 'life' ? 0.86 : 1 }
   private pointers = new Map<number, { x: number; y: number }>()
   private pinch = 0
   private downAt = { x: 0, y: 0, t: 0 }
@@ -704,11 +708,24 @@ export class RoomView {
 
   resetView() {
     this.want.az = nearestAz(this.az, Math.PI / 4)
-    this.want.pol = this.basePol
-    this.want.radius = this.baseRadius
+    this.want.pol = this.clampModePol(this.modePol)
+    this.want.radius = this.baseRadius * this.modeRadiusFactor
     this.want.tgt.copy(TARGET)
     this.dirty = true
   }
+
+  private clampModePol(p: number) {
+    return clamp(p, 0.7, 1.2)
+  }
+
+  /** Switch between the human-eye 'life' view and the higher 'layout' view. */
+  setCameraMode(mode: 'life' | 'layout') {
+    if (this.cameraMode === mode) return
+    this.cameraMode = mode
+    this.resetView()
+  }
+
+  get cameraModeNow() { return this.cameraMode }
 
   /** Moves the camera close to an object (the sheet that opens covers the lower part). */
   /** Adds a hotspot that has an anchor (used for the mailbox once the guestbook is known to exist). */
@@ -991,11 +1008,14 @@ export class RoomView {
     const old = this.baseRadius
     this.baseRadius = Math.max(12.5, 4.6 / (Math.tan((this.camera.fov * Math.PI) / 360) * asp))
     const oldPol = this.basePol
-    this.basePol = asp < 0.8 ? 0.86 : 1.0
-    if (Math.abs(this.want.radius - old) < 0.01) this.want.radius = this.baseRadius
-    if (Math.abs(this.radius - old) < 0.01) this.radius = this.baseRadius
-    if (Math.abs(this.want.pol - oldPol) < 0.01) this.want.pol = this.basePol
-    if (Math.abs(this.pol - oldPol) < 0.01) this.pol = this.basePol
+    const portrait = asp < 0.8
+    this.basePol = portrait ? 0.86 : 1.0
+    // Life mode sits a little lower than layout mode, but stays higher on portrait so the room still fits.
+    const wanted = portrait ? this.basePol + 0.06 : this.modePol
+    if (Math.abs(this.want.radius - old) < 0.01) this.want.radius = this.baseRadius * this.modeRadiusFactor
+    if (Math.abs(this.radius - old) < 0.01) this.radius = this.baseRadius * this.modeRadiusFactor
+    if (Math.abs(this.want.pol - oldPol) < 0.01) this.want.pol = this.clampModePol(wanted)
+    if (Math.abs(this.pol - oldPol) < 0.01) this.pol = this.clampModePol(wanted)
     this.camera.updateProjectionMatrix()
     this.dirty = true
   }

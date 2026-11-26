@@ -1,10 +1,8 @@
 import { useState } from 'preact/hooks'
 import {
-  DAILY_GOALS,
   FIRST_DAY_STEPS,
   firstDayComplete,
   progress,
-  type DailyGoal,
   type FirstDayStep,
   type Onboarding,
 } from '../../core/onboarding.ts'
@@ -17,9 +15,6 @@ const COPY = {
     dayOneSub: 'Boo will show you around. No rush — explore at your own pace.',
     hidden: 'Hide guide',
     done: 'All done — this home is yours now ✦',
-    today: 'Today',
-    dailySub: 'Small things, whenever you like',
-    close: 'Close',
     steps: {
       walk: 'Walk around your home',
       diary: 'Write your first entry',
@@ -28,21 +23,12 @@ const COPY = {
       website: 'Open your website studio',
       publish: 'Open the door for visitors',
     } as Record<FirstDayStep, string>,
-    goals: {
-      write: 'Write a little',
-      company: 'Keep Boo company',
-      neighbour: 'Visit a neighbour',
-      mail: 'Open your mailbox',
-    } as Record<DailyGoal, string>,
   },
   zh: {
     dayOne: '你的第一天',
     dayOneSub: 'Boo 带你四处看看。不用着急，按你的节奏来就好。',
     hidden: '收起引导',
     done: '都做到了——这个家现在真正属于你了 ✦',
-    today: '今天',
-    dailySub: '一些小事，想做的时候再做',
-    close: '关闭',
     steps: {
       walk: '在家里四处走走',
       diary: '写下第一篇日记',
@@ -51,12 +37,6 @@ const COPY = {
       website: '打开你的网站工坊',
       publish: '为访客打开房门',
     } as Record<FirstDayStep, string>,
-    goals: {
-      write: '写一点东西',
-      company: '陪陪 Boo',
-      neighbour: '去邻居家看看',
-      mail: '打开你的信箱',
-    } as Record<DailyGoal, string>,
   },
 }
 
@@ -68,14 +48,8 @@ const STEP_ICON: Record<FirstDayStep, IconName> = {
   website: 'palette',
   publish: 'door',
 }
-const GOAL_ICON: Record<DailyGoal, IconName> = {
-  write: 'pen',
-  company: 'ghost',
-  neighbour: 'globe',
-  mail: 'mail',
-}
 
-/** The gentle first-day task card + daily goals. Never blocks the scene. */
+/** The gentle first-day checklist, tucked to the right. Never blocks the scene. */
 export function FirstDay(props: {
   onboarding: Onboarding
   onHide: () => void
@@ -116,21 +90,6 @@ export function FirstDay(props: {
             })}
           </ol>
           {allDone && <p class="fd-complete">{c.done}</p>}
-
-          <div class="fd-daily">
-            <div class="fd-daily-title"><span>{c.today}</span><small>{c.dailySub}</small></div>
-            <div class="fd-goals">
-              {DAILY_GOALS.map((g) => {
-                const done = o.daily.includes(g)
-                return (
-                  <span key={g} class={`fd-goal${done ? ' is-done' : ''}`} title={c.goals[g]}>
-                    <Icon name={GOAL_ICON[g]} size={13} /> {c.goals[g]}
-                  </span>
-                )
-              })}
-            </div>
-          </div>
-
           <button type="button" class="fd-hide" onClick={props.onHide}>{c.hidden}</button>
         </div>
       )}
