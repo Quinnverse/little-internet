@@ -34,7 +34,7 @@ const GOAL_ICON: Record<DailyGoal, IconName> = {
 }
 
 /** Gentle daily goals on the left — a quiet counterweight to the first-day card. */
-export function DailyGoals(props: { onboarding: Onboarding }) {
+export function DailyGoals(props: { onboarding: Onboarding; onGoal: (g: DailyGoal) => void }) {
   const zh = getLang() === 'zh'
   const c = zh ? COPY.zh : COPY.en
   const [open, setOpen] = useState(true)
@@ -55,9 +55,11 @@ export function DailyGoals(props: { onboarding: Onboarding }) {
               const done = o.daily.includes(g)
               return (
                 <li key={g} class={done ? 'is-done' : ''}>
-                  <span class="dg-ico"><Icon name={GOAL_ICON[g]} size={14} /></span>
-                  <span>{c.goals[g]}</span>
-                  {done && <span class="dg-tick" aria-hidden="true">✦</span>}
+                  <button type="button" class="dg-action" onClick={() => props.onGoal(g)} aria-label={c.goals[g]}>
+                    <span class="dg-ico"><Icon name={GOAL_ICON[g]} size={14} /></span>
+                    <span>{c.goals[g]}</span>
+                    {done && <span class="dg-tick" aria-hidden="true">✦</span>}
+                  </button>
                 </li>
               )
             })}

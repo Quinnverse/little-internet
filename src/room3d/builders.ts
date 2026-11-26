@@ -648,6 +648,38 @@ export function buildDecor(kind: DecorKind, ctx: BuildCtx): THREE.Group {
       g.add(handle)
       break
     }
+    case 'sidetable': {
+      g.add(place(box(0.5, 0.05, 0.5, '#b57d4a', 0.03), 0, 0.5, 0))
+      for (const [x, z] of [[-0.2, -0.2], [0.2, -0.2], [-0.2, 0.2], [0.2, 0.2]] as const)
+        g.add(place(cyl(0.022, 0.02, 0.48, WOOD_DARK, 8), x, 0.24, z))
+      g.add(place(cyl(0.09, 0.11, 0.14, '#e8b4b8', 16), 0, 0.6, 0))
+      break
+    }
+    case 'lavalamp': {
+      g.add(place(cyl(0.14, 0.17, 0.06, '#44505b', 16), 0, 0.03, 0))
+      g.add(place(cyl(0.05, 0.06, 0.5, '#8a6fbf', 16), 0, 0.31, 0))
+      const glow = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.11, 0.14, 0.5, 20, 1, true),
+        glowMat(ctx, '#f39ac0', 0.2, 0.7),
+      )
+      ;(glow.material as THREE.MeshStandardMaterial).side = THREE.DoubleSide
+      glow.position.y = 0.55
+      g.add(glow)
+      addLamp(ctx, g, 0, 0.55, 0, 1.4, '#e79abb', 4)
+      break
+    }
+    case 'officechair': {
+      g.add(place(cyl(0.28, 0.28, 0.09, '#44505b', 16), 0, 0.45, 0))
+      g.add(place(box(0.48, 0.5, 0.1, '#5a6b7a', 0.05), 0, 0.75, 0.18))
+      g.add(place(cyl(0.03, 0.03, 0.42, '#6b7a88', 8), 0, 0.23, 0))
+      for (const a of [0, 2.1, 4.2]) {
+        const arm = box(0.3, 0.04, 0.05, '#44505b', 0.02)
+        arm.position.set(Math.cos(a) * 0.14, 0.04, Math.sin(a) * 0.14)
+        arm.rotation.y = -a
+        g.add(arm)
+      }
+      break
+    }
   }
   shadowAll(g)
   return g

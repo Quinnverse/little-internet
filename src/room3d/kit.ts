@@ -209,6 +209,9 @@ const DECOR_MODEL: Record<DecorKind, string> = {
   stool: 'stool',
   basket: 'basket',
   bookcase: 'mini_bookcase',
+  sidetable: 'side_table',
+  lavalamp: 'lava_lamp',
+  officechair: 'office_chair',
 }
 
 export function kitDecor(kind: DecorKind, ctx: BuildCtx): THREE.Group {

@@ -81,6 +81,7 @@ export function Home(props: { ctx: Ctx }) {
   const [decorating, setDecorating] = useState(false)
   const [selected, setSelected] = useState<string | null>(null)
   const [view, setView] = useState<RoomView | null>(null)
+  const [moreOpen, setMoreOpen] = useState(false)
   const [cameraMode, setCameraMode] = useState<'life' | 'layout'>('life')
   const toggleCameraMode = () => {
     const next = cameraMode === 'life' ? 'layout' : 'life'
@@ -130,6 +131,12 @@ export function Home(props: { ctx: Ctx }) {
   }
   const markGoal = (goal: DailyGoal) => updateOnboarding((o) => completeGoal(o, goal))
   const openAtelier = () => { markStep('website'); setAtelier(true) }
+  const handleGoal = (g: DailyGoal) => {
+    if (g === 'write') onPick('diary')
+    else if (g === 'company') onPick('pet')
+    else if (g === 'neighbour') open({ kind: 'walk' })
+    else if (g === 'mail') open({ kind: 'people' })
+  }
   const handleWalk = () => {
     const before = onboardingRef.current
     const after = notedWalk(before)
@@ -254,12 +261,24 @@ export function Home(props: { ctx: Ctx }) {
     return () => window.clearTimeout(id)
   }, [peek])
 
+  // Close the "more" menu when tapping elsewhere in the room.
+  useEffect(() => {
+    if (!moreOpen) return
+    const close = (e: Event) => {
+      if ((e.target as HTMLElement).closest('.dock-more, .dock-more-btn')) return
+      setMoreOpen(false)
+    }
+    document.addEventListener('pointerdown', close)
+    return () => document.removeEventListener('pointerdown', close)
+  }, [moreOpen])
+
   const close = () => {
     setPanel(null)
     view?.resetView()
   }
 
   const open = (p: Panel, focus?: string) => {
+    setBooLine('')
     if (p && p.kind === 'people') markGoal('mail')
     if (focus) view?.focus(focus)
     // Boo walks over to keep you company where you are working.
@@ -364,6 +383,7 @@ export function Home(props: { ctx: Ctx }) {
   }
 
   const startDecorate = () => {
+    setBooLine('')
     setPanel(null)
     view?.resetView()
     setDecorating(true)
@@ -435,7 +455,7 @@ export function Home(props: { ctx: Ctx }) {
         <FirstDay onboarding={onboarding} onHide={() => updateOnboarding((o) => ({ ...o, dismissed: true }))} />
       )}
       {!arrival && !decorating && !atelier && !panel && (
-        <DailyGoals onboarding={onboarding} />
+        <DailyGoals onboarding={onboarding} onGoal={handleGoal} />
       )}
       {!arrival && booLine && !panel && (
         <BooBubble line={booLine} tone={booTone} onDone={() => setBooLine('')} />
@@ -445,20 +465,39 @@ export function Home(props: { ctx: Ctx }) {
 
       {!decorating && (
         <nav class="dock" aria-label="Home">
-          {!flatMode && (
-            <>
-              <DockBtn icon="eye" label={ta('hud.hints')} onClick={() => setPeek((v) => !v)} />
-          <DockBtn icon="rotl" label={t('hud.rotateL')} onClick={() => view?.rotateBy(-Math.PI / 4)} />
-              <DockBtn icon="rotr" label={t('hud.rotateR')} onClick={() => view?.rotateBy(Math.PI / 4)} />
-            </>
-          )}
-          <button type="button" class="dock-main" onClick={() => onPick('diary')}>
-            <Icon name="pen" size={20} /> <span>{t('hud.write')}</span>
+          <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} />
+          <button type="button" class="dock-main" onClick={() => onPick('diary')} aria-label={t('hud.write')} title={t('hud.write')}>
+            <Icon name="pen" size={22} /> <span>{t('hud.write')}</span>
           </button>
-          <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} text />
-          <DockBtn icon="sofa" label={t('hud.decorate')} onClick={startDecorate} text />
-          <DockBtn icon="palette" label={ta('crt.decorate')} onClick={openAtelier} />
+          <DockBtn icon="sofa" label={t('hud.decorate')} onClick={startDecorate} />
           <DockBtn icon="mail" label={ta('mail.dock')} onClick={() => open({ kind: 'people' })} badge={unread} />
+          <button type="button" class={`dock-more-btn${moreOpen ? ' is-open' : ''}`} onClick={() => { setMoreOpen((v) => !v); setBooLine('') }}
+            aria-expanded={moreOpen} aria-label={lang === 'zh' ? '更多' : 'More'} title={lang === 'zh' ? '更多' : 'More'}>
+            <Icon name="more" size={20} />
+          </button>
+          {moreOpen && (
+            <div class="dock-more" role="menu">
+              <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); openAtelier() }}>
+                <Icon name="palette" size={18} /><span>{lang === 'zh' ? '网站工坊' : 'Website studio'}</span>
+              </button>
+              {!flatMode && (
+                <>
+                  <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); setPeek((v) => !v) }}>
+                    <Icon name="eye" size={18} /><span>{ta('hud.hints')}</span>
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); view?.rotateBy(-Math.PI / 4) }}>
+                    <Icon name="rotl" size={18} /><span>{t('hud.rotateL')}</span>
+                  </button>
+                  <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); view?.rotateBy(Math.PI / 4) }}>
+                    <Icon name="rotr" size={18} /><span>{t('hud.rotateR')}</span>
+                  </button>
+                </>
+              )}
+              <button type="button" role="menuitem" onClick={() => { setMoreOpen(false); open({ kind: 'settings' }) }}>
+                <Icon name="gear" size={18} /><span>{t('hud.settings')}</span>
+              </button>
+            </div>
+          )}
         </nav>
       )}
 

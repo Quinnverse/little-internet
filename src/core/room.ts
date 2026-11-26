@@ -14,7 +14,7 @@ export const WALLS = ['cream', 'sage', 'blush', 'sky', 'plum'] as const
 export const FLOORS = ['oak', 'walnut', 'tile', 'checker'] as const
 export const LIGHTS = ['auto', 'day', 'night'] as const
 
-export const DECOR_KINDS = ['plant', 'cactus', 'floorlamp', 'armchair', 'stool', 'basket', 'bookcase'] as const
+export const DECOR_KINDS = ['plant', 'cactus', 'floorlamp', 'armchair', 'stool', 'basket', 'bookcase', 'sidetable', 'lavalamp', 'officechair'] as const
 export const MEMORY_KINDS = [
   'shell',
   'candle',
