@@ -6,12 +6,15 @@ import {
   PEN_COLORS,
   SHAPES,
   StrokeBuilder,
+  drawingToAnimatedSvg,
+  drawingToSvg,
   strokePath,
   type Drawing,
   type Pen,
   type ShapeName,
   type Stroke,
 } from '../../core/strokes.ts'
+import { saveBytes } from '../download.ts'
 import { ta } from '../i18nAtelier.ts'
 import { Icon } from './icons.tsx'
 
@@ -58,6 +61,10 @@ export function DrawPad(props: {
   onHandle?: (h: DrawPadHandle | null) => void
   /** Extra controls shown in the toolbar (e.g. the camera button). */
   extra?: preact.ComponentChildren
+  /** Optional: save this drawing as a website sticker asset (provided by the letter/people flow). */
+  onSaveSticker?: (d: Drawing) => void
+  /** Optional: keep this drawing in the archive and place it as a room keepsake. */
+  onKeepDrawing?: (d: Drawing) => void
   /** Live status text for assistive tech (e.g. "pen down"). */
   status?: string
 }) {
@@ -81,6 +88,28 @@ export function DrawPad(props: {
     const l = live.current?.build()
     if (l) strokes.push(l)
     paintStrokes(ctx, c.width, strokes, props.paper)
+  }
+
+  /** Standalone exports: SVG + animated SVG are pure text; PNG comes from the on-screen canvas. */
+  const exportSvg = (animated: boolean) => {
+    const d = hist.current
+    if (!d.strokes.length) return
+    const svg = animated ? drawingToAnimatedSvg(d) : drawingToSvg(d)
+    saveBytes(new TextEncoder().encode(svg), `little-internet-drawing${animated ? '-animated' : ''}.svg`, 'image/svg+xml')
+  }
+  const exportPng = () => {
+    const c = cv.current
+    if (!c || !hist.current.strokes.length) return
+    // Re-render on a transparent square at 2x so the PNG is crisp and has no UI chrome.
+    const out = document.createElement('canvas')
+    out.width = out.height = 1000
+    const ctx = out.getContext('2d')
+    if (!ctx) return
+    paintStrokes(ctx, 1000, hist.current.strokes)
+    out.toBlob((blob) => {
+      if (!blob) return
+      blob.arrayBuffer().then((buf) => saveBytes(new Uint8Array(buf), 'little-internet-drawing.png', 'image/png'))
+    }, 'image/png')
   }
 
   const fit = () => {
@@ -201,6 +230,18 @@ export function DrawPad(props: {
             {ta('draw.clear')}
           </button>
           {props.extra}
+        </div>
+        <div class="choice-row draw-export" role="group" aria-label={ta('draw.export')}>
+          <span class="field-label">{ta('draw.export')}</span>
+          <button type="button" class="btn btn-small" disabled={!nonEmpty} onClick={() => exportSvg(false)}>{ta('draw.svg')}</button>
+          <button type="button" class="btn btn-small" disabled={!nonEmpty} onClick={exportPng}>{ta('draw.png')}</button>
+          <button type="button" class="btn btn-small" disabled={!nonEmpty} onClick={() => exportSvg(true)}>{ta('draw.animated')}</button>
+          {props.onSaveSticker && (
+            <button type="button" class="btn btn-small" disabled={!nonEmpty} onClick={() => props.onSaveSticker?.(hist.current)}>{ta('draw.sticker')}</button>
+          )}
+          {props.onKeepDrawing && (
+            <button type="button" class="btn btn-small" disabled={!nonEmpty} onClick={() => props.onKeepDrawing?.(hist.current)}>{ta('draw.keep')}</button>
+          )}
         </div>
         {props.status && <p class="muted small" role="status">{props.status}</p>}
         <div class="sheet-actions">

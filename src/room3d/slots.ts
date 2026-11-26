@@ -15,6 +15,10 @@ export const SLOT_POSES: Record<string, SlotPose> = {
   'desk-3': { x: 1.85, y: 0.8, z: 0.62, rotY: 0.5, wall: false },
   'sill-1': { x: 2.95, y: 1.03, z: 0.13, rotY: 0.2, wall: false },
   'sill-2': { x: 3.5, y: 1.03, z: 0.13, rotY: -0.3, wall: false },
+  // Dresser / cabinet top at x≈3.2, z≈0.3. Kept below the window sill (y=1.03) so nothing overlaps.
+  'cabinet-1': { x: 2.78, y: 0.86, z: 0.36, rotY: 0.18, wall: false },
+  'cabinet-2': { x: 3.2, y: 0.86, z: 0.36, rotY: -0.12, wall: false },
+  'cabinet-3': { x: 3.62, y: 0.86, z: 0.36, rotY: 0.22, wall: false },
   // Hung on the left wall (x = 0), facing into the room (+x).
   'wall-1': { x: 0.03, y: 1.9, z: 1.35, rotY: Math.PI / 2, wall: true },
   'wall-2': { x: 0.03, y: 1.9, z: 2.15, rotY: Math.PI / 2, wall: true },

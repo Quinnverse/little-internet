@@ -446,7 +446,7 @@ export const setPostObject =
     return { ...p, room: { ...base, memory: [...rest, { id: newId, kind, postId, slot }] } }
   }
 
-export const placeGiftFrame = (postId: string, group: 'wall' | 'desk' | 'shelf', id: string): Command => (p) => {
+export const placeGiftFrame = (postId: string, group: 'wall' | 'desk' | 'shelf' | 'cabinet', id: string): Command => (p) => {
   if (!p.gifts.some(g => g.postId === postId)) throw new Error('Gift must be saved first')
   const slot = freeSlotsFor(p.room, 'photo').find(s => s.startsWith(group + '-'))
   if (!slot) throw new Error('No free space here')

@@ -36,13 +36,15 @@ export type MemoryKind = (typeof MEMORY_KINDS)[number]
 export const MAX_DECOR = 12
 export const MAX_MEMORY_OBJECTS = 40
 
-type SlotGroup = 'shelf' | 'desk' | 'sill' | 'wall'
+type SlotGroup = 'shelf' | 'desk' | 'sill' | 'wall' | 'cabinet'
 
 export const SLOT_GROUPS: Record<SlotGroup, readonly string[]> = {
   shelf: ['shelf-1', 'shelf-2', 'shelf-3', 'shelf-4', 'shelf-5', 'shelf-6'],
   desk: ['desk-1', 'desk-2', 'desk-3'],
   sill: ['sill-1', 'sill-2'],
   wall: ['wall-1', 'wall-2', 'wall-3', 'wall-4'],
+  // The dresser top: a drawer/cabinet surface for small keepsakes, clear of the window sill.
+  cabinet: ['cabinet-1', 'cabinet-2', 'cabinet-3'],
 }
 
 export const SLOTS: readonly string[] = [
@@ -50,18 +52,19 @@ export const SLOTS: readonly string[] = [
   ...SLOT_GROUPS.desk,
   ...SLOT_GROUPS.sill,
   ...SLOT_GROUPS.wall,
+  ...SLOT_GROUPS.cabinet,
 ]
 
 /** Which slot groups each memory kind may use, in order of preference. */
 export const KIND_GROUPS: Record<MemoryKind, readonly SlotGroup[]> = {
-  shell: ['shelf', 'sill', 'desk'],
-  candle: ['desk', 'shelf', 'sill'],
-  book: ['shelf', 'desk'],
-  flower: ['sill', 'desk', 'shelf'],
-  cassette: ['shelf', 'desk'],
-  postcard: ['wall'],
-  photo: ['wall', 'desk', 'shelf'],
-  ticket: ['wall'],
+  shell: ['shelf', 'sill', 'desk', 'cabinet'],
+  candle: ['desk', 'shelf', 'sill', 'cabinet'],
+  book: ['shelf', 'desk', 'cabinet'],
+  flower: ['sill', 'desk', 'shelf', 'cabinet'],
+  cassette: ['shelf', 'desk', 'cabinet'],
+  postcard: ['wall', 'cabinet'],
+  photo: ['wall', 'desk', 'shelf', 'cabinet'],
+  ticket: ['wall', 'cabinet'],
 }
 
 /** Cells taken by built-in furniture (x to the right, z toward the viewer). */

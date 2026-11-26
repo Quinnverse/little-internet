@@ -98,6 +98,8 @@ export function LetterAtelier(props: {
   onClose: () => void
   onSent: (to: string) => void
   toast: (m: string, kind?: 'ok' | 'error') => void
+  onSaveSticker?: (d: Drawing) => void
+  onKeepDrawing?: (d: Drawing) => void
 }) {
   const [letter, setLetter] = useState<Letter>(props.initial ?? BLANK_LETTER)
   const past = useRef<Letter[]>([])
@@ -299,6 +301,8 @@ export function LetterAtelier(props: {
           dark={letter.paper === 'night'}
           onCancel={() => setMode('edit')}
           onHandle={(h) => (penRef.current = h)}
+          onSaveSticker={props.onSaveSticker}
+          onKeepDrawing={props.onKeepDrawing}
           extra={<>
             <label>{getLang()==='zh'?'指尖灵敏度':'Pointer sensitivity'} <input type="range" min=".65" max="1.6" step=".05" value={gain} onInput={e=>setGain(Number(e.currentTarget.value))}/></label>
             <button class="btn btn-small" onClick={()=>{penRef.current?.end();setRemaining(30);setCalibrating(!calibrating)}}>{calibrating?'✓ '+remaining+'s':'30s · '+(getLang()==='zh'?'校准':'Calibrate')}</button>

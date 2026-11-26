@@ -1,6 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import { letterSummary, letterText, letterToSvg, type Letter } from '../../core/letter.ts'
-import { keepGift, placeGiftFrame } from '../commands.ts'
+import type { Drawing } from '../../core/strokes.ts'
+import * as D from '../../core/designOps.ts'
+import { paintStrokes } from './DrawPad.tsx'
+import { addAsset, addPost, compose, design as designCmd, keepGift, placeGiftFrame, setPostObject } from '../commands.ts'
 import { getLang } from '../i18n.ts'
 import { ta } from '../i18nAtelier.ts'
 import { randomId } from '../ids.ts'
@@ -55,6 +58,51 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
   const [who, setWho] = useState('')
   const [note, setNote] = useState('')
   const alive = useRef(true)
+
+  /** Keep a drawing as a private archive entry and hang it in the room as a keepsake. */
+  const keepDrawing = (d: Drawing) => {
+    if (!d.strokes.length) return
+    const c = document.createElement('canvas')
+    c.width = c.height = 512
+    const g = c.getContext('2d')
+    if (!g) return
+    paintStrokes(g, 512, d.strokes)
+    c.toBlob((blob) => {
+      if (!blob) return
+      void blob.arrayBuffer().then((buf) => {
+        const assetId = randomId()
+        const postId = randomId()
+        const title = getLang() === 'zh' ? '我的空中绘画' : 'My air drawing'
+        const r = ctx.apply(compose(
+          addAsset({ id: assetId, mime: 'image/png', data: new Uint8Array(buf) }),
+          addPost({ id: postId, createdAt: new Date().toISOString(), title, body: ' ', imageIds: [assetId], kind: 'collection' }),
+          setPostObject(postId, 'photo', randomId()),
+        ))
+        ctx.toast(r.ok ? (getLang() === 'zh' ? '涂鸦已收藏，并挂进了房间' : 'Drawing kept and hung in your room') : r.reason, r.ok ? 'ok' : 'error')
+      })
+    }, 'image/png')
+  }
+
+  /** Turn a finished drawing into a website sticker asset, reusable in the Web Atelier. */
+  const saveSticker = (d: Drawing) => {
+    if (!d.strokes.length) return
+    const c = document.createElement('canvas')
+    c.width = c.height = 512
+    const g = c.getContext('2d')
+    if (!g) return
+    paintStrokes(g, 512, d.strokes)
+    c.toBlob((blob) => {
+      if (!blob) return
+      void blob.arrayBuffer().then((buf) => {
+        const id = randomId()
+        const r = ctx.apply(compose(
+          addAsset({ id, mime: 'image/png', data: new Uint8Array(buf) }),
+          designCmd(D.addDecoration({ id, kind: 'sticker', name: getLang() === 'zh' ? '手绘贴纸' : 'Hand-drawn sticker' })),
+        ))
+        ctx.toast(r.ok ? (getLang() === 'zh' ? '贴纸已保存，去网站工坊的贴纸组件选用它' : 'Sticker saved — pick it in the website studio') : r.reason, r.ok ? 'ok' : 'error')
+      })
+    }, 'image/png')
+  }
 
   const refresh = useCallback(async () => {
     try {
@@ -166,6 +214,8 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
         {...(writing.letter ? { initial: writing.letter } : {})}
         {...(writing.to ? { initialTo: writing.to } : {})}
         toast={ctx.toast}
+        onSaveSticker={saveSticker}
+        onKeepDrawing={keepDrawing}
         onClose={() => {
           setWriting(null)
           void refresh()
@@ -213,11 +263,13 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
               >
                 <Icon name="photo" size={18} /> {hasObject ? ta('mail.onWall') : ta('mail.frame')}
               </button>
-              {kept && (['desk','shelf'] as const).map(group => (
+              {kept && (['desk','shelf','cabinet'] as const).map(group => (
                 <button type="button" class="btn" onClick={() => {
                   const gift = ctx.project.gifts.find(g => g.mailId === open.id)
                   if (gift) run(ctx, placeGiftFrame(gift.postId, group, randomId()), ta('mail.framed'))
-                }}>{getLang() === 'zh' ? (group === 'desk' ? '摆到书桌' : '放上收藏架') : (group === 'desk' ? 'Frame on desk' : 'Frame on shelf')}</button>
+                }}>{getLang() === 'zh'
+                  ? (group === 'desk' ? '摆到书桌' : group === 'shelf' ? '放上收藏架' : '放进收藏柜')
+                  : (group === 'desk' ? 'Frame on desk' : group === 'shelf' ? 'Frame on shelf' : 'Keep in cabinet')}</button>
               ))}
               <button type="button" class="btn" onClick={() => (setOpen(null), setWriting({ to: open.from, letter: template('thinking') }))}>
                 <Icon name="mail" size={18} /> {ta('mail.reply')}
