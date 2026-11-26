@@ -637,3 +637,105 @@ button.mail-row { cursor: pointer; }
 .home-perception{position:absolute;z-index:6;top:4.4rem;right:1rem;max-width:min(20rem,90vw);padding:.6rem;background:var(--card,#fffaed);border-radius:12px}.home-perception label{display:block}.cam-preview[hidden]{display:none!important}
 
 .calibrate-pad{position:relative;height:145px;aspect-ratio:1;margin:8px auto;border:1px dashed currentColor;border-radius:12px}.calibrate-pad span{position:absolute;width:12px;height:12px;border-radius:50%;transform:translate(-50%,-50%)}.calibrate-pad small{position:absolute;bottom:5px;left:5px;right:5px}
+
+/* ---------------------------------------------------------------- first-day journey */
+/* Arrival: a quiet "coming home" veil shown once on a brand-new home. */
+.arrival {
+  position: absolute; inset: 0; z-index: 40; display: grid; place-items: center;
+  background: radial-gradient(circle at 50% 42%, #2a2140 0%, #171227 70%);
+  color: #f6ead2; cursor: pointer; transition: opacity .6s ease; overflow: hidden;
+}
+.arrival.is-leaving { opacity: 0; pointer-events: none; }
+.arrival-art { position: absolute; inset: 0; display: grid; place-items: center; opacity: .9; }
+.ar-door {
+  width: min(240px, 42vw); aspect-ratio: 3/4; border-radius: 120px 120px 6px 6px;
+  background: linear-gradient(160deg, #b57a49, #8a5230); border: 6px solid #6e4227;
+  box-shadow: 0 0 0 12px rgba(255,255,255,.05), inset 0 0 40px rgba(0,0,0,.35);
+  transform-origin: left center; animation: ar-open 3.4s ease forwards;
+}
+.ar-glow {
+  position: absolute; width: min(420px, 80vw); aspect-ratio: 1; border-radius: 50%;
+  background: radial-gradient(circle, rgba(255,214,140,.42), transparent 65%); animation: ar-glow 3.4s ease forwards;
+}
+@keyframes ar-open { 0%,20% { transform: perspective(800px) rotateY(0deg); } 100% { transform: perspective(800px) rotateY(-62deg); } }
+@keyframes ar-glow { 0%,20% { opacity: 0; } 100% { opacity: 1; } }
+.arrival-copy { position: relative; z-index: 1; text-align: center; padding: 0 24px; max-width: 30rem; }
+.arrival-copy .ar-kicker { letter-spacing: .22em; text-transform: uppercase; font-size: .72rem; opacity: .7; margin: 0 0 14px; }
+.arrival-copy h2 { font-size: 2.4rem; margin: 0 0 12px; font-weight: 700; }
+.arrival-copy p { font-size: 1.05rem; opacity: .92; margin: 0 0 28px; }
+.arrival-copy small { opacity: .5; font-size: .75rem; }
+
+/* Boo's speech bubble, floating above the dock. */
+.boo-bubble {
+  position: absolute; z-index: 12; left: 50%; transform: translateX(-50%);
+  bottom: calc(104px + var(--safe-bottom)); display: flex; align-items: center; gap: 10px;
+  max-width: min(34rem, calc(100% - 32px)); padding: 8px 12px 8px 8px;
+  background: rgba(255, 250, 240, .96); color: #4a3224; border-radius: 18px;
+  border: 1.5px solid rgba(255,255,255,.8); box-shadow: 0 6px 24px rgba(60,35,20,.2);
+  animation: boo-in .32s cubic-bezier(.2,.9,.25,1);
+}
+.boo-bubble.tone-greet { border-color: #e8c07a; }
+.boo-bubble.tone-happy { border-color: #d98a6a; }
+.bb-avatar { flex: none; display: grid; place-items: center; width: 38px; height: 38px; border-radius: 50%; background: #f3e7d4; }
+.bb-line { font-size: .9rem; line-height: 1.35; }
+.bb-close { flex: none; border: 0; background: transparent; font-size: 1.2rem; color: #9c8a76; cursor: pointer; padding: 0 4px; }
+@keyframes boo-in { from { opacity: 0; transform: translate(-50%, 10px); } }
+.home:has(.scene.is-night) .boo-bubble { background: rgba(38, 30, 60, .95); color: #f0e2c8; border-color: rgba(255,255,255,.14); }
+
+/* First-day card: a calm checklist tucked to the side, never covering the room. */
+.first-day {
+  position: absolute; z-index: 10; top: calc(96px + var(--safe-top)); right: 16px;
+  width: 268px; max-width: calc(100vw - 32px); padding: 14px;
+  background: rgba(255, 250, 240, .93); border: 1.5px solid rgba(255,255,255,.8);
+  border-radius: 18px; box-shadow: 0 8px 28px rgba(60,35,20,.16); backdrop-filter: blur(10px);
+}
+.first-day.is-hidden { display: none; }
+.fd-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 8px; }
+.fd-head strong { font-size: .98rem; color: #4a3224; }
+.fd-sub { margin: 3px 0 0; font-size: .74rem; line-height: 1.35; color: #7b6650; }
+.fd-collapse { border: 0; background: transparent; cursor: pointer; color: #8a745e; padding: 2px; }
+.fd-body { margin-top: 10px; }
+.fd-progress { height: 6px; border-radius: 99px; background: #eadcc4; overflow: hidden; margin-bottom: 10px; }
+.fd-bar { display: block; height: 100%; border-radius: 99px; background: linear-gradient(90deg, #d98a6a, #e8b45c); transition: width .4s ease; }
+.fd-steps { list-style: none; margin: 0; padding: 0; display: grid; gap: 5px; }
+.fd-steps li { display: flex; align-items: center; gap: 8px; font-size: .8rem; color: #8a745e; padding: 3px 5px; border-radius: 8px; }
+.fd-steps li.is-next { background: #fff2de; color: #6a4a30; font-weight: 600; }
+.fd-steps li.is-done { color: #b09a80; text-decoration: line-through; text-decoration-color: #d8c7ae; }
+.fd-check { flex: none; width: 20px; height: 20px; display: grid; place-items: center; border-radius: 50%; background: #f0e3cd; }
+.fd-steps li.is-done .fd-check { background: #f6d99a; color: #8a5a2a; }
+.fd-complete { margin: 10px 2px 0; font-size: .8rem; color: #a5642a; font-weight: 600; }
+.fd-daily { margin-top: 12px; padding-top: 10px; border-top: 1px dashed #e1cfb4; }
+.fd-daily-title { display: flex; justify-content: space-between; align-items: baseline; gap: 6px; margin-bottom: 7px; }
+.fd-daily-title span { font-size: .8rem; font-weight: 700; color: #6a4a30; }
+.fd-daily-title small { font-size: .66rem; color: #9c8a76; }
+.fd-goals { display: flex; flex-wrap: wrap; gap: 5px; }
+.fd-goal { display: inline-flex; align-items: center; gap: 4px; font-size: .7rem; padding: 4px 8px; border-radius: 99px; background: #f4e9d6; color: #7b6650; }
+.fd-goal.is-done { background: #dfecdb; color: #4d7a4a; }
+.fd-hide { margin-top: 10px; border: 0; background: transparent; color: #9c8a76; font-size: .72rem; cursor: pointer; padding: 0; }
+.home:has(.scene.is-night) .first-day { background: rgba(38,30,60,.92); border-color: rgba(255,255,255,.14); }
+.home:has(.scene.is-night) .fd-head strong,
+.home:has(.scene.is-night) .fd-steps li.is-next,
+.home:has(.scene.is-night) .fd-daily-title span { color: #f0e2c8; }
+.home:has(.scene.is-night) .fd-steps li { color: #efe0c4; }
+.home:has(.scene.is-night) .fd-steps li.is-done { color: #8f816e; }
+.home:has(.scene.is-night) .fd-check { background: rgba(255,255,255,.12); }
+.home:has(.scene.is-night) .fd-sub,
+.home:has(.scene.is-night) .fd-hide,
+.home:has(.scene.is-night) .fd-goal { color: #c3b39c; }
+.home:has(.scene.is-night) .fd-goal { background: rgba(255,255,255,.1); }
+.home:has(.scene.is-night) .fd-goal.is-done { background: rgba(120,160,110,.32); color: #d6ecc9; }
+.home:has(.scene.is-night) .fd-complete { color: #f0c175; }
+.home:has(.scene.is-night) .fd-progress { background: rgba(255,255,255,.16); }
+.home:has(.scene.is-night) .fd-sub,
+.home:has(.scene.is-night) .fd-daily-title small { color: #a99b88; }
+
+@media (max-width: 899px) {
+  .first-day { top: auto; bottom: calc(84px + var(--safe-bottom)); right: 10px; left: 10px; width: auto; max-width: none; padding: 10px 12px; }
+  .fd-steps { grid-template-columns: 1fr 1fr; gap: 2px 8px; }
+  .boo-bubble { bottom: calc(150px + var(--safe-bottom)); }
+  .arrival-copy h2 { font-size: 2rem; }
+}
+@media (prefers-reduced-motion: reduce) {
+  .arrival, .boo-bubble, .fd-bar { animation: none; transition: none; }
+  .ar-door, .ar-glow { animation: none; transform: rotateY(-45deg); opacity: 1; }
+}

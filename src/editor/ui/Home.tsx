@@ -3,7 +3,7 @@ import { publicProjection } from '../../core/privacy.ts'
 import type { Post, Project } from '../../core/schema.ts'
 import type { RoomView } from '../../room3d/view.ts'
 import { moveDecor, updateRoomSkin, updateSite, type Command } from '../commands.ts'
-import { setLang, t, useLang } from '../i18n.ts'
+import { getLang, setLang, t, useLang } from '../i18n.ts'
 import { run, type Ctx } from './common.tsx'
 import { Decorate } from './Decorate.tsx'
 import { EntrySheet } from './EntrySheet.tsx'
@@ -24,6 +24,19 @@ import { Sheet } from './common.tsx'
 import { PEOPLE_ON, PeopleSheet } from './PeopleSheet.tsx'
 import {CameraControl} from './CameraControl.tsx'
 import { LivingClock } from './LivingClock.tsx'
+import { BooBubble, type BubbleTone } from './BooBubble.tsx'
+import { FirstDay } from './FirstDay.tsx'
+import { Arrival } from './Arrival.tsx'
+import {
+  completeGoal,
+  completeStep,
+  loadOnboarding,
+  notedWalk,
+  saveOnboarding,
+  type DailyGoal,
+  type FirstDayStep,
+  type Onboarding,
+} from '../../core/onboarding.ts'
 import { flushOutbox, inbox as fetchInbox } from '../people.ts'
 
 type Panel =
@@ -75,6 +88,49 @@ export function Home(props: { ctx: Ctx }) {
   const [showHint, setShowHint] = useState(() => {
     try { return localStorage.getItem('li-walk-hint') !== 'done' } catch { return true }
   })
+
+  // ---- First-day journey (device-local, keyed by slug; never stored in the home) ----
+  const slug = ctx.project.site.slug
+  const [onboarding, setOnboarding] = useState<Onboarding>(() => loadOnboarding(slug))
+  const onboardingRef = useRef(onboarding)
+  const [arrival, setArrival] = useState(() => !onboarding.introSeen)
+  const [booLine, setBooLine] = useState('')
+  const [booTone, setBooTone] = useState<BubbleTone>('hint')
+  const updateOnboarding = (fn: (o: Onboarding) => Onboarding) => {
+    const next = fn(onboardingRef.current)
+    onboardingRef.current = next
+    setOnboarding(next)
+    saveOnboarding(slug, next)
+  }
+  const sayBoo = (line: string, tone: BubbleTone = 'hint') => {
+    setBooTone(tone)
+    setBooLine(line)
+  }
+  const markStep = (step: FirstDayStep) => {
+    const wasDone = onboardingRef.current.done.includes(step)
+    updateOnboarding((o) => completeStep(o, step))
+    if (!wasDone) {
+      const praise: Record<FirstDayStep, string> = {
+        walk: getLang() === 'zh' ? '你走得很稳！家里每个角落都看看。' : 'Nice walking! Every corner is yours to see.',
+        diary: getLang() === 'zh' ? '写下来了。这是只属于你的记录。' : 'You wrote it down. That record is just yours.',
+        pet: getLang() === 'zh' ? '有你陪着，真好。' : 'It’s nice having you here.',
+        decorate: getLang() === 'zh' ? '家里变样了，我很喜欢。' : 'The place looks different. I like it.',
+        website: getLang() === 'zh' ? '你的网站工坊打开了，随心布置吧。' : 'Your website studio is open. Make it yours.',
+        publish: getLang() === 'zh' ? '门开了。想来的人可以进来了。' : 'The door is open. People can come in now.',
+      }
+      sayBoo(praise[step], 'happy')
+    }
+  }
+  const markGoal = (goal: DailyGoal) => updateOnboarding((o) => completeGoal(o, goal))
+  const openAtelier = () => { markStep('website'); setAtelier(true) }
+  const handleWalk = () => {
+    const before = onboardingRef.current
+    const after = notedWalk(before)
+    onboardingRef.current = after
+    setOnboarding(after)
+    saveOnboarding(slug, after)
+    if (!before.done.includes('walk') && after.done.includes('walk')) markStep('walk')
+  }
   // Letters: the server is contacted only after the owner has opened People once on this device.
   const [perceive,setPerceive]=useState(false)
   const [caught,setCaught]=useState(false)
@@ -123,6 +179,41 @@ export function Home(props: { ctx: Ctx }) {
     }, 9000)
     return () => window.clearTimeout(id)
   }, [showHint])
+
+  // On a brand-new home, open the door and have Boo welcome the owner behind the arrival veil.
+  useEffect(() => {
+    if (!arrival || !view) return
+    view.setDoorOpen(true)
+    view.pet.set('greet')
+    const id = window.setTimeout(() => view.setDoorOpen(false), 2400)
+    return () => window.clearTimeout(id)
+  }, [arrival, view])
+
+  const finishArrival = () => {
+    setArrival(false)
+    updateOnboarding((o) => ({ ...o, introSeen: true }))
+    sayBoo(getLang() === 'zh' ? '欢迎回家！我是 Boo。四处走走吧，点地板我就能跟上。' : 'Welcome home! I’m Boo. Walk around — tap the floor and I’ll follow.', 'greet')
+  }
+  // Detect first-day steps from real product state — never fake completion.
+  const prevPostCount = useRef(ctx.project.posts.length)
+  const prevDecorCount = useRef(ctx.project.room.decor.length)
+  const prevPublished = useRef(!!ctx.project.web.published)
+  useEffect(() => {
+    const p = ctx.project
+    if (p.posts.length > prevPostCount.current) {
+      markStep('diary')
+      markGoal('write')
+    }
+    prevPostCount.current = p.posts.length
+    if (p.room.decor.length > prevDecorCount.current) markStep('decorate')
+    prevDecorCount.current = p.room.decor.length
+    if (p.web.published && !prevPublished.current) {
+      markStep('publish')
+      markGoal('neighbour')
+    }
+    prevPublished.current = !!p.web.published
+  }, [ctx.project])
+
   const data = useMemo(() => toHomeData(ctx.project), [ctx.project])
   const history = useRef<Project[]>([])
   const [undoable, setUndoable] = useState(0)
@@ -162,6 +253,7 @@ export function Home(props: { ctx: Ctx }) {
   }
 
   const open = (p: Panel, focus?: string) => {
+    if (p && p.kind === 'people') markGoal('mail')
     if (focus) view?.focus(focus)
     // Boo walks over to keep you company where you are working.
     const spot = focus && ({ diary: 'desk', computer: 'desk', voice: 'desk', shelf: 'shelf', window: 'window', door: 'door' } as Record<string, 'desk' | 'shelf' | 'window' | 'door'>)[focus]
@@ -191,6 +283,9 @@ export function Home(props: { ctx: Ctx }) {
       case 'voice':
         return open({ kind: 'voice' }, 'voice')
       case 'pet':
+        markStep('pet')
+        markGoal('company')
+        view?.pet.respond('happy')
         if (unread) return open({kind:'people'}, 'pet')
         return open({ kind: 'pet' }, 'pet')
       case 'shelf':
@@ -209,7 +304,7 @@ export function Home(props: { ctx: Ctx }) {
     switch (c) {
       case 'decorate':
         setPanel(null)
-        return setAtelier(true)
+        return openAtelier()
       case 'walk':
         return setPanel({ kind: 'walk' })
       case 'move':
@@ -279,6 +374,7 @@ export function Home(props: { ctx: Ctx }) {
 
   return (
     <div class={`home${assistAlways || peek ? ' assist' : ''}${decorating ? ' is-decorating' : ''}`}>
+      {arrival && <Arrival onDone={finishArrival} />}
       {flatMode ? (
         <FlatHome ctx={ctx} onPick={onPick} />
       ) : (
@@ -290,6 +386,7 @@ export function Home(props: { ctx: Ctx }) {
           onPick={onPick}
           onCell={onCell}
           onView={setView}
+          onWalk={handleWalk}
         />
       )}
 
@@ -321,7 +418,14 @@ export function Home(props: { ctx: Ctx }) {
         </div>
       </header>
 
-      {!decorating && !flatMode && showHint && <p class="hud-hint">{t('hud.hint')}</p>}
+      {!arrival && !decorating && !atelier && !panel && !onboarding.dismissed && (
+        <FirstDay onboarding={onboarding} onHide={() => updateOnboarding((o) => ({ ...o, dismissed: true }))} />
+      )}
+      {!arrival && booLine && !panel && (
+        <BooBubble line={booLine} tone={booTone} onDone={() => setBooLine('')} />
+      )}
+
+      {!decorating && !flatMode && showHint && !arrival && <p class="hud-hint">{t('hud.hint')}</p>}
 
       {!decorating && (
         <nav class="dock" aria-label="Home">
@@ -337,7 +441,7 @@ export function Home(props: { ctx: Ctx }) {
           </button>
           <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} text />
           <DockBtn icon="sofa" label={t('hud.decorate')} onClick={startDecorate} text />
-          <DockBtn icon="palette" label={ta('crt.decorate')} onClick={() => setAtelier(true)} />
+          <DockBtn icon="palette" label={ta('crt.decorate')} onClick={openAtelier} />
           <DockBtn icon="mail" label={ta('mail.dock')} onClick={() => open({ kind: 'people' })} badge={unread} />
         </nav>
       )}
@@ -367,7 +471,7 @@ export function Home(props: { ctx: Ctx }) {
       )}
       {panel?.kind === 'computer' && <ComputerSheet onClose={close} onChoose={onComputer} />}
       {panel?.kind === 'publishing' && <Website ctx={ctx} onClose={close} onPreview={() => setPreviewing('published')} />}
-      {panel?.kind === 'door' && <DoorSheet ctx={ctx} onClose={close} onPreview={() => setPreviewing('published')} onAtelier={() => { setPanel(null); setAtelier(true) }} />}
+      {panel?.kind === 'door' && <DoorSheet ctx={ctx} onClose={close} onPreview={() => setPreviewing('published')} onAtelier={() => { setPanel(null); openAtelier() }} />}
       {panel?.kind === 'walk' && <WalkSheet ctx={ctx} onClose={close} />}
       {panel?.kind === 'move' && <MoveSheet ctx={ctx} onClose={close} />}
       {panel?.kind === 'settings' && (

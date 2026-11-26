@@ -25,6 +25,7 @@ import {
 import { buildExterior, type Exterior } from './exterior.ts'
 import { kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
 import { getAnimations, getModel, kitReady } from './models.ts'
+import { mat } from './materials.ts'
 import { Pet, type PetState } from './pet.ts'
 import { Avatar } from './avatar.ts'
 import { SLOT_POSES } from './slots.ts'
@@ -49,6 +50,8 @@ export type ViewOptions = {
   icon?: (id: string) => string
   onPick: (id: string) => void
   onCell?: (x: number, z: number) => void
+  /** Fired when the owner taps bare floor and the avatar walks there (explore mode). */
+  onWalk?: () => void
   /** Ids that get a visible hotspot button. Memory objects are added automatically. */
   hotspots: string[]
   reduceMotion: boolean
@@ -278,6 +281,7 @@ export class RoomView {
       this.doorTarget = this.doorOpen
       this.staticLamps = this.ctx.lamps.length
       this.staticGlows = this.ctx.glows.length
+      this.addHouseCharacter(data)
       return
     }
     this.shell = buildShell(data.house, data.wall, data.floor, this.ctx)
@@ -299,6 +303,47 @@ export class RoomView {
     this.doorTarget = this.doorOpen
     this.staticLamps = this.ctx.lamps.length
     this.staticGlows = this.ctx.glows.length
+    this.addHouseCharacter(data)
+  }
+
+  /**
+   * A visible structural difference between the two house types, without a new
+   * schema or moving any furniture: the villa gets a low partition that divides
+   * the open plan into a reading nook, the cabin stays open. Purely decorative
+   * geometry added to the static room; not pickable and not a navigation wall.
+   */
+  private addHouseCharacter(data: HomeData) {
+    if (data.house !== 'villa') return
+    const g = new THREE.Group()
+    const wallMat = mat('#f4efe4', { roughness: 0.9 })
+    const capMat = mat('#d9c7a8', { roughness: 0.75 })
+    // Low partition along x=3.15, from the back wall toward the middle, leaving a wide gap to walk through.
+    const part = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.82, 1.9), wallMat)
+    part.position.set(3.15, 0.41, 1.95)
+    part.castShadow = true
+    part.receiveShadow = true
+    const cap = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.06, 2.0), capMat)
+    cap.position.set(3.15, 0.85, 1.95)
+    cap.castShadow = true
+    g.add(part, cap)
+    // A short perpendicular return makes an L, hinting at a separate nook.
+    const ret = new THREE.Mesh(new THREE.BoxGeometry(1.1, 0.82, 0.14), wallMat)
+    ret.position.set(2.6, 0.41, 2.9)
+    ret.castShadow = true
+    const retCap = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.06, 0.2), capMat)
+    retCap.position.set(2.6, 0.85, 2.9)
+    g.add(ret, retCap)
+    // A raised rug tone marks the nook floor.
+    const nook = new THREE.Mesh(
+      new THREE.PlaneGeometry(2.3, 2.2),
+      new THREE.MeshStandardMaterial({ color: '#e8dcc4', roughness: 1 }),
+    )
+    nook.rotation.x = -Math.PI / 2
+    nook.position.set(4.72, 0.012, 2.0)
+    nook.receiveShadow = true
+    g.add(nook)
+    g.userData.houseCharacter = true
+    this.root.add(g)
   }
 
   private buildDynamic(data: HomeData) {
@@ -888,6 +933,7 @@ export class RoomView {
     this.avatar.goTo(cx + 0.5, cz + 0.5)
     this.followPet = true
     this.dirty = true
+    this.opts.onWalk?.()
   }
 
   /** Whether the owner's character is currently walking (for UI hints). */

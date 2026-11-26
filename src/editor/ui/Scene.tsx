@@ -61,6 +61,7 @@ export type SceneProps = {
   drift?: boolean
   onPick: (id: string) => void
   onCell?: (x: number, z: number) => void
+  onWalk?: () => void
   onView?: (v: RoomView | null) => void
 }
 
@@ -110,6 +111,7 @@ export function Scene(props: SceneProps) {
         icon: (id) => iconSvg(HOT_ICON[id] ?? 'book', id.startsWith('memory:') ? 12 : 18),
         onPick: (id) => latest.current.onPick(id),
         onCell: (x, z) => latest.current.onCell?.(x, z),
+        onWalk: () => latest.current.onWalk?.(),
         hotspots: latest.current.hotspots,
         reduceMotion: matchMedia('(prefers-reduced-motion: reduce)').matches,
         onContextLost: () => setProblem('gpu'),
