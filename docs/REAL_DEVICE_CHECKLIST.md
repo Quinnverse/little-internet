@@ -20,3 +20,12 @@ Device: ____________  OS/browser: ____________  Network: ____________  Date: ___
 **Android Chrome**: repeat 2–11. **Desktop Safari or Firefox**: repeat 2–11 with the mouse.
 
 Report anything odd with a screenshot; do not paste private entries.
+
+## V5 additions (camera and mail), all NOT_TESTED until someone ticks them
+- [ ] Laptop webcam: press "Use camera", see "Camera on", stop; the browser's camera light goes out.
+- [ ] Phone (iOS Safari and Android Chrome): same, over https; permission refusal shows the message.
+- [ ] Wave, two-hand heart, open palm, thumbs up each react once in Boo's panel; holding a pose does not repeat.
+- [ ] Air drawing: pinch draws, open lifts, losing the hand lifts; compare with mouse drawing.
+- [ ] Dim room: the "too dark" hint appears.
+- [ ] Two real phones: send a letter from A to B, B receives it, keeps it, hangs it; A sees "read".
+- [ ] Voice note and photo inside a letter: record, send, play on the other device.

@@ -77,7 +77,7 @@ Deploying to a server: [deploy/README.md](deploy/README.md) (status: written, no
 
 | Area | State |
 |---|---|
-| Tests | 135 unit and property tests; 36 headless-Chromium end-to-end checks; 17-check cross-browser smoke (Chromium) |
+| Tests | 210 unit and property tests; 45 Web Atelier end-to-end checks; 16 two-profile Heart Mail checks; 7 public-gift checks; 10 fake-camera checks (all headless Chromium); 17-check cross-browser smoke (Chromium). V5 status per area: [docs/v5/REPORT.md](docs/v5/REPORT.md) |
 | Safari / WebKit | **Not tested**: the WebKit build cannot start in the dev sandbox. Run `scripts/e2e-browser.mjs` with `BROWSER=webkit` |
 | Real phones | **Not tested.** Checklist: [docs/REAL_DEVICE_CHECKLIST.md](docs/REAL_DEVICE_CHECKLIST.md) |
 | Real users | **Not tested.** None were run. A task script exists on branch `feat/online-publish-r1` (`docs/user-testing/`) |
