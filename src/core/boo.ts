@@ -201,6 +201,10 @@ export function understand(i: BooInput): { reply: BooReply; ctx: BooContext } {
     })
   }
 
+  if (/写封信|怎么写信|信件建议|make a letter|write a letter|letter idea/.test(s)) {
+    return reply({ text: T(lang, 'Think of one moment you shared. Start with “I still remember…” and add a photo, a pressed flower sticker or your voice. You can choose a recipient in Letters when it feels ready.', '想一件你们一起经历的小事，从“我还记得……”写起。可以夹一张照片、贴一朵花，或者录下你的声音。写好后再去信件里选收件人。') })
+  }
+
   // ---- decoration help (uses real counts from the room)
   if (/decorat|furniture|what should i put|装修|摆什么|家具|布置/.test(s) && !/note|record|记录|笔记/.test(s)) {
     const free = i.freeSlots ?? 0

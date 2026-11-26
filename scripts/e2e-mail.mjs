@@ -19,7 +19,7 @@ const check = (name, ok, extra = '') => {
 
 const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 async function device(slug, title) {
-  const ctx = await browser.newContext({ viewport: { width: 1000, height: 900 }, locale: 'en-US' })
+  const ctx = await browser.newContext({ ...(process.env.VIDEOS ? {recordVideo:{dir:process.env.VIDEOS}} : {}), viewport: { width: 1000, height: 900 }, locale: 'en-US' })
   await ctx.addInitScript(() => {
     try {
       localStorage.setItem('li-flat', '1')
@@ -92,7 +92,7 @@ await row.click()
 await b.page.getByText('The sender keeps this one private').waitFor()
 check('B: a letter sent without "may show publicly" is marked private', true)
 await b.page.locator('.letter-open svg').waitFor()
-check('B: the letter is drawn', (await b.page.locator('.letter-open svg text').allTextContents()).join(' ').includes('Thinking of you'))
+check('B: the letter is drawn', (await b.page.locator('.letter-open svg text').allTextContents()).join(' ').includes('Dear night owl'))
 await b.page.getByRole('button', { name: 'Keep in my archive' }).click()
 await b.page.getByRole('button', { name: 'Kept in archive' }).waitFor()
 check('B: keeping creates a private archive entry', true)
@@ -160,6 +160,14 @@ if (radios > 0) {
   check('blocked: A can no longer pick B as a recipient', true, String(blockedFriends))
 }
 
+for (const device of [a,b]) {
+  const video = device.page.video()
+  await device.ctx.close()
+  if (video && process.env.VIDEOS) {
+    await video.saveAs(join(process.env.VIDEOS, device === a ? 'sender.webm' : 'recipient.webm'))
+    await video.delete()
+  }
+}
 await browser.close()
 const failed = results.filter((x) => !x).length
 console.log(`\n${results.length - failed}/${results.length} passed (Chromium automation, two profiles, real server; not real devices)`)

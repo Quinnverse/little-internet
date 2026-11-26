@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'preact/hooks'
 import { letterSummary, letterText, letterToSvg, type Letter } from '../../core/letter.ts'
-import { keepGift, setPostObject } from '../commands.ts'
+import { keepGift, placeGiftFrame } from '../commands.ts'
 import { getLang } from '../i18n.ts'
 import { ta } from '../i18nAtelier.ts'
 import { randomId } from '../ids.ts'
@@ -39,7 +39,7 @@ type Tab = 'inbox' | 'friends' | 'sent'
 
 const why = (e: unknown) => (e instanceof PeopleError && e.status === 0 ? ta('mail.offline') : e instanceof Error ? e.message : String(e))
 
-export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n: number) => void; onKept?: () => void; startTab?: Tab }) {
+export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n: number) => void; onKept?: () => void; startTab?: Tab; heartDraft?:boolean }) {
   const { ctx } = props
   const slug = ctx.project.site.slug
   const server = savedServer()
@@ -51,7 +51,7 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
   const [sentList, setSentList] = useState<SentItem[]>([])
   const [outbox, setOutbox] = useState<Pending[]>([])
   const [open, setOpen] = useState<FullMail | null>(null)
-  const [writing, setWriting] = useState<{ to?: string; letter?: Letter } | null>(null)
+  const [writing, setWriting] = useState<{ to?: string; letter?: Letter } | null>(()=>props.heartDraft?{letter:template('heart')}:null)
   const [who, setWho] = useState('')
   const [note, setNote] = useState('')
   const alive = useRef(true)
@@ -177,7 +177,7 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
 
   if (open) {
     const kept = keptMailIds.has(open.id)
-    const hasObject = ctx.project.gifts.some((g) => g.mailId === open.id && ctx.project.room.memory.some((o) => o.postId === g.postId))
+    const hasObject = ctx.project.gifts.some((g) => g.mailId === open.id && ctx.project.room.memory.some((o) => o.postId === g.postId && o.slot.startsWith('wall-')))
     const fromName = fr.friends.find((f) => f.slug === open.from)?.title || open.from
     return (
       <Sheet title={ta('mail.from', { from: fromName })} onClose={() => setOpen(null)} wide>
@@ -208,11 +208,17 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
                 onClick={async () => {
                   const id = await keep(open)
                   if (!id) return
-                  if (run(ctx, setPostObject(id, 'photo', randomId()), ta('mail.framed'))) props.onKept?.()
+                  if (run(ctx, placeGiftFrame(id, 'wall', randomId()), ta('mail.framed'))) props.onKept?.()
                 }}
               >
                 <Icon name="photo" size={18} /> {hasObject ? ta('mail.onWall') : ta('mail.frame')}
               </button>
+              {kept && (['desk','shelf'] as const).map(group => (
+                <button type="button" class="btn" onClick={() => {
+                  const gift = ctx.project.gifts.find(g => g.mailId === open.id)
+                  if (gift) run(ctx, placeGiftFrame(gift.postId, group, randomId()), ta('mail.framed'))
+                }}>{getLang() === 'zh' ? (group === 'desk' ? '摆到书桌' : '放上收藏架') : (group === 'desk' ? 'Frame on desk' : 'Frame on shelf')}</button>
+              ))}
               <button type="button" class="btn" onClick={() => (setOpen(null), setWriting({ to: open.from, letter: template('thinking') }))}>
                 <Icon name="mail" size={18} /> {ta('mail.reply')}
               </button>

@@ -6,7 +6,7 @@ import {
   moveMemoryObject,
   removeDecor,
   rotateDecor,
-  setPostObject,
+  removePlacement,
   updateRoomSkin,
   type Command,
 } from '../commands.ts'
@@ -173,7 +173,7 @@ export function Decorate(props: {
                   type="button"
                   class="btn btn-small btn-danger"
                   onClick={() => {
-                    if (apply(setPostObject(selMemory.postId, null, randomId()))) props.setSelected(null)
+                    if (apply(removePlacement(selMemory.id))) props.setSelected(null)
                   }}
                 >
                   {t('deco.takeDown')}

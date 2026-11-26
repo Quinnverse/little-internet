@@ -60,7 +60,7 @@ export const KIND_GROUPS: Record<MemoryKind, readonly SlotGroup[]> = {
   flower: ['sill', 'desk', 'shelf'],
   cassette: ['shelf', 'desk'],
   postcard: ['wall'],
-  photo: ['wall'],
+  photo: ['wall', 'desk', 'shelf'],
   ticket: ['wall'],
 }
 

@@ -54,19 +54,19 @@ export function template(name: 'thinking' | 'thanks' | 'heart' | 'flower' | 'sea
       return {
         v: 1,
         paper: 'kraft',
-        items: [text(zh ? '谢谢你。' : 'Thank you.', 300, 80), text(zh ? '你让今天好了一点。' : 'You made today a little better.', 440, 50), { id: newItemId(), t: 'seal', color: '#b33a3a', x: 780, y: 1080, rot: 0, scale: 1 }],
+        items: [{...text('FIELD STATION   /   07',170,30),font:'typewriter',rot:0} as LetterItem,{id:newItemId(),t:'tape',color:TAPES[0],x:590,y:995,rot:-12,scale:1.3},{id:newItemId(),t:'sticker',name:'flower',x:470,y:810,rot:-14,scale:3.2},text(zh ? '谢谢你。' : 'Thank you.', 300, 80), text(zh ? '你让今天好了一点。' : 'You made today a little better.', 440, 50), { id: newItemId(), t: 'seal', color: '#b33a3a', x: 780, y: 1080, rot: 0, scale: 1 }],
       }
     case 'sea':
       return {
         v: 1,
         paper: 'lined',
-        items: [text(zh ? '想起你，\n在海边。' : 'Thinking of you,\nby the sea.', 260, 60), { id: newItemId(), t: 'sticker', name: 'shell', x: 740, y: 900, rot: 12, scale: 2.2 }, { id: newItemId(), t: 'tape', color: TAPES[2], x: 500, y: 90, rot: -4, scale: 1 }],
+        items: [{...text('COASTAL POST   /   03',175,28),font:'typewriter',rot:0} as LetterItem,{id:newItemId(),t:'stamp',name:'postmark',label:'PORT 03',x:850,y:140,rot:9,scale:1.05},text(zh ? '想起你，\n在海边。' : 'Thinking of you,\nby the sea.', 260, 60), { id: newItemId(), t: 'sticker', name: 'shell', x: 740, y: 900, rot: 12, scale: 2.2 }, { id: newItemId(), t: 'tape', color: TAPES[2], x: 500, y: 90, rot: -4, scale: 1 }],
       }
     case 'thinking':
       return {
         v: 1,
-        paper: 'cream',
-        items: [text(zh ? '想你了。' : 'Thinking of you.', 300, 80), { id: newItemId(), t: 'stamp', name: 'heart', x: 820, y: 170, rot: 8, scale: 1 }, { id: newItemId(), t: 'sticker', name: 'sparkle', x: 220, y: 900, rot: 0, scale: 2 }],
+        paper: 'night',
+        items: [{...text('NIGHT LETTERS   /   01',220,29),color:'#c9c8dc',font:'typewriter',rot:0} as LetterItem,{...text(zh?'晚安，朋友。':'Dear night owl,',380,80),color:'#fff0ce',font:'serif',rot:0} as LetterItem,{...text(zh?'今晚窗外的月亮很亮。':'The moon kept your window lit.',575,42),color:'#f4e1ca'} as LetterItem,{id:newItemId(),t:'sticker',name:'moon',x:670,y:805,rot:0,scale:2}, { id: newItemId(), t: 'stamp', name: 'heart', x: 820, y: 170, rot: 8, scale: 1 }, { id: newItemId(), t: 'sticker', name: 'sparkle', x: 220, y: 900, rot: 0, scale: 2 }],
       }
   }
 }
@@ -115,6 +115,17 @@ export function LetterAtelier(props: {
   const sentOnce = useRef(false)
   const clientId = useRef(newClientId())
   const penRef = useRef<DrawPadHandle | null>(null)
+  const [calibrating,setCalibrating]=useState(false)
+  const [remaining,setRemaining]=useState(30)
+  const [gain,setGain]=useState(1)
+  const [cursor,setCursor]=useState({x:.5,y:.5,down:false})
+  useEffect(()=>{
+    if(!calibrating)return
+    const until=performance.now()+30000
+    const tick=setInterval(()=>{const left=Math.max(0,Math.ceil((until-performance.now())/1000));setRemaining(left);if(!left)setCalibrating(false)},200)
+    return ()=>clearInterval(tick)
+  },[calibrating])
+  const calibrated=(n:number)=>Math.max(0,Math.min(1,.5+(n-.5)*gain))
   const [proposal, setProposal] = useState(false)
 
   // A draft is kept on this device only, so closing by accident loses nothing.
@@ -288,18 +299,25 @@ export function LetterAtelier(props: {
           dark={letter.paper === 'night'}
           onCancel={() => setMode('edit')}
           onHandle={(h) => (penRef.current = h)}
-          extra={
+          extra={<>
+            <label>{getLang()==='zh'?'指尖灵敏度':'Pointer sensitivity'} <input type="range" min=".65" max="1.6" step=".05" value={gain} onInput={e=>setGain(Number(e.currentTarget.value))}/></label>
+            <button class="btn btn-small" onClick={()=>{penRef.current?.end();setRemaining(30);setCalibrating(!calibrating)}}>{calibrating?'✓ '+remaining+'s':'30s · '+(getLang()==='zh'?'校准':'Calibrate')}</button>
+            {calibrating&&<div class="calibrate-pad"><span style={{left:cursor.x*100+'%',top:cursor.y*100+'%',background:cursor.down?'#973c50':'#347e7a'}}/><small>{getLang()==='zh'?'移动食指到左右两侧，然后捏合、松开。练习不会写入信纸。':'Point left and right, pinch and release. Practice stays off the letter.'}</small></div>}
             <CameraControl
               mode="draw"
               hint={ta('cam.drawHint')}
               onAction={(a: Action) => {
+                if(calibrating){
+                  if(a.kind==='draw'||a.kind==='cursor')setCursor({x:calibrated(a.x),y:calibrated(a.y),down:a.kind==='draw'&&a.op!=='end'})
+                  return
+                }
                 const h = penRef.current
                 if (!h || a.kind !== 'draw') return
                 if (a.op === 'begin') h.begin()
-                if (a.op !== 'end') h.point(a.x * 1000, a.y * 1000, performance.now())
+                if (a.op !== 'end') h.point(calibrated(a.x) * 1000, calibrated(a.y) * 1000, performance.now())
                 else h.end()
               }}
-            />
+            /></>
           }
           onDone={(d: Drawing | null) => {
             setMode('edit')

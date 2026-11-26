@@ -22,6 +22,7 @@ import { hasKey, savedServer, siteStatus, siteUrl } from '../publish.ts'
 import { LIGHTS } from '../../core/room.ts'
 import { Sheet } from './common.tsx'
 import { PEOPLE_ON, PeopleSheet } from './PeopleSheet.tsx'
+import {CameraControl} from './CameraControl.tsx'
 import { flushOutbox, inbox as fetchInbox } from '../people.ts'
 
 type Panel =
@@ -70,6 +71,9 @@ export function Home(props: { ctx: Ctx }) {
   const [assistAlways, setAssistAlways] = useState(assistPref())
   const [peek, setPeek] = useState(false)
   // Letters: the server is contacted only after the owner has opened People once on this device.
+  const [perceive,setPerceive]=useState(false)
+  const [caught,setCaught]=useState(false)
+  const [heartLetter,setHeartLetter]=useState(false)
   const [unread, setUnread] = useState(0)
   const lastUnread = useRef<number | null>(null)
   useEffect(() => {
@@ -89,8 +93,8 @@ export function Home(props: { ctx: Ctx }) {
         const n = (await fetchInbox(slug, savedServer())).mail.filter((m) => m.unread).length
         if (stop) return
         // Boo reacts only to a letter that really arrived on the server.
-        if (lastUnread.current !== null && n > lastUnread.current) {
-          view?.pet.set('react')
+        if (n > (lastUnread.current ?? 0)) {
+          view?.pet.deliver()
           ctx.toast(ta('mail.arrived'))
         }
         lastUnread.current = n
@@ -174,6 +178,7 @@ export function Home(props: { ctx: Ctx }) {
       case 'voice':
         return open({ kind: 'voice' }, 'voice')
       case 'pet':
+        if (unread) return open({kind:'people'}, 'pet')
         return open({ kind: 'pet' }, 'pet')
       case 'shelf':
         // The shelf is where reading notes live; the Journal button opens the whole archive.
@@ -275,12 +280,20 @@ export function Home(props: { ctx: Ctx }) {
         />
       )}
 
+      {perceive&&!panel&&!decorating&&<div class="home-perception">
+        <CameraControl mode="boo" immersive hint="Boo" onFace={cue=>view?.pet.faceCue(cue)} onAction={action=>{
+          if(action.kind==='cursor')view?.pet.follow(action.x,action.y)
+          if(action.kind==='boo'){view?.pet.respond(action.reaction);if(action.reaction==='catch-heart')setCaught(true)}
+        }}/>
+        {caught&&<button class="btn" onClick={()=>{setCaught(false);setHeartLetter(true);open({kind:'people'})}}>♥ {lang==='zh'?'写一封爱心信':'Make a heart letter'}</button>}
+      </div>}
       <header class="hud-top">
         <div class="home-title">
           <h1>{ctx.project.site.title}</h1>
           {ctx.project.site.tagline && <p>{ctx.project.site.tagline}</p>}
         </div>
         <div class="hud-actions">
+          <button class="round" aria-label="Boo perception" aria-pressed={perceive} onClick={()=>setPerceive(!perceive)}><Icon name="eye" size={18}/></button>
           <button type="button" class="round" onClick={toggleLang} aria-label={t('hud.lang')} title={t('hud.lang')}>
             <Icon name="globe" size={18} /><span class="lang-text">{lang === 'en' ? '中文' : 'EN'}</span>
           </button>
@@ -363,7 +376,7 @@ export function Home(props: { ctx: Ctx }) {
           }}
         />
       )}
-      {panel?.kind === 'people' && <PeopleSheet ctx={ctx} onClose={close} onUnread={setUnread} />}
+      {panel?.kind === 'people' && <PeopleSheet ctx={ctx} heartDraft={heartLetter} onClose={()=>{setHeartLetter(false);close()}} onUnread={setUnread} />}
       {panel?.kind === 'light' && <LightSheet ctx={ctx} onClose={close} />}
       {previewing && <Preview project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
       {atelier && (

@@ -446,6 +446,18 @@ export const setPostObject =
     return { ...p, room: { ...base, memory: [...rest, { id: newId, kind, postId, slot }] } }
   }
 
+export const placeGiftFrame = (postId: string, group: 'wall' | 'desk' | 'shelf', id: string): Command => (p) => {
+  if (!p.gifts.some(g => g.postId === postId)) throw new Error('Gift must be saved first')
+  const slot = freeSlotsFor(p.room, 'photo').find(s => s.startsWith(group + '-'))
+  if (!slot) throw new Error('No free space here')
+  const memory = [...p.room.memory, { id, kind: 'photo' as const, postId, slot }]
+  return { ...p, room: { ...p.room, memory } }
+}
+
+export const removePlacement = (id: string): Command => p => ({
+  ...p, room: { ...p.room, memory: p.room.memory.filter(m => m.id !== id) },
+})
+
 export const moveMemoryObject =
   (id: string, slot: string): Command =>
   (p) => {
