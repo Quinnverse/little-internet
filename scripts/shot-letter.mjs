@@ -3,7 +3,7 @@ import { chromium } from 'playwright'
 const BASE = (process.env.BASE ?? 'http://127.0.0.1:4176').replace(/\/+$/, '') + '/'
 const OUT = process.env.SHOTS ?? '.shots-letter'
 mkdirSync(OUT, { recursive: true })
-const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+const browser = await chromium.launch({channel:process.env.PW_CHANNEL,  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 for (const [name, vp, mobile] of [['desktop', { width: 1280, height: 860 }, false], ['phone', { width: 390, height: 844 }, true]]) {
   const ctx = await browser.newContext({ viewport: vp, isMobile: mobile, hasTouch: mobile, locale: 'en-US' })
   await ctx.addInitScript(() => localStorage.setItem('li-flat', '1'))

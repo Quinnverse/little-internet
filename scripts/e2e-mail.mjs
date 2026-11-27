@@ -18,7 +18,7 @@ const check = (name, ok, extra = '') => {
 }
 
 const immersive = process.env.IMMERSIVE === '1'
-const browser = await chromium.launch({headless:!immersive, args: process.env.HEART_VIDEO ? ['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--use-file-for-fake-video-capture='+process.env.HEART_VIDEO] : immersive ? [] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+const browser = await chromium.launch({channel:process.env.PW_CHANNEL, headless:!immersive, args: process.env.HEART_VIDEO ? ['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--use-file-for-fake-video-capture='+process.env.HEART_VIDEO] : immersive ? [] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 async function device(slug, title) {
   const ctx = await browser.newContext({ ...(process.env.VIDEOS ? {recordVideo:{dir:process.env.VIDEOS}} : {}), viewport: immersive && slug===A ? {width:390,height:844} : { width: 1000, height: 900 },hasTouch:immersive,isMobile:immersive && slug===A, locale: 'en-US' })
   if (!immersive) await ctx.addInitScript(() => {
