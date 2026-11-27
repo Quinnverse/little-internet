@@ -22,7 +22,8 @@ import { hasKey, savedServer, siteStatus, siteUrl } from '../publish.ts'
 import { LIGHTS } from '../../core/room.ts'
 import { Sheet } from './common.tsx'
 import { PEOPLE_ON, PeopleSheet } from './PeopleSheet.tsx'
-import {CameraControl} from './CameraControl.tsx'
+import { CameraControl } from './CameraControl.tsx'
+import { DayOne } from './DayOne.tsx'
 import { flushOutbox, inbox as fetchInbox } from '../people.ts'
 
 type Panel =
@@ -255,6 +256,11 @@ export function Home(props: { ctx: Ctx }) {
   }
 
   const endDecorate = () => {
+    try {
+      localStorage.setItem(`li-day1-decor-${ctx.project.site.slug}`, '1')
+    } catch {
+      /* the task simply stays open */
+    }
     view?.pet.set('react') // Boo is pleased with the new look
     setDecorating(false)
     setSelected(null)
@@ -309,16 +315,28 @@ export function Home(props: { ctx: Ctx }) {
 
       {!decorating && !flatMode && <p class="hud-hint">{t('hud.hint')}</p>}
 
+      {!decorating && !panel && !previewing && !atelier && (
+        <DayOne
+          slug={ctx.project.site.slug}
+          posts={ctx.project.posts.length}
+          decorated={(() => { try { return localStorage.getItem(`li-day1-decor-${ctx.project.site.slug}`) === '1' } catch { return false } })()}
+          published={!!ctx.project.web.published}
+          onWrite={() => onPick('diary')}
+          onDecorate={startDecorate}
+          onPublish={() => open({ kind: 'publishing' })}
+        />
+      )}
+
       {!decorating && (
         <nav class="dock" aria-label="Home">
           {!flatMode && (
-            <>
+            <div class="dock-aux">
               <DockBtn icon="eye" label={ta('hud.hints')} onClick={() => setPeek((v) => !v)} />
-          <DockBtn icon="rotl" label={t('hud.rotateL')} onClick={() => view?.rotateBy(-Math.PI / 4)} />
+              <DockBtn icon="rotl" label={t('hud.rotateL')} onClick={() => view?.rotateBy(-Math.PI / 4)} />
               <DockBtn icon="rotr" label={t('hud.rotateR')} onClick={() => view?.rotateBy(Math.PI / 4)} />
-            </>
+            </div>
           )}
-          <button type="button" class="dock-main" onClick={() => onPick('diary')}>
+          <button type="button" class="dock-main" aria-label={t('hud.write')} onClick={() => onPick('diary')}>
             <Icon name="pen" size={20} /> <span>{t('hud.write')}</span>
           </button>
           <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} text />

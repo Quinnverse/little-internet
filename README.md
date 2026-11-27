@@ -13,9 +13,14 @@ that can become objects on a shelf, private-by-default publishing, and a site yo
 
 ## Try it in one minute
 
-Open the app. No account. On the first screen either **look at three published demo homes** (fictional owners, each
-a different style) or press **Try a demo home** to get your own private copy to decorate, write in, publish and
-export. A copy lives on your device and has a different address, so it can never overwrite the public demos.
+Open the app. No account. The first screen is a **cover, not a form**: a painted field of little homes, the story of
+what this place is, and one door. Push it open and a four-chapter **moving-in journal** asks for a name, a room, a
+companion and a kind of paper, while the 3D room changes behind the page. When you move in, a pinned **Day One**
+postcard offers three real things to do: write the first page, arrange one object, open the door and publish.
+
+If you only want to look around, the cover also leads to **three published demo homes** (fictional owners, each a
+different style). A demo becomes your own private copy to decorate, write in, publish and export. A copy lives on
+your device and has a different address, so it can never overwrite the public demos.
 
 | Demo home | Owner (fictional) | Website | Room |
 |---|---|---|---|

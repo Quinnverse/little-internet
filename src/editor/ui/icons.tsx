@@ -65,6 +65,8 @@ const PATHS = {
   suitcase: 'M4 8h16v12H4zM9 8V5h6v3M4 13h16',
   badge: 'M3 8h18v8H3zM6 12h5M14 11h4v2h-4z',
   pages: 'M7 3h9l4 4v14H7zM16 3v4h4M4 7v14h3',
+  sound: 'M4 9.5h4L13 5.5v13L8 14.5H4zM16.5 9a4 4 0 0 1 0 6M19 6.5a7.5 7.5 0 0 1 0 11',
+  mute: 'M4 9.5h4L13 5.5v13L8 14.5H4zM17 9.5l4 5M21 9.5l-4 5',
 } as const
 
 export type IconName = keyof typeof PATHS
