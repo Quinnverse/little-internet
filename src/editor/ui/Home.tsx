@@ -69,6 +69,9 @@ export function Home(props: { ctx: Ctx }) {
   const [flat, setFlat] = useState(() => flatPref() || sceneFailed())
   // Quiet by default: names and markers show on hover/focus, or when the owner asks (Hints button or Settings).
   const [assistAlways, setAssistAlways] = useState(assistPref())
+  const [immersed,setImmersed]=useState(false)
+  const [tour,setTour]=useState(()=>{try{return localStorage.getItem('boo-tour:'+ctx.project.site.slug)?-1:0}catch{return -1}})
+  const finishTour=()=>{setTour(-1);try{localStorage.setItem('boo-tour:'+ctx.project.site.slug,'1')}catch{}}
   const [peek, setPeek] = useState(false)
   // Letters: the server is contacted only after the owner has opened People once on this device.
   const [perceive,setPerceive]=useState(false)
@@ -172,7 +175,8 @@ export function Home(props: { ctx: Ctx }) {
       case 'diary':
         return open({ kind: 'entry' }, 'diary')
       case 'computer':
-        return open({ kind: 'computer' }, 'computer')
+        view?.focus('computer')
+        return setPreviewing(ctx.project.web.published ? 'published' : 'draft')
       case 'export':
         return open({ kind: 'move' }, 'export')
       case 'voice':
@@ -291,12 +295,16 @@ export function Home(props: { ctx: Ctx }) {
         }}>♡ {lang==='zh'?'递给 Boo 一颗心':'Give Boo a heart'}</button>}
         {caught&&<button class="btn" onClick={()=>{setCaught(false);setHeartLetter(true);open({kind:'people'})}}>♥ {lang==='zh'?'写一封爱心信':'Make a heart letter'}</button>}
       </div>}
+      {tour>=0 && !panel && !immersed && !perceive && <aside class="welcome-tour">
+        <strong>{'Boo'}</strong><p>{(lang==='zh'?['我给你留了灯。点一块空地，我们一起走进去。','书桌上有一本空白手账。写下今天想留住的一件小事，也可以只留给自己。','想念朋友时就打开信箱。交换好友码，选一张信纸，写一句话或放一颗爱心。']:['I left the light on. Tap an empty floor tile and walk in with me.','There’s a fresh page on the desk. Write one thing you want to remember. You can keep it private.','Missing someone? Open Letters, exchange friend codes, then send a note or a single heart.'])[tour]}</p>
+        <button class="chip" onClick={()=>tour===2?finishTour():setTour(tour+1)}>{tour===2?(lang==='zh'?'开始探索':'Explore'):(lang==='zh'?'继续':'Next')}</button> <button class="chip" onClick={finishTour}>{lang==='zh'?'自己逛逛':'Skip tour'}</button></aside>}
       <header class="hud-top">
-        <div class="home-title">
+        <div class="home-title" hidden={immersed}>
           <h1>{ctx.project.site.title}</h1>
           {ctx.project.site.tagline && <p>{ctx.project.site.tagline}</p>}
         </div>
         <div class="hud-actions">
+          <button class="round" aria-label={lang==='zh'?'切换沉浸模式':'Toggle immersive view'} aria-pressed={immersed} onClick={()=>setImmersed(!immersed)}>{immersed?'↩':'⛶'}</button>
           <button class="round" aria-label="Boo perception" aria-pressed={perceive} onClick={()=>setPerceive(!perceive)}><Icon name="eye" size={18}/></button>
           <button type="button" class="round" onClick={toggleLang} aria-label={t('hud.lang')} title={t('hud.lang')}>
             <Icon name="globe" size={18} /><span class="lang-text">{lang === 'en' ? '中文' : 'EN'}</span>
@@ -309,7 +317,7 @@ export function Home(props: { ctx: Ctx }) {
 
       {!decorating && !flatMode && <p class="hud-hint">{t('hud.hint')}</p>}
 
-      {!decorating && (
+      {!decorating && !immersed && (
         <nav class="dock" aria-label="Home">
           {!flatMode && (
             <>
@@ -323,6 +331,7 @@ export function Home(props: { ctx: Ctx }) {
           </button>
           <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} text />
           <DockBtn icon="sofa" label={t('hud.decorate')} onClick={startDecorate} text />
+          <DockBtn icon="globe" label={lang==='zh'?'网站管理':'Website tools'} onClick={()=>open({kind:'computer'})} />
           <DockBtn icon="palette" label={ta('crt.decorate')} onClick={() => setAtelier(true)} />
           <DockBtn icon="mail" label={ta('mail.dock')} onClick={() => open({ kind: 'people' })} badge={unread} />
         </nav>

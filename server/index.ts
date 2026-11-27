@@ -444,7 +444,7 @@ export function createApp(opts: AppOptions): {
       if (parts[1] === 'boo' && parts.length === 3 && req.method === 'POST') {
         const slug = parts[2]!
         owner(req,slug)
-        if (process.env.BOO_CHAT_OWNER !== slug) throw new HttpError(503,'Boo model is not configured for this home')
+        if (process.env.BOO_CHAT_OWNER !== slug && process.env.BOO_CHAT_ACCESS !== 'authenticated') throw new HttpError(503,'Boo model is not configured for this home')
         if (!allow('boo:'+slug,20,60_000)) throw new HttpError(429,'Please try again shortly')
         const data = JSON.parse((await readBody(req,48_000)).toString('utf8'))
         const {chatWithBoo} = await import('./boo-chat.ts')

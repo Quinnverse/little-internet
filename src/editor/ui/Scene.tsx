@@ -105,6 +105,7 @@ export function Scene(props: SceneProps) {
     let view: RoomView
     try {
       view = new RoomView({
+        ownerAvatar: !!props.onCell,
         container: host.current!,
         label: (id) => hotspotLabel(id, titles()),
         icon: (id) => iconSvg(HOT_ICON[id] ?? 'book', id.startsWith('memory:') ? 12 : 18),

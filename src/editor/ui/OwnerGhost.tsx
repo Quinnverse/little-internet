@@ -49,7 +49,7 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
   const [share,setShare] = useState(false)
   const [modelError,setModelError] = useState(false)
   const chat = useRef<{role:string;content:string}[]>([])
-  const [showVoice, setShowVoice] = useState(false)
+  const [showVoice, setShowVoice] = useState(true)
   const end = useRef<HTMLDivElement>(null)
   const freeSlots = useMemo(() => freeSlotsAll(ctx.project.room), [ctx.project.room])
 

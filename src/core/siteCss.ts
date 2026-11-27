@@ -255,6 +255,7 @@ function widgetRules(d: SiteDesign): string {
       const sel = `.w-${w.id}`
       const span = Math.min(w.layout.span, page.columns)
       const decl = [`grid-column:span ${span}`]
+      if (w.layout.layer || w.layout.offsetX || w.layout.offsetY) desk.push(`${sel}{position:relative;left:${w.layout.offsetX??0}px;top:${w.layout.offsetY??0}px;z-index:${w.layout.layer??0}}`)
       if (w.style.bg) decl.push(`background:${w.style.bg}`)
       if (w.style.fg) decl.push(`color:${w.style.fg}`)
       if (w.style.tilt) decl.push(`transform:rotate(${w.style.tilt * 0.8}deg)`)

@@ -43,6 +43,7 @@ export function PreviewFrame(props: {
   labels: Record<string, string>
   device: 'desktop' | 'phone'
   title: string
+  onAdjust: (id:string, dx:number, dy:number, resize:boolean, colWidth:number)=>void
   onSelect: (id: string | null) => void
 }) {
   const ref = useRef<HTMLIFrameElement>(null)
@@ -50,6 +51,8 @@ export function PreviewFrame(props: {
   const html = useMemo(() => renderPreviewPage(props.project, props.pageId, urlResolver(props.project)), [props.project, props.pageId])
   const onSelect = useRef(props.onSelect)
   onSelect.current = props.onSelect
+  const adjust=useRef(props.onAdjust)
+  adjust.current=props.onAdjust
   const selectedRef = useRef(props.selected)
   selectedRef.current = props.selected
   const labelsRef = useRef(props.labels)
@@ -76,6 +79,23 @@ export function PreviewFrame(props: {
       const style = doc.createElement('style')
       style.textContent = EDITOR_CSS
       doc.head.append(style)
+      if(frame.clientWidth>640){
+        for(const widget of doc.querySelectorAll<HTMLElement>('[data-w]')){
+          for (const resize of [false,true]){
+            const handle=doc.createElement('button')
+            handle.textContent=resize?'↔':'✥'
+            handle.title=resize?'Resize / 调整宽度':'Move / 移动'
+            handle.style.cssText='position:absolute;bottom:4px;'+(resize?'right:4px':'left:4px')+';z-index:30;pointer-events:auto;touch-action:none;cursor:grab'
+            widget.style.position='relative'
+            widget.append(handle)
+            let start:{x:number;y:number}|null=null
+            handle.onpointerdown=e=>{start={x:e.clientX,y:e.clientY};handle.setPointerCapture(e.pointerId)}
+            handle.onpointercancel=()=>{start=null;widget.style.translate=''}
+            handle.onpointermove=e=>{if(start&&!resize)widget.style.translate=(e.clientX-start.x)+'px '+(e.clientY-start.y)+'px'}
+            handle.onpointerup=e=>{if(!start)return;widget.style.translate='';adjust.current(widget.dataset.w!,e.clientX-start.x,e.clientY-start.y,resize,(widget.parentElement?.clientWidth??640)/Math.max(1,props.project.web.draft.pages.find(p=>p.id===props.pageId)?.columns??1));start=null}
+          }
+        }
+      }
       frame.contentWindow?.scrollTo(0, scroll.current)
       doc.addEventListener(
         'click',

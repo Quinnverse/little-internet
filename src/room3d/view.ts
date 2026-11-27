@@ -25,6 +25,8 @@ import {
 import { buildExterior, type Exterior } from './exterior.ts'
 import { kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
 import { getAnimations, getModel, kitReady } from './models.ts'
+import { Avatar } from './avatar.ts'
+import { RESERVED_CELLS } from '../core/room.ts'
 import { Pet, type PetState } from './pet.ts'
 import { SLOT_POSES } from './slots.ts'
 
@@ -50,6 +52,7 @@ export type ViewOptions = {
   onCell?: (x: number, z: number) => void
   /** Ids that get a visible hotspot button. Memory objects are added automatically. */
   hotspots: string[]
+  ownerAvatar?: boolean
   reduceMotion: boolean
   onHover?: (id: string | null) => void
   /** The GPU context was lost and could not be restored in time; show the owner a real choice. */
@@ -86,6 +89,7 @@ export class RoomView {
   readonly renderer: THREE.WebGLRenderer
   readonly scene = new THREE.Scene()
   readonly camera = new THREE.PerspectiveCamera(32, 1, 0.04, 80)
+  private avatar?: Avatar
   readonly pet: Pet
   private opts: ViewOptions
   private root = new THREE.Group()
@@ -193,6 +197,7 @@ export class RoomView {
     this.pet = new Pet('white', opts.reduceMotion)
     if (kitReady()) this.pet.useModel(getModel('pet_ghost')!, getAnimations('pet_ghost'))
     this.scene.add(this.pet.group)
+    if(opts.ownerAvatar){this.avatar=new Avatar(opts.reduceMotion);this.avatar.place(2.5,4.2);this.scene.add(this.avatar.group)}
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.34, 0.42, 36),
       new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0.95, depthWrite: false }),
@@ -234,6 +239,7 @@ export class RoomView {
     const skinChanged =
       !prev || prev.house !== data.house || prev.wall !== data.wall || prev.floor !== data.floor || prev.welcome !== data.welcome || this.kitUsed !== kitReady()
     if (skinChanged) this.buildStatic(data)
+    if(this.avatar) this.avatar.group.visible=this.mode==='home'
     this.buildDynamic(data)
     this.setNight(isNightNow(data.light), true)
     this.buildHotspots()
@@ -251,7 +257,8 @@ export class RoomView {
     if (this.kitUsed) {
       // Blender models (assets/blender). The code-drawn version below is the fallback.
       this.shell = kitShell(data.house, data.wall, data.floor, this.ctx)
-      this.root.add(this.shell.group)
+      if (data.house === 'villa') this.shell.group.scale.x = 1.42
+    this.root.add(this.shell.group)
       const f = kitFurniture(this.ctx, data.welcome)
       this.led = f.led
       this.root.add(f.group)
@@ -270,6 +277,7 @@ export class RoomView {
       return
     }
     this.shell = buildShell(data.house, data.wall, data.floor, this.ctx)
+    if (data.house === 'villa') this.shell.group.scale.x = 1.42
     this.root.add(this.shell.group)
     const desk = buildDesk(this.ctx)
     const chair = buildChair()
@@ -531,6 +539,7 @@ export class RoomView {
     this.mode = 'exterior'
     this.sun.position.set(-5, 10, 10)
     this.sun.target.position.set(0, 0, 0)
+    if(this.avatar)this.avatar.group.visible=false
     this.pet.frozen = true
     this.pet.placeXZ(this.ext.petSpot.x, this.ext.petSpot.z, 0.14)
     this.extraAnchors.set('bell', this.ext.bell.clone())
@@ -563,6 +572,7 @@ export class RoomView {
     this.dynamic.visible = true
     this.sun.position.set(8, 9, -8)
     this.sun.target.position.set(3, 0, 3)
+    if(this.avatar)this.avatar.group.visible=true
     this.pet.frozen = false
     this.pet.placeAt('door')
     this.pet.set('greet')
@@ -669,7 +679,7 @@ export class RoomView {
     if (!p) return
     // Look slightly below the object so it sits in the upper part of the screen.
     this.want.tgt.copy(p).add(new THREE.Vector3(0, -0.35, 0))
-    this.want.radius = Math.max(4.4, this.baseRadius * 0.5)
+    this.want.radius = Math.max(2.4, this.baseRadius * 0.3)
     this.want.pol = Math.max(this.basePol, 1.05)
     this.dirty = true
   }
@@ -832,13 +842,17 @@ export class RoomView {
       this.opts.onPick(id)
       return
     }
-    if (this.decorMode && this.opts.onCell) {
+    if (this.mode === 'home' && (this.avatar || this.decorMode)) {
       this.raycaster.setFromCamera(this.ndc(e), this.camera)
       const p = new THREE.Vector3()
       if (this.raycaster.ray.intersectPlane(this.floorPlane, p)) {
         const x = Math.floor(p.x)
         const z = Math.floor(p.z)
-        if (x >= 0 && z >= 0 && x < FLOOR_SIZE && z < FLOOR_SIZE) this.opts.onCell(x, z)
+        if (x >= 0 && z >= 0 && x < FLOOR_SIZE && z < FLOOR_SIZE) {
+          if(this.decorMode) this.opts.onCell?.(x,z)
+          else if (!RESERVED_CELLS.some(([a,b])=>a===x && b===z) && !this.data?.decor.some(d=>d.x===x && d.z===z)) this.avatar?.goTo(x+.5,z+.5)
+          this.dirty=true
+        }
       }
     }
   }
@@ -959,11 +973,13 @@ export class RoomView {
     }
 
     if (animated) {
+      this.avatar?.update(dt,t)
       this.pet.update(dt, t)
       if (this.led && this.data?.welcome) this.led.emissiveIntensity = 0.7 + (Math.sin(t * 3) + 1) * 0.5
       if (this.ring.visible) this.ring.scale.setScalar(1 + Math.sin(t * 5) * 0.05)
       for (const l of this.ctx.lamps) l.userData.flicker = l.distance < 2
     } else if (this.dirty) {
+      this.avatar?.update(0.016,t)
       this.pet.update(0.016, t)
     }
 

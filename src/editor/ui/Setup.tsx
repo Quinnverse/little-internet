@@ -65,7 +65,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
       <main class="setup">
         <div class="setup-hero">
           <h1>{t('setup.hero')}</h1>
-          <p class="muted">{t('setup.sub')}</p>
+          <p class="muted">{lang==='zh'?'我是 Boo，钥匙给你。先给家起个名字，进门后我带你认认路。':"I’m Boo. Here’s your key. Give this place a name and I’ll show you around."}</p>
         </div>
 
         <div class="card demo-card">

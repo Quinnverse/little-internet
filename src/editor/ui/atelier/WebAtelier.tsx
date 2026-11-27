@@ -296,7 +296,12 @@ export function WebAtelier(props: { ctx: Ctx; onClose: () => void }) {
         )}
 
         <main class="at-center">
-          <PreviewFrame project={p} pageId={page.id} selected={selected} labels={labels} device={device} title={ta('at.previewLabel')} onSelect={select} />
+          <PreviewFrame project={p} pageId={page.id} selected={selected} labels={labels} device={device} title={ta('at.previewLabel')} onAdjust={(id,dx,dy,resize,colWidth)=>{
+            const w=d.widgets.find(item=>item.id===id)
+            if(!w)return
+            const limit=(n:number)=>Math.max(-80,Math.min(80,Math.round(n)))
+            apply(D.setWidgetLayout(id,resize?{span:Math.min(page.columns,Math.max(1,w.layout.span+Math.round(dx/colWidth)))}:{offsetX:limit((w.layout.offsetX??0)+dx),offsetY:limit((w.layout.offsetY??0)+dy)}))
+          }} onSelect={select} />
           <p class="at-note muted small">{ta('at.onlyPublic')}</p>
         </main>
 
@@ -679,6 +684,8 @@ function Inspector(props: { ctx: Ctx; w: SiteWidget; d: SiteDesign; apply: Apply
       </Section>
 
       <Section title={ta('ed.layout')}>
+        <Range label={props.ctx.project.site.lang==='zh'?'桌面图层':'Desktop layer'} value={w.layout.layer??0} min={0} max={20} onChange={v=>apply(D.setWidgetLayout(w.id,{layer:v}))}/>
+        <Range label={props.ctx.project.site.lang==='zh'?'垂直偏移':'Vertical offset'} value={w.layout.offsetY??0} min={-80} max={80} onChange={v=>apply(D.setWidgetLayout(w.id,{offsetY:v}))}/>
         <Seg label={ta('ed.width')} value={Math.min(w.layout.span, pageCols)} options={([1, 2, 3, 4] as const).filter((n) => n <= pageCols).map((n) => [n, n === pageCols ? ta('ed.full') : `${n}/${pageCols}`] as const)} onChange={(v) => apply(D.setWidgetLayout(w.id, { span: v }))} />
         <Seg label={ta('ed.onPhone')} value={w.layout.mobile} options={[['full', ta('ed.full')], ['half', ta('ed.half')], ['hide', ta('ed.hide')]]} onChange={(v) => apply(D.setWidgetLayout(w.id, { mobile: v }))} />
         <Seg label={ta('ed.onDesktop')} value={w.layout.desktop} options={[['show', ta('ed.show')], ['hide', ta('ed.hide')]]} onChange={(v) => apply(D.setWidgetLayout(w.id, { desktop: v }))} />

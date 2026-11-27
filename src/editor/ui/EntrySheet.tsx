@@ -1,5 +1,5 @@
 import { useState } from 'preact/hooks'
-import { archiveLabel, KIND_FIELDS, parseTags, type FieldDef, type PostKind } from '../../core/archive.ts'
+import { archiveLabel, POST_KINDS, KIND_FIELDS, parseTags, type FieldDef, type PostKind } from '../../core/archive.ts'
 import type { Asset, Post } from '../../core/schema.ts'
 import { parseVideoUrl } from '../../core/video.ts'
 import { MEMORY_KINDS, type MemoryKind } from '../../core/room.ts'
@@ -27,7 +27,7 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; newKind?: PostKind; o
   const { ctx, post } = props
   const existingObject = post ? ctx.project.room.memory.find((m) => m.postId === post.id) : undefined
   const [keepsake, setKeepsake] = useState<MemoryKind | null>(existingObject?.kind ?? null)
-  const kind: PostKind = post?.kind ?? props.newKind ?? 'diary'
+  const [kind,setKind] = useState<PostKind>(post?.kind ?? props.newKind ?? 'diary')
   const lang = getLang()
   const [fields, setFields] = useState<Post['fields']>(post?.fields ?? {})
   const [tagText, setTagText] = useState((post?.tags ?? []).map((x) => `#${x}`).join(' '))
@@ -118,6 +118,10 @@ export function EntrySheet(props: { ctx: Ctx; post?: Post; newKind?: PostKind; o
 
   return (
     <Sheet title={`${post ? t('entry.edit') : t('entry.new')} · ${archiveLabel(`kind.${kind}`, lang)}`} onClose={props.onClose}>
+      {!post && <Field label={lang==='zh'?'这次想记录什么？':'What would you like to keep?'}>
+        <select value={kind} onChange={e=>setKind(e.currentTarget.value as PostKind)}>
+          {POST_KINDS.filter(k=>k!=='gift').map(k=><option value={k}>{archiveLabel('kind.'+k as `kind.${PostKind}`,lang)}</option>)}
+        </select></Field>}
       <Field label={t('entry.title')}>
         <input value={title} maxLength={120} placeholder={t('entry.titlePh')} onInput={(e) => setTitle(e.currentTarget.value)} />
       </Field>

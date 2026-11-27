@@ -630,3 +630,4 @@ button.mail-row { cursor: pointer; }
 .cam-preview video { object-fit:contain; }
 .cam-feedback { display:grid; gap:.2rem; text-align:center; font-size:.85rem; }
 .cam-guide { margin-top:.5rem; font-size:.85rem; }
+.welcome-tour{position:absolute;z-index:4;bottom:5.5rem;left:1rem;max-width:min(22rem,88vw);padding:.85rem 1rem;background:#fff6e5;color:#49392f;border-radius:1rem;box-shadow:0 3px 18px #33221133}.welcome-tour p{margin:.35rem 0 .65rem}

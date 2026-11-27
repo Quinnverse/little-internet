@@ -130,6 +130,9 @@ export type WidgetContent = z.infer<typeof WidgetContentSchema>
 
 export const WidgetLayoutSchema = z.object({
   /** Columns this widget spans on wide screens (clamped to the page's column count). */
+  layer: z.number().int().min(0).max(20).optional(),
+  offsetX: z.number().int().min(-80).max(80).optional(),
+  offsetY: z.number().int().min(-80).max(80).optional(),
   span: z.number().int().min(1).max(4),
   /** On phones the page has two columns: full width, half width, or hidden. */
   mobile: z.enum(['full', 'half', 'hide']),
