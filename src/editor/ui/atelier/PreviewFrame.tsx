@@ -89,7 +89,8 @@ export function PreviewFrame(props: {
             widget.style.position='relative'
             widget.append(handle)
             let start:{x:number;y:number}|null=null
-            handle.onpointerdown=e=>{start={x:e.clientX,y:e.clientY};handle.setPointerCapture(e.pointerId)}
+            handle.ondragstart=e=>e.preventDefault()
+            handle.onpointerdown=e=>{e.preventDefault();e.stopPropagation();start={x:e.clientX,y:e.clientY};handle.setPointerCapture(e.pointerId)}
             handle.onpointercancel=()=>{start=null;widget.style.translate=''}
             handle.onpointermove=e=>{if(start&&!resize)widget.style.translate=(e.clientX-start.x)+'px '+(e.clientY-start.y)+'px'}
             handle.onpointerup=e=>{if(!start)return;widget.style.translate='';adjust.current(widget.dataset.w!,e.clientX-start.x,e.clientY-start.y,resize,(widget.parentElement?.clientWidth??640)/Math.max(1,props.project.web.draft.pages.find(p=>p.id===props.pageId)?.columns??1));start=null}

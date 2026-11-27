@@ -21,6 +21,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
   const [count,setCount] = useState<number | null>(null)
   const [facePresent,setFacePresent] = useState(false)
   const trials:TrialSink = useRef(null)
+  const [edge,setEdge]=useState(false)
   const lastAction = useRef(0)
   const lastSeen = useRef(0)
   const [debug,setDebug]=useState(false)
@@ -108,6 +109,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
           props.onFace?.(cue)
         }} : {}),
         onFrame:(detected,present)=>{
+          setEdge(detected.some(hand=>hand.points.some(p=>p.x<.035 || p.x>.965 || p.y<.035 || p.y>.965)))
           setCount(detected.length)
           setFacePresent(present)
           if ((!detected.length && !present) || performance.now()-lastSeen.current>1800) setSeen('')
@@ -157,6 +159,8 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
           {hands && <span>{count ? (zh?`已检测到 ${count} 只手`:`${count} hand(s) tracked`) : (zh?'寻找手部，请让手腕也入镜':'Looking for hands. Include your wrists.')}</span>}
           {face && <span>{facePresent ? (zh?'已检测到面部':'Face tracked') : (zh?'寻找面部':'Looking for face')}</span>}
         </>}
+        {edge && <span>{zh?'手靠近画面边缘了，稍微后退，让手腕和指尖都入镜。':'Move back slightly so wrists and fingertips stay inside the frame.'}</span>}
+        {hands && count===2 && !edge && !seen && <span>{zh?'两只手都看到了。比心时食指在上、拇指在下，保持片刻。':'Both hands visible. For a heart, touch index tips above the thumbs and hold briefly.'}</span>}
         {seen && <strong>{ta('cam.seen',{what:seen})}</strong>}
         {hint==='dark' && <span>{ta('cam.dark')}</span>}
       </div>}
