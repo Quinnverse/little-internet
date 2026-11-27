@@ -10,10 +10,13 @@ import { Icon } from './icons.tsx'
  * The only door to the camera. Off until pressed. While on it always shows a "Camera on" light, a mirrored preview
  * and a Stop button. Video never leaves the page: only simple gesture events do, and the router decides what they may do.
  */
-export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void; hint: string }) {
+export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void; hint: string; immersive?:boolean; softwareRenderer?:boolean; onFace?:(cue:import('../../perception/face.ts').FaceCue)=>void }) {
   const [state, setState] = useState<CamState>('off')
   const [msg, setMsg] = useState('')
   const [hint, setHint] = useState<CamHint>('ok')
+  const [debug,setDebug]=useState(false)
+  const [hands,setHands] = useState(true)
+  const [face,setFace]=useState(false)
   const [seen, setSeen] = useState('')
   const [pen, setPen] = useState(false)
   const video = useRef<HTMLVideoElement>(null)
@@ -68,7 +71,10 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
           }
         },
         onHint: setHint,
-        onFrame: paint,
+        hands,
+        preferCPU: !!props.softwareRenderer,
+        ...(face&&props.onFace?{onFace:props.onFace}:{}),
+        ...(debug||!props.immersive?{onFrame:paint}:{}),
       },
       newClientId(),
     )
@@ -87,7 +93,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
             <Icon name="stop" size={16} /> {ta('cam.stop')}
           </button>
         ) : (
-          <button type="button" class="btn btn-small" onClick={() => void start()}>
+          <button type="button" class="btn btn-small" disabled={!hands && !face} onClick={() => void start()}>
             <Icon name="eye" size={16} /> {ta('cam.use')}
           </button>
         )}
@@ -97,7 +103,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
       {state === 'asking' && <p class="muted small" role="status">{ta('cam.asking')}</p>}
       {state === 'loading' && <p class="muted small" role="status">{ta('cam.loading')}</p>}
       {state === 'error' && <p class="error small" role="alert">{msg}</p>}
-      {state === 'on' && (
+      {state === 'on' && (!props.immersive||debug) && (
         <>
           <p class="muted small">{props.hint}</p>
           {hint === 'dark' && <p class="small" role="status">{ta('cam.dark')}</p>}
@@ -105,7 +111,11 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
           {seen && <p class="muted small" role="status">{ta('cam.seen', { what: seen })}</p>}
         </>
       )}
-      <div class="cam-preview" hidden={state !== 'on'}>
+      {props.immersive&&!live&&<details><summary>Perception options · 感知设置</summary>
+        <label><input type="checkbox" checked={hands} onChange={e=>setHands(e.currentTarget.checked)}/> Hand gestures · 手势</label>
+        <label><input type="checkbox" checked={face} onChange={e=>setFace(e.currentTarget.checked)}/> Face movements · 面部动作</label>
+        <label><input type="checkbox" checked={debug} onChange={e=>setDebug(e.currentTarget.checked)}/> Debug preview · 调试预览</label></details>}
+      <div class="cam-preview" hidden={state !== 'on'||(props.immersive&&!debug)}>
         <video ref={video} muted playsInline aria-hidden="true" />
         <canvas ref={overlay} width={160} height={120} aria-hidden="true" />
       </div>

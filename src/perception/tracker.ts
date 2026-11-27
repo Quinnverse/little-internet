@@ -13,7 +13,7 @@ export type HandTracker = {
 
 const url = (p: string) => new URL(p, document.baseURI).href
 
-export async function createHandTracker(mode: 'VIDEO' | 'IMAGE' = 'VIDEO'): Promise<HandTracker> {
+export async function createHandTracker(mode: 'VIDEO' | 'IMAGE' = 'VIDEO', preferCPU = false): Promise<HandTracker> {
   const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision')
   const fileset = await FilesetResolver.forVisionTasks(url('vision/wasm'))
   const make = (delegate: 'GPU' | 'CPU') =>
@@ -25,11 +25,12 @@ export async function createHandTracker(mode: 'VIDEO' | 'IMAGE' = 'VIDEO'): Prom
       minHandPresenceConfidence: 0.5,
       minTrackingConfidence: 0.5,
     })
-  let delegate: 'GPU' | 'CPU' = 'GPU'
+  let delegate: 'GPU' | 'CPU' = preferCPU ? 'CPU' : 'GPU'
   let lm: Awaited<ReturnType<typeof make>>
   try {
-    lm = await make('GPU')
-  } catch {
+    lm = await make(delegate)
+  } catch (error) {
+    if (preferCPU) throw error
     delegate = 'CPU'
     lm = await make('CPU')
   }

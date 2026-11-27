@@ -21,6 +21,10 @@ export const cameraSupported = () => typeof navigator !== 'undefined' && !!navig
  * The loop slows itself down when the device is slow and pauses while the tab is hidden.
  */
 export class CameraSession {
+  private epoch=0
+  private face: import('./face.ts').FaceTracker|null=null
+  private lastVideoTime = -1
+  private lastFace=0
   private stream: MediaStream | null = null
   private tracker: HandTracker | null = null
   private timer = 0
@@ -42,6 +46,9 @@ export class CameraSession {
     onEvent: (e: PerceptionEvent) => void
     onState: (s: CamState, message?: string) => void
     onHint?: (h: CamHint) => void
+    preferCPU?: boolean
+    hands?: boolean
+    onFace?: (cue:import('./face.ts').FaceCue)=>void
     onFrame?: (hands: readonly Hand[]) => void
   }
 
@@ -57,10 +64,15 @@ export class CameraSession {
 
   async start(): Promise<void> {
     if (this.running) return
+    const epoch=++this.epoch
+    this.lastVideoTime = -1
     this.cb.onState('asking')
     try {
-      this.stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false })
+      const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'user', width: { ideal: 640 }, height: { ideal: 480 }, frameRate: { ideal: 30 } }, audio: false })
+      if(epoch!==this.epoch){stream.getTracks().forEach(t=>t.stop());return}
+      this.stream=stream
     } catch (e) {
+      if(epoch!==this.epoch)return
       this.cb.onState('error', describeCameraError(e))
       return
     }
@@ -70,8 +82,21 @@ export class CameraSession {
       this.video.muted = true
       this.video.playsInline = true
       await this.video.play()
-      this.tracker = await createHandTracker('VIDEO')
+      if(epoch!==this.epoch)return
+      if (this.cb.hands !== false) {
+        const tracker = await createHandTracker('VIDEO', this.cb.preferCPU)
+        if (epoch !== this.epoch) { tracker.close(); return }
+        this.tracker = tracker
+      }
+      if(this.cb.onFace){
+        const {createFaceTracker}=await import('./face.ts')
+        if(epoch!==this.epoch)return
+        const face=await createFaceTracker()
+        if(epoch!==this.epoch){face.close();return}
+        this.face=face
+      }
     } catch (e) {
+      if(epoch!==this.epoch)return
       this.stop()
       this.cb.onState('error', e instanceof Error ? `Hand tracking could not start: ${e.message}` : 'Hand tracking could not start.')
       return
@@ -83,6 +108,8 @@ export class CameraSession {
   }
 
   stop() {
+    ++this.epoch
+    this.face?.close();this.face=null;this.canvas=null
     this.running = false
     window.clearTimeout(this.timer)
     document.removeEventListener('visibilitychange', this.onVis)
@@ -105,15 +132,20 @@ export class CameraSession {
   }
 
   private tick() {
-    if (!this.running || !this.tracker) return
+    if (!this.running) return
     if (document.hidden) return
     const t0 = performance.now()
-    if (this.video.readyState >= 2 && this.video.videoWidth > 0) {
+    if (this.video.readyState >= 2 && this.video.videoWidth > 0 && this.video.currentTime !== this.lastVideoTime) {
+      this.lastVideoTime = this.video.currentTime
       let hands: Hand[] = []
       try {
-        hands = this.tracker.detect(this.video, t0)
+        hands = this.tracker?.detect(this.video, t0) ?? []
       } catch {
         hands = []
+      }
+      if(this.face && t0-this.lastFace>=Math.max(80,this.ema*3)){
+        this.lastFace=t0
+        try{const cue=this.face.detect(this.video,t0);if(cue)this.cb.onFace?.(cue)}catch{this.stop();this.cb.onState('error','Face tracking interrupted. Start again to retry.');return}
       }
       this.cb.onFrame?.(hands)
       if (hands.length) this.sawHandAt = t0

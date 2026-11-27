@@ -35,3 +35,7 @@ Run `npm ls --all` for transitive packages; a full SBOM scan has **not** been ru
 ## GeoCities and historical sites
 The product is inspired by the culture of early personal homepages, webrings and 88×31 badges. No historical page,
 image, GIF or text from GeoCities archives or other sites is copied or shipped.
+
+The locally served MediaPipe Face Landmarker float16 v1 bundle is by Google (Apache-2.0). Its SHA-256 is
+`64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`.
+[Google model file](https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task) · [Task and model cards](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker).

@@ -128,6 +128,8 @@ export class RoomView {
   private anchorsKit = new Map<string, THREE.Vector3>()
   private staticLamps = 0
   private staticGlows = 0
+  readonly softwareRenderer: boolean
+  private lastShadowUpdate = -Infinity
   private mode: 'home' | 'exterior' = 'home'
   private extDoor = 0
   private extDoorTarget = 0
@@ -155,8 +157,14 @@ export class RoomView {
     this.opts = opts
     this.hotIds = opts.hotspots
     this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true, powerPreference: 'high-performance', preserveDrawingBuffer: false })
-    this.renderer.setPixelRatio(Math.min(window.devicePixelRatio || 1, 2))
-    this.renderer.shadowMap.enabled = true
+    const gl = this.renderer.getContext()
+    const debugRenderer = gl.getExtension('WEBGL_debug_renderer_info')
+    const rendererName = debugRenderer ? String(gl.getParameter(debugRenderer.UNMASKED_RENDERER_WEBGL)) : ''
+    const software = /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(rendererName)
+    this.softwareRenderer = software
+    this.renderer.setPixelRatio(software ? 0.75 : Math.min(window.devicePixelRatio || 1, 2))
+    this.renderer.shadowMap.enabled = !software
+    this.renderer.shadowMap.autoUpdate = false
     this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     const el = this.renderer.domElement
@@ -965,6 +973,11 @@ export class RoomView {
       this.fill.position.copy(this.camera.position)
     }
     if (animated || this.dirty || camChanged || fading || lightChanged) {
+      // The sun and furniture stay put. Reuse the depth map between pet animation samples.
+      if (this.dirty || fading || lightChanged || (animated && now - this.lastShadowUpdate >= 125)) {
+        this.renderer.shadowMap.needsUpdate = true
+        this.lastShadowUpdate = now
+      }
       this.renderer.render(this.scene, this.camera)
       this.updateHotspots()
       this.dirty = false

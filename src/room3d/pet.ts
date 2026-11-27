@@ -106,6 +106,11 @@ export class Pet {
     }
     this.zzz.visible = false
     this.group.add(this.zzz)
+    this.tokenMaterials = {heart: petToken('heart'), mail: petToken('mail')}
+    this.token.material.dispose()
+    this.token.material = this.tokenMaterials.heart
+    this.token.visible = false
+    this.group.add(this.token)
     this.group.userData.pick = 'pet'
     this.group.position.copy(this.pos)
   }
@@ -199,6 +204,37 @@ export class Pet {
   }
 
   private observeFor = 0
+  private tokenTime = 0
+  private token = new THREE.Sprite()
+  private tokenMaterials: Record<'heart' | 'mail', THREE.SpriteMaterial>
+
+  deliver() {
+    this.token.material = this.tokenMaterials.mail
+    this.tokenTime = 5
+    this.attend('door', 5)
+    this.nudge()
+  }
+
+  private waveTime=0
+  private lookTime=0
+  private lookYaw=0
+  private lookPitch=0
+  follow(x:number,y:number){if(this.still)return;this.lookTime=.5;this.lookYaw=(x-.5)*1.3;this.lookPitch=(y-.5)*.35}
+  faceCue(cue:'smile'|'blink'|'left'|'right'){
+    if(cue==='smile'||cue==='blink')this.nudge()
+    else this.follow(cue==='left'?.15:.85,.5)
+  }
+  respond(reaction:'greet'|'come'|'catch-heart'|'happy'){
+    if(reaction==='greet'){this.set('greet');this.waveTime=1.4;this.follow(.5,.5)}
+    else if(reaction==='come'){this.attend('rug',5)}
+    else {
+      if (reaction === 'catch-heart') {
+        this.token.material = this.tokenMaterials.heart
+        this.tokenTime = 2
+      }
+      this.set('react')
+    }
+  }
 
   nudge() {
     this.idleFor = 0
@@ -259,6 +295,17 @@ export class Pet {
       this.set('idle')
     }
 
+    this.tokenTime = Math.max(0, this.tokenTime - dt)
+    this.token.visible = this.tokenTime > 0
+    const catching = this.token.material === this.tokenMaterials.heart
+    const approach = catching && !this.still ? Math.max(0, this.tokenTime - 1.3) : 0
+    this.token.position.set(.22 + approach * .5, .79 + approach, .24)
+    this.token.scale.setScalar(.4 * Math.min(1, this.tokenTime * 4))
+    this.waveTime=Math.max(0,this.waveTime-dt)
+    this.lookTime=Math.max(0,this.lookTime-dt)
+    this.body.rotation.z=this.still?0:Math.sin(this.waveTime*17)*Math.min(.24,this.waveTime)
+    this.body.rotation.x+=( (this.lookTime?this.lookPitch:0)-this.body.rotation.x)*Math.min(1,dt*7)
+    if(this.lookTime)this.body.rotation.y+=(this.lookYaw-this.body.rotation.y)*Math.min(1,dt*8)
     const sleeping = this.state === 'sleep'
     this.hop = Math.max(0, this.hop - dt * 2.2)
     const hopY = Math.sin(this.hop * Math.PI) * 0.35
@@ -296,4 +343,22 @@ function zTexture(): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   return t
+}
+
+function petToken(kind: 'heart' | 'mail') {
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 128
+  const g = canvas.getContext('2d')!
+  g.textAlign = 'center'
+  g.textBaseline = 'middle'
+  g.font = 'bold 100px sans-serif'
+  g.lineWidth = 7
+  g.strokeStyle = '#fff5dc'
+  g.fillStyle = kind === 'heart' ? '#ca3859' : '#914c2d'
+  const glyph = kind === 'heart' ? '♥' : '✉'
+  g.strokeText(glyph, 64, 68)
+  g.fillText(glyph, 64, 68)
+  const map = new THREE.CanvasTexture(canvas)
+  map.colorSpace = THREE.SRGBColorSpace
+  return new THREE.SpriteMaterial({ map, transparent: true, depthWrite: false })
 }

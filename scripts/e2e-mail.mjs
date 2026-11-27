@@ -17,10 +17,11 @@ const check = (name, ok, extra = '') => {
   console.log(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? `  (${extra})` : ''}`)
 }
 
-const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+const immersive = process.env.IMMERSIVE === '1'
+const browser = await chromium.launch({headless:!immersive, args: process.env.HEART_VIDEO ? ['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream','--use-file-for-fake-video-capture='+process.env.HEART_VIDEO] : immersive ? [] : ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 async function device(slug, title) {
-  const ctx = await browser.newContext({ viewport: { width: 1000, height: 900 }, locale: 'en-US' })
-  await ctx.addInitScript(() => {
+  const ctx = await browser.newContext({ ...(process.env.VIDEOS ? {recordVideo:{dir:process.env.VIDEOS}} : {}), viewport: immersive && slug===A ? {width:390,height:844} : { width: 1000, height: 900 },hasTouch:immersive,isMobile:immersive && slug===A, locale: 'en-US' })
+  if (!immersive) await ctx.addInitScript(() => {
     try {
       localStorage.setItem('li-flat', '1')
     } catch {}
@@ -69,9 +70,25 @@ check('A now sees B as a friend (mutual)', true)
 await closeSheet(a)
 
 // ---- send a letter A -> B (golden path)
-await openPeople(a, 'Inbox')
-await a.page.getByRole('dialog').getByRole('button', { name: 'Write', exact: true }).click()
-await a.page.getByRole('button', { name: 'Thinking of you' }).click()
+if (immersive) {
+  await closeSheet(b)
+  await b.ctx.setOffline(true)
+  await a.page.bringToFront()
+  await a.page.getByRole('button',{name:'Boo perception'}).tap()
+  if (process.env.HEART_VIDEO) {
+    await a.page.getByRole('button',{name:/Use camera/}).tap()
+    await a.page.getByRole('button',{name:/Make a heart letter/}).waitFor({timeout:60000})
+    check('local video inference triggers the Boo catch-and-compose action',true)
+  } else {
+    await a.page.getByRole('button',{name:/Give Boo a heart/}).tap()
+  }
+  await a.page.screenshot({path:join(SHOTS,process.env.HEART_VIDEO?'camera-heart.png':'touch-heart.png')})
+  await a.page.getByRole('button',{name:/Make a heart letter/}).tap()
+} else {
+  await openPeople(a,'Inbox')
+  await a.page.getByRole('dialog').getByRole('button',{name:'Write',exact:true}).click()
+  await a.page.getByRole('button',{name:'Thinking of you'}).click()
+}
 await a.page.getByRole('button', { name: /Choose who gets it/ }).click()
 await a.page.getByRole('radio').first().check()
 const sendBtn = a.page.getByRole('button', { name: 'Send', exact: true })
@@ -82,8 +99,17 @@ await a.page.screenshot({ path: join(SHOTS, 'a-sent.png') })
 await a.page.getByRole('button', { name: 'Done' }).click()
 
 // ---- B receives, reads, keeps, hangs it
-await closeSheet(b)
-await openPeople(b, 'Inbox')
+if (immersive) {
+  await b.page.bringToFront()
+  await b.ctx.setOffline(false)
+  await b.page.getByText('A letter arrived.',{exact:true}).waitFor({timeout:35000})
+  await b.page.screenshot({path:join(SHOTS,'boo-delivers.png')})
+  await b.page.getByRole('button',{name:'Show what I can tap'}).click()
+  await b.page.locator('.hotspot[data-id="pet"]').click()
+} else {
+  await closeSheet(b)
+  await openPeople(b, 'Inbox')
+}
 const row = b.page.locator('.mail-row.unread').first()
 await row.waitFor({ timeout: 25000 })
 check('B: letter arrives in the inbox as unread', true)
@@ -92,7 +118,7 @@ await row.click()
 await b.page.getByText('The sender keeps this one private').waitFor()
 check('B: a letter sent without "may show publicly" is marked private', true)
 await b.page.locator('.letter-open svg').waitFor()
-check('B: the letter is drawn', (await b.page.locator('.letter-open svg text').allTextContents()).join(' ').includes('Thinking of you'))
+check('B: the letter is drawn', immersive ? (await b.page.locator('.letter-open svg rect').count()) > 1 : (await b.page.locator('.letter-open svg text').allTextContents()).join(' ').includes('Dear night owl'))
 await b.page.getByRole('button', { name: 'Keep in my archive' }).click()
 await b.page.getByRole('button', { name: 'Kept in archive' }).waitFor()
 check('B: keeping creates a private archive entry', true)
@@ -100,6 +126,24 @@ await b.page.getByRole('button', { name: 'Put on my wall' }).click()
 await b.page.getByRole('button', { name: 'On your wall' }).waitFor()
 check('B: the kept letter can be hung on the wall', true)
 await b.page.screenshot({ path: join(SHOTS, 'b-open.png') })
+
+if (immersive) {
+  await b.page.getByRole('button',{name:'Frame on desk'}).click()
+  await b.page.waitForTimeout(800)
+  await b.page.reload()
+  await b.page.locator('.scene canvas.room-canvas').waitFor()
+  await b.page.waitForFunction(()=>document.querySelectorAll('.hotspot[data-id^="memory:"]').length===2)
+  const placed=await b.page.evaluate(async ()=>{
+    const db=await new Promise(resolve=>{const q=indexedDB.open('little-internet');q.onsuccess=()=>resolve(q.result)})
+    const p=await new Promise(resolve=>{const q=db.transaction('kv').objectStore('kv').get('project');q.onsuccess=()=>resolve(q.result)})
+    db.close()
+    return p.room.memory.filter(m=>m.postId===p.gifts[0].postId).map(m=>m.slot)
+  })
+  check('two 3D placements reload against the same gift',placed.some(s=>s.startsWith('desk-'))&&placed.some(s=>s.startsWith('wall-')),placed.join(','))
+  await b.page.screenshot({path:join(SHOTS,'restored-3d.png')})
+  await openPeople(b,'Inbox')
+  await b.page.locator('.mail-row').first().click()
+}
 
 // ---- sender state follows reality
 await b.page.getByRole('dialog').last().getByRole('button', { name: 'Close' }).click() // closes the opened letter
@@ -128,7 +172,7 @@ check('retry after reconnect delivers', true)
 await a.page.getByRole('button', { name: 'Done' }).click()
 await closeSheet(b).catch(() => {})
 await openPeople(b, 'Inbox')
-await b.page.waitForTimeout(500)
+await b.page.locator('.mail-list .mail-row').nth(1).waitFor()
 const rows = await b.page.locator('.mail-list .mail-row').count()
 check('B has exactly 2 letters (no duplicate from the retry)', rows === 2, `rows=${rows}`)
 
@@ -140,7 +184,7 @@ await b.page.getByText('Blocked', { exact: true }).first().waitFor({ timeout: 10
 check('B blocks A', true)
 await closeSheet(a).catch(() => {})
 await openPeople(a, 'Inbox')
-await a.page.getByRole('button', { name: 'Send a heart' }).click({ trial: true }).catch(() => {})
+
 const blockedFriends = await a.page.evaluate(() => 0)
 await a.page.getByRole('dialog').getByRole('button', { name: 'Write', exact: true }).click()
 await a.page.getByRole('button', { name: 'Just a heart' }).click()
@@ -160,6 +204,14 @@ if (radios > 0) {
   check('blocked: A can no longer pick B as a recipient', true, String(blockedFriends))
 }
 
+for (const device of [a,b]) {
+  const video = device.page.video()
+  await device.ctx.close()
+  if (video && process.env.VIDEOS) {
+    await video.saveAs(join(process.env.VIDEOS, device === a ? 'sender.webm' : 'recipient.webm'))
+    await video.delete()
+  }
+}
 await browser.close()
 const failed = results.filter((x) => !x).length
 console.log(`\n${results.length - failed}/${results.length} passed (Chromium automation, two profiles, real server; not real devices)`)
