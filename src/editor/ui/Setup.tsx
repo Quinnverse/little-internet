@@ -13,7 +13,7 @@ import { GhostIcon } from './common.tsx'
 import { Icon } from './icons.tsx'
 import { describeProject, pickProjectFile } from './files.ts'
 import { Scene } from './Scene.tsx'
-import { sfx, setSoundMuted, soundMuted } from './sfx.ts'
+import { sfx, setSoundMuted, soundMuted, ambientVolume, setAmbientVolume, startAmbient, stopAmbient, primeSound } from './sfx.ts'
 
 /** Marks a freshly created home so Day One knows it may offer its three small tasks. */
 export function markDayOne(slug: string): void {
@@ -50,6 +50,24 @@ export function Setup(props: { onDone: (p: Project) => Result<Project>; onBack?:
   const [error, setError] = useState<string | null>(null)
   const [active, setActive] = useState(0)
   const [muted, setMuted] = useState(soundMuted())
+  const [vol, setVol] = useState(ambientVolume())
+  const [audioOpen, setAudioOpen] = useState(false)
+
+  // The room tone follows the first real gesture (browsers refuse before one),
+  // and stops when you leave the table for the room.
+  useEffect(() => {
+    const warm = () => {
+      primeSound()
+      startAmbient()
+    }
+    window.addEventListener('pointerdown', warm, { once: true })
+    window.addEventListener('keydown', warm, { once: true })
+    return () => {
+      window.removeEventListener('pointerdown', warm)
+      window.removeEventListener('keydown', warm)
+      stopAmbient()
+    }
+  }, [])
 
   // Desktop opens with the cursor already on the brass plate, like a game asking
   // for your name. Phones keep the keyboard down until you tap the plate.
@@ -103,20 +121,52 @@ export function Setup(props: { onDone: (p: Project) => Result<Project>; onBack?:
               <span aria-hidden="true">←</span> {t('ga.back')}
             </button>
           )}
-          <button
-            type="button"
-            class="gs-lang gs-sound"
-            aria-pressed={muted}
-            aria-label={t(muted ? 'ga.soundOff' : 'ga.soundOn')}
-            title={t(muted ? 'ga.soundOff' : 'ga.soundOn')}
-            onClick={() => {
-              const next = !muted
-              setMuted(next)
-              setSoundMuted(next)
-            }}
-          >
-            <Icon name={muted ? 'mute' : 'sound'} size={15} />
-          </button>
+          <div class="gs-audio-wrap">
+            <button
+              type="button"
+              class="gs-lang gs-sound"
+              aria-pressed={muted}
+              aria-expanded={audioOpen}
+              aria-label={t(muted ? 'ga.soundOff' : 'ga.soundOn')}
+              title={t(muted ? 'ga.soundOff' : 'ga.soundOn')}
+              onClick={() => setAudioOpen(!audioOpen)}
+            >
+              <Icon name={muted ? 'mute' : 'sound'} size={15} />
+            </button>
+            {audioOpen && (
+              <div class="gs-audio" role="dialog" aria-label={t('ga.audio')}>
+                <label class="gs-audio-row gs-audio-toggle">
+                  <input
+                    type="checkbox"
+                    checked={!muted}
+                    onChange={(e) => {
+                      const on = e.currentTarget.checked
+                      setMuted(!on)
+                      setSoundMuted(!on)
+                      if (on) startAmbient()
+                    }}
+                  />
+                  <span>{muted ? t('ga.muted') : t('ga.sound')}</span>
+                </label>
+                <label class="gs-audio-row">
+                  <span>{t('ga.ambient')}</span>
+                  <input
+                    type="range"
+                    min="0"
+                    max="100"
+                    value={Math.round(vol * 100)}
+                    aria-label={t('ga.ambient')}
+                    onInput={(e) => {
+                      const v = Number(e.currentTarget.value) / 100
+                      setVol(v)
+                      setAmbientVolume(v)
+                    }}
+                  />
+                </label>
+                <p>{t('ga.audioHint')}</p>
+              </div>
+            )}
+          </div>
           <button
             type="button"
             class="gs-lang"
@@ -148,7 +198,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project>; onBack?:
             <p>{guide}</p>
             <i aria-hidden="true" />
           </div>
-          <img class="gs-boo-img" src="./art/boo-guide.webp" alt="" aria-hidden="true" />
+          <img class="gs-boo-img" src="./art/boo-guide.svg" alt="" aria-hidden="true" />
         </div>
 
         <section
@@ -204,7 +254,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project>; onBack?:
                 }}
               >
                 <span class="gs-room-photo">
-                  <img src={`./art/house-${h}.webp`} alt="" aria-hidden="true" />
+                  <img src={`./art/house-${h}.svg`} alt="" aria-hidden="true" />
                   <span class="gs-room-tag">{t(`house.${h}` as Key)}</span>
                   <span class="gs-room-seal" aria-hidden="true">✓</span>
                 </span>

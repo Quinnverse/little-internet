@@ -22,7 +22,7 @@ export function Prologue(props: { onStart: () => void; onDemo: () => void }) {
   }
   return (
     <div class={`cover${opening ? ' is-opening' : ''}`} role="main">
-      <img class="cover-art" src="./art/prologue-hero.webp" alt="" aria-hidden="true" />
+      <img class="cover-art" src="./art/prologue-hero.svg" alt="" aria-hidden="true" />
       <div class="cover-veil" aria-hidden="true" />
       <div class="cover-dust" aria-hidden="true">
         <i /><i /><i /><i /><i />
@@ -103,12 +103,23 @@ export function Prologue(props: { onStart: () => void; onDemo: () => void }) {
   )
 }
 
-/** The cover is remembered per device so a reload before moving in does not replay it every time. */
+/**
+ * The cover belongs to a visit, not to a device: every new session opens on the
+ * same dusk field, and a reload inside that session does not replay it.
+ */
 const COVER_KEY = 'li-cover-seen'
+
+function seenStore(): Storage | null {
+  try {
+    return window.sessionStorage ?? window.localStorage
+  } catch {
+    return null
+  }
+}
 
 export function coverSeen(): boolean {
   try {
-    return localStorage.getItem(COVER_KEY) === '1'
+    return seenStore()?.getItem(COVER_KEY) === '1'
   } catch {
     return false
   }
@@ -116,7 +127,7 @@ export function coverSeen(): boolean {
 
 export function markCoverSeen(): void {
   try {
-    localStorage.setItem(COVER_KEY, '1')
+    seenStore()?.setItem(COVER_KEY, '1')
   } catch {
     /* private mode: the cover simply shows again */
   }

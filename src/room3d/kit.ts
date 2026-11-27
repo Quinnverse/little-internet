@@ -132,6 +132,15 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   floor.position.set(3, 0.002, 3)
   floor.receiveShadow = true
   group.add(floor)
+
+  /**
+   * The kit ships one footprint for both houses, so the difference is made in
+   * the proportions and the dress: the cabin sits lower under its roof, the
+   * villa stands taller, with a pale skirting and a waist rail along the walls
+   * the cut-away leaves visible. Nothing is built into the open front.
+   */
+  group.scale.y = house === 'cabin' ? 0.93 : 1.06
+
   return { group, walls, doorPivot, floor }
 }
 

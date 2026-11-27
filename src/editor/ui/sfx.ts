@@ -1,16 +1,32 @@
-// Three tiny sounds, synthesised in the browser. No audio files, no autoplay:
-// every sound follows a real pointer or key gesture, and one mute switch (kept
-// in localStorage) silences all of them for this device.
-const KEY = 'li-sound-muted'
+// Four sounds, all synthesised in the browser: three small gestures (door, wax,
+// paper) and one room tone — crickets outside, a filament humming inside. No
+// audio files, no autoplay: everything follows a real pointer or key gesture,
+// one mute switch silences all of it, and the room tone has its own volume.
+const MUTE_KEY = 'li-sound-muted'
+const VOL_KEY = 'li-ambient-volume'
 
 let ctx: AudioContext | null = null
-let muted = read()
+let muted = readBool(MUTE_KEY)
+let volume = readVolume()
+let wanted = false
+let ambient: { master: GainNode; timer: number; nodes: AudioNode[] } | null = null
 
-function read(): boolean {
+function readBool(key: string): boolean {
   try {
-    return localStorage.getItem(KEY) === '1'
+    return localStorage.getItem(key) === '1'
   } catch {
     return false
+  }
+}
+
+function readVolume(): number {
+  try {
+    const raw = localStorage.getItem(VOL_KEY)
+    if (raw === null) return 0.4
+    const n = Number(raw)
+    return Number.isFinite(n) ? Math.min(1, Math.max(0, n)) : 0.4
+  } catch {
+    return 0.4
   }
 }
 
@@ -21,11 +37,26 @@ export function soundMuted(): boolean {
 export function setSoundMuted(v: boolean): void {
   muted = v
   try {
-    localStorage.setItem(KEY, v ? '1' : '0')
+    localStorage.setItem(MUTE_KEY, v ? '1' : '0')
   } catch {
     /* the switch still works for this visit */
   }
-  if (!v) audio()
+  if (v) stopAmbient()
+  else if (wanted) startAmbient()
+}
+
+export function ambientVolume(): number {
+  return volume
+}
+
+export function setAmbientVolume(v: number): void {
+  volume = Math.min(1, Math.max(0, v))
+  try {
+    localStorage.setItem(VOL_KEY, String(volume))
+  } catch {
+    /* the slider still works for this visit */
+  }
+  if (ambient) ambient.master.gain.setTargetAtTime(volume * 0.5, ambient.master.context.currentTime, 0.2)
 }
 
 function audio(): AudioContext | null {
@@ -129,6 +160,97 @@ function paper(c: AudioContext): void {
     n.start(now + offset)
     n.stop(now + offset + 0.15)
   }
+}
+
+/** One cricket, two or three dry chirps, a little way off in the garden. */
+function chirp(c: AudioContext, master: GainNode): void {
+  const now = c.currentTime + Math.random() * 0.6
+  const pitch = 3200 + Math.random() * 900
+  const count = 2 + (Math.random() < 0.4 ? 1 : 0)
+  for (let i = 0; i < count; i += 1) {
+    const at = now + i * 0.055
+    const n = noise(c, 0.03)
+    const band = c.createBiquadFilter()
+    band.type = 'bandpass'
+    band.Q.value = 16
+    band.frequency.value = pitch
+    const gain = c.createGain()
+    gain.gain.setValueAtTime(0.0001, at)
+    gain.gain.exponentialRampToValueAtTime(0.012, at + 0.006)
+    gain.gain.exponentialRampToValueAtTime(0.0001, at + 0.026)
+    n.connect(band).connect(gain).connect(master)
+    n.start(at)
+    n.stop(at + 0.04)
+  }
+}
+
+/**
+ * The room tone: a low filament hum, a whisper of air, and crickets outside.
+ * Very quiet by design — it should be noticed only when it stops.
+ */
+export function startAmbient(): void {
+  wanted = true
+  if (muted || ambient) return
+  const c = audio()
+  if (!c) return
+
+  const master = c.createGain()
+  master.gain.value = volume * 0.5
+  master.connect(c.destination)
+
+  const nodes: AudioNode[] = [master]
+
+  // Filament hum: 96 Hz with a soft second harmonic.
+  for (const [freq, peak] of [
+    [96, 0.028],
+    [192, 0.008],
+  ] as const) {
+    const osc = c.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.value = freq
+    const gain = c.createGain()
+    gain.gain.value = peak
+    const low = c.createBiquadFilter()
+    low.type = 'lowpass'
+    low.frequency.value = 420
+    osc.connect(low).connect(gain).connect(master)
+    osc.start()
+    nodes.push(osc, gain, low)
+  }
+
+  // Air in the room: a slow, low noise bed.
+  const air = noise(c, 4)
+  air.loop = true
+  const airLow = c.createBiquadFilter()
+  airLow.type = 'lowpass'
+  airLow.frequency.value = 380
+  const airGain = c.createGain()
+  airGain.gain.value = 0.05
+  air.connect(airLow).connect(airGain).connect(master)
+  air.start()
+  nodes.push(air, airLow, airGain)
+
+  const timer = window.setInterval(() => {
+    if (Math.random() < 0.75) chirp(c, master)
+  }, 1700)
+  ambient = { master, timer, nodes }
+}
+
+export function stopAmbient(): void {
+  wanted = false
+  if (!ambient) return
+  window.clearInterval(ambient.timer)
+  for (const node of ambient.nodes) {
+    try {
+      const stoppable = node as OscillatorNode & AudioBufferSourceNode
+      if (typeof stoppable.stop === 'function') stoppable.stop()
+      node.disconnect()
+    } catch {
+      /* already gone */
+    }
+  }
+  ambient.master.disconnect()
+  ambient = null
 }
 
 export function sfx(kind: 'door' | 'stamp' | 'paper'): void {

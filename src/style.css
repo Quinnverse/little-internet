@@ -801,6 +801,52 @@ button.mail-row { cursor: pointer; }
 .gs-sound { width: 38px; padding: 0; justify-content: center; }
 .gs-sound[aria-pressed="true"] { color: #a8907a; }
 
+/* The sound pill opens a small panel: one mute, one volume, no page of settings. */
+.gs-audio-wrap { position: relative; }
+.gs-audio-wrap .gs-sound[aria-expanded="true"] { background: #fffaf0; color: #3c2f24; }
+.gs-audio {
+  position: absolute; top: calc(100% + 10px); right: 0; z-index: 40;
+  width: 232px; padding: 13px 14px 11px; border-radius: 14px;
+  background: #fbf6ee; border: 1px solid #e4d8c6;
+  box-shadow: 0 14px 34px rgba(58, 44, 30, .16), 0 2px 0 rgba(255, 255, 255, .8) inset;
+  font-family: inherit; color: #3c2f24;
+  animation: gs-audio-in .16s ease-out both;
+}
+@keyframes gs-audio-in { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+.gs-audio::before {
+  content: ''; position: absolute; top: -6px; right: 15px; width: 10px; height: 10px;
+  background: #fbf6ee; border-left: 1px solid #e4d8c6; border-top: 1px solid #e4d8c6;
+  transform: rotate(45deg);
+}
+.gs-audio-row { display: flex; align-items: center; gap: 9px; font-size: 12.5px; line-height: 1.6; }
+.gs-audio-row + .gs-audio-row { margin-top: 9px; }
+.gs-audio-toggle input { accent-color: #7d6a52; width: 15px; height: 15px; }
+.gs-audio input[type=range] {
+  flex: 1; -webkit-appearance: none; appearance: none;
+  height: 16px; min-height: 0; margin: 0; padding: 0;
+  border: 0; border-radius: 0; background: transparent;
+  box-shadow: none; outline: none;
+}
+.gs-audio input[type=range]::-webkit-slider-runnable-track {
+  height: 3px; border-radius: 3px; background: #cbb99f;
+}
+.gs-audio input[type=range]::-moz-range-track {
+  height: 3px; border-radius: 3px; background: #cbb99f;
+}
+.gs-audio input[type=range]::-webkit-slider-thumb {
+  -webkit-appearance: none; width: 13px; height: 13px; border-radius: 50%;
+  background: #fbf6ee; border: 1px solid #a8907a; box-shadow: 0 1px 2px rgba(58, 44, 30, .18);
+  cursor: pointer; margin-top: -5px;
+}
+.gs-audio input[type=range]::-moz-range-thumb {
+  width: 12px; height: 12px; border-radius: 50%; background: #fbf6ee;
+  border: 1px solid #a8907a; cursor: pointer;
+}
+.gs-audio p { margin: 9px 0 0; font-size: 11px; line-height: 1.55; color: #8a7a67; }
+@media (max-width: 599px) {
+  .gs-audio { width: 210px; right: -2px; }
+}
+
 .gs-heading {
   position: fixed; z-index: 4; left: clamp(22px, 4vw, 54px); top: clamp(82px, 10.5vh, 112px);
   width: min(400px, 38vw); pointer-events: none;
@@ -1021,10 +1067,10 @@ button.mail-row { cursor: pointer; }
 
 /* the door: the only way in */
 .gs-paper { background-size: 118% 118%; background-position: center; background-repeat: no-repeat; }
-.gs-paper.ps-retro { background-image: url(/art/paper-retro.webp); }
-.gs-paper.ps-scrapbook { background-image: url(/art/paper-scrapbook.webp); }
-.gs-paper.ps-literary { background-image: url(/art/paper-literary.webp); }
-.gs-paper.ps-blank { background-image: url(/art/paper-blank.webp); }
+.gs-paper.ps-retro { background-image: url(/art/paper-retro.svg); }
+.gs-paper.ps-scrapbook { background-image: url(/art/paper-scrapbook.svg); }
+.gs-paper.ps-literary { background-image: url(/art/paper-literary.svg); }
+.gs-paper.ps-blank { background-image: url(/art/paper-blank.svg); }
 .gs-paper .sw-art, .gs-paper .sw-art::before, .gs-paper .sw-art::after { display: none; }
 
 .gs-door {
