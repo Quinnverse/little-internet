@@ -69,6 +69,8 @@ export function Home(props: { ctx: Ctx }) {
   const [flat, setFlat] = useState(() => flatPref() || sceneFailed())
   // Quiet by default: names and markers show on hover/focus, or when the owner asks (Hints button or Settings).
   const [assistAlways, setAssistAlways] = useState(assistPref())
+  const [inspect,setInspect]=useState(false)
+  useEffect(()=>{if(view)view.inspect=inspect && !decorating},[inspect,view,decorating])
   const [immersed,setImmersed]=useState(false)
   const [tour,setTour]=useState(()=>{try{return localStorage.getItem('boo-tour:'+ctx.project.site.slug)?-1:0}catch{return -1}})
   const finishTour=()=>{setTour(-1);try{localStorage.setItem('boo-tour:'+ctx.project.site.slug,'1')}catch{}}
@@ -275,7 +277,7 @@ export function Home(props: { ctx: Ctx }) {
       ) : (
         <Scene
           data={data}
-          hotspots={PRIMARY_HOTSPOTS}
+          hotspots={inspect?[]:PRIMARY_HOTSPOTS}
           decorate={decorating}
           selected={selected}
           onPick={onPick}
@@ -322,6 +324,7 @@ export function Home(props: { ctx: Ctx }) {
           {!flatMode && (
             <>
               <DockBtn icon="eye" label={ta('hud.hints')} onClick={() => setPeek((v) => !v)} />
+          <button class="chip" aria-pressed={inspect} onClick={()=>setInspect(!inspect)}>{lang==='zh'?'观察家具':'Inspect furniture'}</button>
           <DockBtn icon="rotl" label={t('hud.rotateL')} onClick={() => view?.rotateBy(-Math.PI / 4)} />
               <DockBtn icon="rotr" label={t('hud.rotateR')} onClick={() => view?.rotateBy(Math.PI / 4)} />
             </>
@@ -391,7 +394,7 @@ export function Home(props: { ctx: Ctx }) {
       )}
       {panel?.kind === 'people' && <PeopleSheet ctx={ctx} heartDraft={heartLetter} onClose={()=>{setHeartLetter(false);close()}} onUnread={setUnread} />}
       {panel?.kind === 'light' && <LightSheet ctx={ctx} onClose={close} />}
-      {previewing && <Preview project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
+      {previewing && <Preview direct onDecorate={()=>{setPreviewing(false);setAtelier(true)}} project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
       {atelier && (
         <WebAtelier
           ctx={ctx}

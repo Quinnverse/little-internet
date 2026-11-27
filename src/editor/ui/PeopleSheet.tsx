@@ -262,6 +262,7 @@ export function PeopleSheet(props: { ctx: Ctx; onClose: () => void; onUnread: (n
             {err} <button type="button" class="btn btn-small" onClick={() => {setReady('wait');setAttempt(a=>a+1)}}>{ta('let.retry')}</button>
           </p>
         )}
+        {ready==='ok' && !mail.length && !fr.friends.length && tab==='inbox' && <div class="card"><p>{getLang()==='zh'?'第一封信寄给谁？先和朋友交换好友码，再来挑信纸。收到的信可以收藏，摆在书桌或墙上。':'Who gets your first letter? Exchange friend codes, choose your stationery, then send. Letters you receive can live on your desk or wall.'}</p><button class="btn" onClick={()=>setTab('friends')}>{getLang()==='zh'?'交换好友码':'Exchange friend codes'}</button></div>}
         <div class="choice-row" role="tablist">
           {(['inbox', 'friends', 'sent'] as const).map((k) => (
             <button type="button" role="tab" key={k} aria-selected={tab === k} class={`chip${tab === k ? ' selected' : ''}`} onClick={() => setTab(k)}>

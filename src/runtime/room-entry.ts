@@ -434,6 +434,7 @@ function start(c: Clean) {
 }
 
 function run() {
+  if(new URLSearchParams(location.search).get('view')==='web') return
   const el = document.getElementById('room-data')
   if (!el || !el.textContent) return
   let raw: unknown

@@ -3,7 +3,7 @@ import { chromium } from 'playwright'
 const BASE = (process.env.BASE ?? 'http://127.0.0.1:4200')
 const SHOTS = process.env.SHOTS ?? '.v4shots'
 mkdirSync(SHOTS, { recursive: true })
-const b = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+const b = await chromium.launch({channel:process.env.PW_CHANNEL,  args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
 for (const [slug, tag] of [['the-book-nook', 'cabin'], ['somewhere-by-the-sea', 'villa']]) {
   const p = await (await b.newContext({ viewport: { width: 1000, height: 700 } })).newPage()
   await p.goto(`${BASE}/@${slug}/`)

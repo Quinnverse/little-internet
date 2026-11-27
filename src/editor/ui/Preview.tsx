@@ -5,7 +5,7 @@ import { t, useLang } from '../i18n.ts'
 import { previewSupported, updatePreview } from '../preview.ts'
 import { Icon } from './icons.tsx'
 
-export function Preview(props: { project: Project; design?: DesignChoice; onClose: () => void }) {
+export function Preview(props: { project: Project; design?: DesignChoice; direct?: boolean; onDecorate?:()=>void; onClose: () => void }) {
   useLang()
   const [src, setSrc] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
@@ -26,10 +26,11 @@ export function Preview(props: { project: Project; design?: DesignChoice; onClos
     <div class="preview" role="dialog" aria-modal="true" aria-label={t('preview.title')}>
       <div class="preview-bar">
         <span><Icon name="eye" size={18} /> {t('preview.bar')}</span>
+        {props.onDecorate && <button class="btn" onClick={props.onDecorate}>{props.project.site.lang==='zh'?'装修网站':'Decorate my website'}</button>}
         <button type="button" class="btn" onClick={props.onClose}>{t('common.done')}</button>
       </div>
       {error && <p class="error" role="alert">{error}</p>}
-      {src && <iframe class="preview-frame" src={src} title={t('preview.title')} />}
+      {src && <iframe class="preview-frame" src={props.direct?src+(src.includes('?')?'&':'?')+'view=web':src} title={t('preview.title')} />}
     </div>
   )
 }

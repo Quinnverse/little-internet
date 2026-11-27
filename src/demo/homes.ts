@@ -436,5 +436,5 @@ export function demoCopy(id: DemoId, baseUrl: string): Project {
   const p = buildDemo(id, baseUrl)
   const { published: _p, ...web } = p.web
   const { demo: _d, ...site } = p.site
-  return { ...p, site: { ...site, slug: `my-${id}`.slice(0, 32).replace(/-+$/, '') }, web }
+  return { ...p, site: { ...site, slug: `my-${id.slice(0,19)}-${crypto.randomUUID().slice(0,8)}` }, web }
 }

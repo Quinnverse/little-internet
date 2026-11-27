@@ -298,6 +298,7 @@ export function LetterAtelier(props: {
   if (mode === 'draw') {
     return (
       <Sheet title={ta('draw.title')} onClose={() => setMode('edit')} wide>
+        <p>{getLang()==='zh'?'用手指、笔或鼠标在纸上画。也可以点下面的爱心形状，再点「使用」贴到信上。':'Draw on the paper with a finger, pen or mouse. Or add a heart shape, then use the drawing in your letter.'}</p>
         <DrawPad
           dark={letter.paper === 'night'}
           onCancel={() => setMode('edit')}

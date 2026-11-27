@@ -30,8 +30,8 @@ async function skipRoom(pg) {
 }
 const shot = (page, name) => page.screenshot({ path: join(SHOTS, `${name}.png`) })
 
-const browser = await chromium.launch({ args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
-const owner = await browser.newContext({ ...(process.env.VIDEOS ? {recordVideo:{dir:process.env.VIDEOS}} : {}), viewport: { width: 1440, height: 900 }, acceptDownloads: true })
+const browser = await chromium.launch({channel:process.env.PW_CHANNEL, args: ['--use-gl=swiftshader', '--enable-unsafe-swiftshader'] })
+const owner = await browser.newContext({locale:"en-US", ...(process.env.VIDEOS ? {recordVideo:{dir:process.env.VIDEOS}} : {}), viewport: { width: 1440, height: 900 }, acceptDownloads: true })
 const page = await owner.newPage()
 page.on('pageerror', (e) => console.log('pageerror', e.message))
 
@@ -41,7 +41,7 @@ await page.locator('.setup').waitFor()
 await page.locator('.demo-links a').first().waitFor({ timeout: 10000 }).catch(() => {})
 check('first screen links to the three published demo homes', (await page.locator('.demo-links a').count()) === 3)
 await page.locator('.more-opts summary').click()
-await page.getByLabel('What is your home called?').fill('Pixel Harbor')
+await page.getByPlaceholder('Moon’s little home').fill('Pixel Harbor')
 await page.getByRole('button', { name: 'Retro Internet' }).click()
 await page.getByRole('button', { name: 'Move in' }).click()
 await page.locator('.home').waitFor()
@@ -124,7 +124,8 @@ await page.locator('.sheet-head button[aria-label="Close"]').last().click()
 
 // ---- 1-3: CRT → Decorate my website
 await page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
-await page.locator('.crt-item', { hasText: 'Decorate my website' }).click()
+await page.locator('.preview-frame').waitFor()
+await page.locator('.preview-bar').getByRole('button',{name:'Decorate my website'}).click()
 await page.locator('.atelier').waitFor()
 const frame = () => page.frameLocator('.at-frame')
 await frame().locator('[data-w]').first().waitFor()
@@ -191,7 +192,7 @@ await page.getByRole('button', { name: 'Not now' }).click().catch(() => {})
 await page.locator('.atelier .sheet-backdrop').click({ position: { x: 5, y: 5 } }).catch(() => {})
 
 // ---- 11-12: another device opens the address
-const visitor = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+const visitor = await browser.newContext({locale:"en-US", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 const vp = await visitor.newPage()
 await vp.goto(url)
 await skipRoom(vp)
@@ -246,7 +247,7 @@ check('opening the door publishes the site again', (await fetch(url)).status ===
 await page.keyboard.press('Escape')
 
 // ---- 14-15: export the website and open it offline on another host
-await page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
+await page.getByRole('button',{name:'Website tools'}).click()
 await page.locator('.crt-item', { hasText: 'Move my home' }).click()
 await page.getByRole('button', { name: 'Skip' }).click().catch(() => {})
 const [dl] = await Promise.all([page.waitForEvent('download'), page.getByRole('button', { name: 'Download website ZIP' }).click()])
@@ -261,7 +262,7 @@ if (SITE_DIR) {
     mkdirSync(dirname(join(SITE_DIR, name)), { recursive: true })
     writeFileSync(join(SITE_DIR, name), data)
   }
-  const offline = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+  const offline = await browser.newContext({locale:"en-US", viewport: { width: 1280, height: 800 } })
   const platformHits = []
   await offline.route(`${APP}**`, (r) => {
     platformHits.push(r.request().url())
@@ -299,7 +300,7 @@ const widgetCount = await page.evaluate(async () => {
     req.onerror = () => res(-1)
   })
 })
-const fresh = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+const fresh = await browser.newContext({locale:"en-US", viewport: { width: 1280, height: 800 } })
 const fp = await fresh.newPage()
 await fp.goto(APP)
 await fp.locator('.setup').waitFor()
@@ -325,7 +326,7 @@ await fresh.close()
 await owner.close()
 
 // ---- 17: Webring to a differently decorated home (demo homes seeded by e2e-atelier.sh)
-const walker = await browser.newContext({ viewport: { width: 1280, height: 800 } })
+const walker = await browser.newContext({locale:"en-US", viewport: { width: 1280, height: 800 } })
 const wp = await walker.newPage()
 await wp.goto(`${APP}@the-midnight-internet/`)
 await skipRoom(wp)
@@ -342,7 +343,7 @@ check('webring directory lists the three demo homes', (await wp.locator('li').co
 await walker.close()
 
 // ---- Try a demo home: a private copy that can be decorated
-const tryCtx = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
+const tryCtx = await browser.newContext({locale:"en-US", viewport: { width: 390, height: 844 }, isMobile: true, hasTouch: true })
 const tp = await tryCtx.newPage()
 await tp.goto(APP)
 await tp.getByRole('button', { name: 'Try a demo home' }).click()

@@ -26,7 +26,7 @@ import { buildExterior, type Exterior } from './exterior.ts'
 import { kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
 import { getAnimations, getModel, kitReady } from './models.ts'
 import { Avatar } from './avatar.ts'
-import { RESERVED_CELLS } from '../core/room.ts'
+import { box } from './materials.ts'
 import { Pet, type PetState } from './pet.ts'
 import { SLOT_POSES } from './slots.ts'
 
@@ -246,6 +246,20 @@ export class RoomView {
     this.dirty = true
   }
 
+  private extendVilla(house:House) {
+    if(house!=='villa')return
+    this.shell.group.scale.x=1.42
+    for(const wall of this.shell.walls)wall.point.x*=1.42
+    // A raised reading alcove spans the added bay, with steps facing the main room.
+    const platform=box(1.85,.26,3.2,'#c5976a',.04)
+    platform.position.set(7.35,.13,2.05)
+    const step=box(.35,.13,2.1,'#d2ad82',.025)
+    step.position.set(6.26,.065,2.05)
+    const seat=box(1.24,.32,.74,'#aab398',.09)
+    seat.position.set(7.4,.42,1.24)
+    this.root.add(platform,step,seat)
+  }
+
   private buildStatic(data: HomeData) {
     disposeTree(this.root)
     this.root.clear()
@@ -257,7 +271,7 @@ export class RoomView {
     if (this.kitUsed) {
       // Blender models (assets/blender). The code-drawn version below is the fallback.
       this.shell = kitShell(data.house, data.wall, data.floor, this.ctx)
-      if (data.house === 'villa') this.shell.group.scale.x = 1.42
+      this.extendVilla(data.house)
     this.root.add(this.shell.group)
       const f = kitFurniture(this.ctx, data.welcome)
       this.led = f.led
@@ -277,7 +291,7 @@ export class RoomView {
       return
     }
     this.shell = buildShell(data.house, data.wall, data.floor, this.ctx)
-    if (data.house === 'villa') this.shell.group.scale.x = 1.42
+    this.extendVilla(data.house)
     this.root.add(this.shell.group)
     const desk = buildDesk(this.ctx)
     const chair = buildChair()
@@ -598,6 +612,8 @@ export class RoomView {
 
   // ---------------------------------------------------------------- camera
 
+  inspect=false
+
   rotateBy(rad: number) {
     this.want.az += rad
     this.dirty = true
@@ -837,6 +853,12 @@ export class RoomView {
   }
 
   private tap(e: PointerEvent) {
+    if(this.inspect && this.mode==='home'){
+      this.raycaster.setFromCamera(this.ndc(e),this.camera)
+      const hit=this.raycaster.intersectObjects([...this.pickRoots,this.dynamic,this.pet.group],true)[0]
+      if(hit){this.want.tgt.copy(hit.point);this.want.radius=2.2;this.dirty=true}
+      return
+    }
     const id = this.hitId(e)
     if (id) {
       this.opts.onPick(id)
@@ -850,7 +872,7 @@ export class RoomView {
         const z = Math.floor(p.z)
         if (x >= 0 && z >= 0 && x < FLOOR_SIZE && z < FLOOR_SIZE) {
           if(this.decorMode) this.opts.onCell?.(x,z)
-          else if (!RESERVED_CELLS.some(([a,b])=>a===x && b===z) && !this.data?.decor.some(d=>d.x===x && d.z===z)) this.avatar?.goTo(x+.5,z+.5)
+          else if (!isReservedCell(x,z) && !this.data?.decor.some(d=>d.x===x && d.z===z)) this.avatar?.goTo(x+.5,z+.5)
           this.dirty=true
         }
       }
