@@ -135,3 +135,26 @@ Still open: two coincident wall quads at 4.32 m and 4.48 m (the shell's inner an
 the plaster into a faint pale rectangle on the left wall. Unifying the material made it worse — the
 overlapping quads then banded — so the real fix is to delete the outer face from the shell model or
 give it a different name and material, which is a one-line change in `build_props.py`.
+
+## Round 12 — the window finally has air behind it
+
+The flat painted sky was the last thing that made the room feel like a set rather than a place. The
+window texture is now a real layered landscape: four ridgelines drawn offscreen, each blurred by its
+own distance, a horizon haze band between every pair, a blurred cloud shelf, a radial sun glow that
+bleeds past the frame, moon halo at night, and the distant town reduced to points of light. Bloom,
+vignette and 2400 specks of grain sit on top, so the pane reads as distance instead of a poster.
+
+Also in this round:
+- the gallery board above the desk no longer casts a shadow (that soft rectangle of light it left on
+  the plaster is gone) and its white is pulled down 14%.
+- everything else about the pale patch on the wall is documented in the open list below, with the three
+  failed fixes, so nobody repeats them.
+
+Open after round 12:
+- the gallery backing board still shows as a pale rectangle when the desk lamp rakes across it. Three
+  fixes were tried and reverted: unifying the wall material (vertical banding), hiding meshes with no
+  map (killed the plaster texture everywhere), hiding the wall's `_2` face or the board object itself
+  (both took the prints with them — the prints share geometry groups and material instances with the
+  board). Fixing it properly means splitting the gallery in Blender into `board` + `print_*` with
+  separate material slots.
+- floor plank seams still read 1:1 dark; wall blotchiness repeats across the wide face; no real GI.

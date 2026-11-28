@@ -542,20 +542,22 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   scrap.position.set(4.95, 0.055, 1.55)
   scrap.rotation.set(0.4, 0.9, 0.2)
   g.add(scrap)
-  // The photo-wall panel exists only as a tap target for the wallpaper editor. Left visible it is a
-  // blank pale board over the wall, and under SSAO it reads as a hard-edged stain.
+  // The gallery above the desk hangs on a backing board. It reads as a pale rectangle against the
+  // plaster, and every attempt to hide it (hide the object, blank the material, hide the wall's spare
+  // face) also removed the prints — they share geometry groups and material instances with the board.
+  // So the board stays, but it is lit softer: no shadow casting, and its whiteness is pulled down.
   const photoWall = put(g, 'photo_wall', { at: [1.0, 1.75, 0.0], pick:'wall' })
   photoWall.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
-    // It still cast a soft rectangle of shadow onto the wall behind it — the pale stain.
     mesh.castShadow = false
-    mesh.receiveShadow = false
-    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
-      m.transparent = true
-      m.opacity = 0
-      m.depthWrite = false
-      m.colorWrite = false
+    mesh.geometry.computeBoundingBox()
+    const bb = mesh.geometry.boundingBox!
+    if (Math.max(bb.max.x - bb.min.x, bb.max.y - bb.min.y) < 0.5) return
+    const mats = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    for (const m of mats) {
+      const sm = m as THREE.MeshStandardMaterial
+      sm.color?.multiplyScalar(0.86)
     }
   })
   picks.push(photoWall)
