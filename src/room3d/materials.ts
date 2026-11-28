@@ -91,6 +91,36 @@ export function photoTex(key: keyof typeof TEX, srgb = false): THREE.Texture {
   return t
 }
 
+const softCache = new Map<string, THREE.Texture>()
+
+/**
+ * The 1k plaster photograph is honest at 20 cm and noisy at 2 m: from across the room the speckle
+ * reads as dirty concrete. This redraws it through a canvas with a blur + contrast trim so the wall
+ * becomes a smooth matte with a hint of tooth, the way the rooms in the reference footage look.
+ */
+export function softenTex(key: keyof typeof TEX, blur: number, contrast = 1, brightness = 1): THREE.Texture {
+  const id = `soft:${key}:${blur}:${contrast}:${brightness}`
+  const hit = softCache.get(id)
+  if (hit) return hit
+  const canvas = document.createElement('canvas')
+  canvas.width = canvas.height = 512
+  const t = new THREE.CanvasTexture(canvas)
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.colorSpace = /_nor$/.test(key) ? THREE.NoColorSpace : THREE.SRGBColorSpace
+  t.anisotropy = 4
+  t.userData.roomOwned = true
+  const img = new Image()
+  img.onload = () => {
+    const g = canvas.getContext('2d')!
+    g.filter = `blur(${blur}px) contrast(${contrast}) brightness(${brightness})`
+    g.drawImage(img, 0, 0, 512, 512)
+    t.needsUpdate = true
+  }
+  img.src = TEX[key]
+  softCache.set(id, t)
+  return t
+}
+
 /** Floor surface drawn on a canvas, so there are no image files to ship. */
 export function floorTexture(id: FloorId): THREE.CanvasTexture {
   if (id === 'checker') {

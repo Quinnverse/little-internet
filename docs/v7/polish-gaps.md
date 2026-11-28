@@ -85,3 +85,32 @@ tiled 3x), `white_stucco_02` (walls, normal at 0.17 so relief reads without goin
 
 Still open: plank seams read slightly too dark at 1:1; wall blotches repeat visibly on very wide walls;
 pale decor still edges toward clipping in direct lamp light.
+
+## Round 10 — weight, air and one palette
+
+The "still stiff" feeling was three separate things wearing one coat.
+
+**Nothing touched the floor.** The shadow map is one 2048 tile across eighteen metres, so the two
+centimetres under a cabinet are far below its resolution; furniture therefore read as stickers. Every
+piece now gets a soft radial darkening plane fitted to its footprint (`addContactShadows`), skipping
+rugs and anything standing on a desk. This is one draw call per piece against one shared texture, and
+it is the cheapest weight in the whole render.
+
+**The walls were concrete.** A 1k plaster photo at three-metre repeat is honest at 20 cm and noisy at
+two metres. `softenTex()` redraws it through a canvas with blur + contrast trim, normal down to 0.055.
+On top of that the wall shader now carries a baked falloff — darker at the floor line, at the ceiling
+line and into every corner, all derived from world position. Flat walls are what make a box read as a
+box, and no light rig fixes that.
+
+**Six colours were arguing.** A teal desk chair, a mauve armchair, a plum rug and a seven-hue shelf in
+one shot. `calmPalette` now pulls every saturated surface toward amber, drops saturation by half and
+leaves value structure alone; book spines and printed matter are explicitly exempt, because that is
+the one place in a room where colour is allowed to speak.
+
+Also in: window muntins and a 13% glass veil (a window with no joinery is a poster), hemisphere and
+ambient lifted (0.24/0.07 → 0.62/0.16) so the right wall stopped reading as a night scene, and the
+camera dropped to 1.19 polar so the rug and the floor carry more of the frame.
+
+Open, in priority order: real global illumination (bounce light off the floor is still faked), the
+shelf's cream band on every spine forms a visible staircase at close range, plank seams go too dark at
+1:1, and there is still no animated ambient motion inside the room itself.

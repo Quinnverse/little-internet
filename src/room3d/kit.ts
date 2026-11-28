@@ -4,7 +4,7 @@ import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room
 import type { BuildCtx, MemoryLook, Shell, Wall } from './builders.ts'
 import type { Exterior } from './exterior.ts'
 import { screenTexture } from './builders.ts'
-import { ball, floorRoughness, floorTexture, glowTexture, labelTexture, photoTex, WALL_COLORS } from './materials.ts'
+import { ball, floorRoughness, floorTexture, glowTexture, labelTexture, photoTex, softenTex, WALL_COLORS } from './materials.ts'
 import { getModel } from './models.ts'
 
 /**
@@ -19,7 +19,7 @@ type Opts = { at?: [number, number, number]; yaw?: number; pick?: string }
  * like a toy. Pulling saturation back a quarter and taking the edge off the brightest values is enough
  * to make the same geometry read as a room someone actually lives in.
  */
-function calmPalette(root: THREE.Object3D) {
+export function calmPalette(root: THREE.Object3D, amount = 1) {
   if (root.userData.calmed) return
   root.userData.calmed = true
   const seen = new Set<THREE.Material>()
@@ -31,9 +31,16 @@ function calmPalette(root: THREE.Object3D) {
       if (!mat || seen.has(mat) || !mat.color) continue
       seen.add(mat)
       if (/^emissive_/.test(mat.name) || mat.name === 'screen') continue
+      // Printed matter and book spines are *meant* to be the one place with colour; flattening those
+      // turns the shelf into grey cardboard.
+      if (/book|spine|poster|print|paper|page|sticker|label/i.test(mat.name)) continue
       const h = { h: 0, s: 0, l: 0 }
       mat.color.getHSL(h)
-      if (h.s > 0.3) mat.color.setHSL(h.h, Math.min(0.5, h.s * 0.68), Math.min(0.64, h.l * 0.9))
+      if (h.s < 0.22 || h.l > 0.82) continue
+      // Hue toward amber rather than flattening everything to one tone: the room keeps a little
+      // variety, it just stops arguing with itself.
+      const h2 = h.h + (0.09 - h.h) * 0.35 * amount
+      mat.color.setHSL((h2 + 1) % 1, h.s * (1 - 0.5 * amount), Math.min(0.7, h.l * 0.97))
     }
   })
 }
@@ -60,6 +67,9 @@ function surfaceDetail(root: THREE.Object3D, kind: 'weave' | 'wood') {
   root.traverse((o) => {
     const mesh = o as THREE.Mesh
     if (!mesh.isMesh) return
+    // Books and pages live inside the shelf model. Projecting timber grain over them printed a
+    // regular white grid across every spine — the exact artefact that makes a render look fake.
+    if (/book|page|paper|spine|sheet|label/i.test(mesh.name)) return
     const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
     for (const src of list) {
       const m = src as THREE.MeshStandardMaterial
@@ -98,9 +108,68 @@ function surfaceDetail(root: THREE.Object3D, kind: 'weave' | 'wood') {
 const DECOR_SURFACE: Record<string, 'wood' | 'weave'> = {
   plant: 'wood', cactus: 'wood', armchair: 'weave', stool: 'wood', basket: 'weave', bookcase: 'wood', floorlamp: 'wood',
 }
+export function applyKindTint(root: THREE.Object3D, kind: string) {
+  const hex = HOME_TINT[kind]
+  if (hex) tintObject(root, hex)
+}
+
 export function decorDetail(root: THREE.Object3D, kind: string) {
   const k = DECOR_SURFACE[kind]
   if (k) surfaceDetail(root, k)
+}
+
+let contactTex: THREE.CanvasTexture | null = null
+function contactTexture(): THREE.CanvasTexture {
+  if (contactTex) return contactTex
+  const s = 128
+  const c = document.createElement('canvas')
+  c.width = c.height = s
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(s / 2, s / 2, 0, s / 2, s / 2, s / 2)
+  grad.addColorStop(0, 'rgba(255,255,255,1)')
+  grad.addColorStop(0.45, 'rgba(255,255,255,0.62)')
+  grad.addColorStop(0.75, 'rgba(255,255,255,0.2)')
+  grad.addColorStop(1, 'rgba(255,255,255,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, s, s)
+  contactTex = new THREE.CanvasTexture(c)
+  contactTex.colorSpace = THREE.NoColorSpace
+  return contactTex
+}
+
+/**
+ * Furniture sat *on* the floor like stickers: the shadow map is one 2048 texture over 18 m, so the 2 cm
+ * under a cabinet is far below its resolution. This puts a soft radial darkening under every footprint
+ * instead. Cheap (one draw call per piece, one shared texture) and it is the single biggest cue that an
+ * object has weight.
+ */
+export function addContactShadows(container: THREE.Object3D) {
+  container.updateMatrixWorld(true)
+  const tex = contactTexture()
+  const box = new THREE.Box3()
+  for (const child of [...container.children]) {
+    if ((child as THREE.Mesh).isMesh && !child.children.length) {
+      // A flat plate (rug, mat) casting a shadow on itself reads as a stain; skip anything low.
+      if (box.setFromObject(child).isEmpty()) continue
+    }
+    const b = box.setFromObject(child)
+    if (b.isEmpty()) continue
+    const size = b.getSize(new THREE.Vector3())
+    const center = b.getCenter(new THREE.Vector3())
+    container.worldToLocal(center)
+    if (size.x < 0.08 || size.z < 0.08) continue
+    if (size.y < 0.12) continue // rugs, mats and decals
+    if (b.min.y > 0.06) continue // things standing on a desk or a shelf
+    const m = new THREE.Mesh(
+      new THREE.PlaneGeometry(size.x * 1.12, size.z * 1.12),
+      new THREE.MeshBasicMaterial({ color: 0x2a1c12, alphaMap: tex, transparent: true, depthWrite: false, opacity: 0.55 }),
+    )
+    m.rotation.x = -Math.PI / 2
+    m.position.set(center.x, 0.0085, center.z)
+    m.renderOrder = 1
+    m.userData.noShadow = true
+    container.add(m)
+  }
 }
 
 function put(parent: THREE.Object3D, name: string, o: Opts = {}): THREE.Group {
@@ -229,16 +298,28 @@ function cloneMats(root: THREE.Object3D, recolor?: (name: string) => string | nu
         const color = recolor?.(src.name)
         if (color) {
           c.color.set(color)
-          c.map=photoTex('wall_diff',true)
+          c.map=softenTex('wall_diff',7,0.8,1.06)
           c.map.userData.roomOwned=true
-          c.normalMap=photoTex('wall_nor')
-          c.normalScale.set(0.17,0.17)
+          c.normalMap=softenTex('wall_nor',3)
+          c.normalScale.set(0.055,0.055)
           c.roughnessMap=photoTex('wall_rough')
           c.roughness=1.0
           c.onBeforeCompile=(shader)=>{
             // Object-space axonometric projection: no UVs ship with the GLB, and the old world-space
             // (x+z) trick skewed the print on the walls that run the other way.
-            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vec2 tuv=(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y))*0.33; vMapUv=tuv;\n#ifdef USE_NORMALMAP\n vNormalMapUv=tuv;\n#endif\n#ifdef USE_ROUGHNESSMAP\n vRoughnessMapUv=tuv;\n#endif')
+            shader.vertexShader=shader.vertexShader
+              .replace('#include <common>', '#include <common>\nvarying vec3 vWallP;')
+              .replace('#include <uv_vertex>', '#include <uv_vertex>\nvWallP=(modelMatrix*vec4(position,1.)).xyz;\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vec2 tuv=(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y))*0.33; vMapUv=tuv;\n#ifdef USE_NORMALMAP\n vNormalMapUv=tuv;\n#endif\n#ifdef USE_ROUGHNESSMAP\n vRoughnessMapUv=tuv;\n#endif')
+            // ...and the same falloff in the shader: floor line, ceiling line, room corners.
+            shader.fragmentShader=shader.fragmentShader
+            .replace('#include <common>', '#include <common>\nvarying vec3 vWallP;')
+            .replace('#include <map_fragment>', `#include <map_fragment>
+            float aoW=1.0;
+            aoW*=mix(0.52,1.0,smoothstep(0.0,0.55,vWallP.y));
+            aoW*=mix(0.60,1.0,1.0-smoothstep(2.55,3.16,vWallP.y));
+            float eW=min(min(vWallP.x,6.0-vWallP.x),min(vWallP.z,6.0-vWallP.z));
+            aoW*=mix(0.68,1.0,smoothstep(0.0,0.55,eW));
+            diffuseColor.rgb*=aoW;`)
           }
         }
         c.userData.roomOwned=true
@@ -300,7 +381,9 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   // cardboard box, so the ceiling gets the same plaster tooth as the walls and a tone below the walls.
   const ceilMap = photoTex('wall_diff', true)
   ceilMap.repeat.set(2.4, 2.4)
-  const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(6.12,6.12),new THREE.MeshStandardMaterial({color:'#d7cdbb',map:ceilMap,roughness:1}))
+  // A ceiling only ever sees bounce light, so it renders as a dark lid. A little self-lit warmth
+  // standing in for the bounce is the difference between a lid and a ceiling.
+  const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(6.12,6.12),new THREE.MeshStandardMaterial({color:'#efe6d5',map:ceilMap,roughness:1,emissive:'#8f7758',emissiveIntensity:0.85}))
   ceiling.rotation.x=Math.PI/2
   ceiling.position.set(3,3.16,3)
   ceiling.name='interior-ceiling'
@@ -311,6 +394,21 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
     const pane=new THREE.Mesh(new THREE.PlaneGeometry(1.19,1.39),new THREE.MeshBasicMaterial({transparent:true}))
     pane.name='view-through-window';pane.position.set(3.2,1.7,-.048);pane.userData.pick='window'
     walls[0]!.group.add(pane);walls[0]!.mats.push(pane.material)
+    // A window without joinery is a poster: two muntins and a hint of haze give the opening a scale
+    // and put the landscape behind glass instead of on it.
+    const trim=new THREE.MeshStandardMaterial({color:'#efe4d2',roughness:0.62})
+    for (const [w,h,x,y] of [[1.19,0.03,3.2,1.7],[0.03,1.39,3.2,1.7]]) {
+      const bar=new THREE.Mesh(new THREE.BoxGeometry(w,h,0.035),trim)
+      bar.position.set(x,y,-0.038)
+      bar.castShadow=true
+      walls[0]!.group.add(bar)
+    }
+    const veilTex=softenTex('wall_diff',2)
+    const veil=new THREE.Mesh(new THREE.PlaneGeometry(1.19,1.39),
+      new THREE.MeshBasicMaterial({color:'#efe8da',transparent:true,opacity:0.13,depthWrite:false}))
+    veil.position.set(3.2,1.7,-0.052)
+    walls[0]!.group.add(veil);walls[0]!.mats.push(veil.material)
+    void veilTex
   }
 
   // The owner's floor is a generated texture on a plane just above the model's plain floor.
@@ -343,6 +441,32 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   return { group, walls, doorPivot, floor }
 }
 
+/**
+ * One palette, not six. The reference rooms are a single warm neutral with one accent; a teal chair,
+ * a mauve armchair and a plum rug in the same shot is the thing that reads as amateur. These tints
+ * pull every upholstered piece into the same oatmeal/walnut family.
+ */
+const HOME_TINT: Record<string, string> = {
+  armchair: '#b1a08c',
+  office_chair: '#4b5045',
+  rug: '#c0ad93',
+  pet_bed: '#9c8e7c',
+  stool: '#a8917a',
+  basket: '#a5937b',
+}
+
+function tintObject(o: THREE.Object3D, hex: string) {
+  o.traverse((n) => {
+    const mesh = n as THREE.Mesh
+    if (!mesh.isMesh) return
+    // Legs, frames and hardware keep their own material: tinting the whole piece turns a chair into
+    // a single flat colour and it reads like a placeholder.
+    if (/leg|frame|metal|base|foot|handle|knob|trims?$/i.test(mesh.name)) return
+    const mats = (Array.isArray(mesh.material) ? mesh.material : [mesh.material]).slice()
+    for (const m of mats) (m as THREE.MeshStandardMaterial).color?.set(hex)
+  })
+}
+
 // ---------------------------------------------------------------- built-in furniture
 
 export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE.Group; picks: THREE.Object3D[]; led: THREE.MeshStandardMaterial | null } {
@@ -365,6 +489,10 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   for (const n of ['office_chair', 'armchair', 'rug', 'pet_bed', 'basket']) {
     const o = g.getObjectByName(n)
     if (o) surfaceDetail(o, 'weave')
+  }
+  for (const n of Object.keys(HOME_TINT)) {
+    const o = g.getObjectByName(n)
+    if (o) applyKindTint(o, n)
   }
 
   const computer = put(g, 'computer', { at: [1.4, 0.775, 0.3], yaw: 0.12, pick: 'computer' })

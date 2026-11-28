@@ -35,7 +35,7 @@ import {
   type Shell,
 } from './builders.ts'
 import { buildExterior, type Exterior } from './exterior.ts'
-import { decorDetail, kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
+import { addContactShadows, applyKindTint, calmPalette, decorDetail, kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
 import { getAnimations, getModel, kitReady } from './models.ts'
 import { glowTexture } from './materials.ts'
 import { Avatar } from './avatar.ts'
@@ -109,6 +109,8 @@ export class RoomView {
   readonly pet: Pet
   private opts: ViewOptions
   private root = new THREE.Group()
+  // DEV-only handle so a probe can name the mesh that is the wrong colour instead of guessing.
+  expose() { if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__room = this.root }
   private dynamic = new THREE.Group()
   private shell!: Shell
   private ctx: BuildCtx = { lamps: [], glows: [] }
@@ -169,7 +171,7 @@ export class RoomView {
   private want = { az: Math.PI / 4, pol: 1.0, radius: 7.2, tgt: TARGET.clone() }
   private vAz = 0
   private baseRadius = 7.2
-  private basePol = 1.30
+  private basePol = 1.19
   private pointers = new Map<number, { x: number; y: number }>()
   private pinch = 0
   private downAt = { x: 0, y: 0, t: 0 }
@@ -364,6 +366,7 @@ export class RoomView {
 
   private buildStatic(data: HomeData) {
     disposeTree(this.root)
+    this.expose()
     this.root.clear()
     this.ctx.lamps.length = 0
     this.ctx.glows.length = 0
@@ -378,6 +381,8 @@ export class RoomView {
       const f = kitFurniture(this.ctx, data.welcome)
       this.led = f.led
       this.root.add(f.group)
+      calmPalette(f.group)
+      addContactShadows(f.group)
       this.lampNodes = ['floor_lamp', 'desk_lamp']
         .map((n) => f.group.getObjectByName(n))
         .filter((o): o is THREE.Object3D => !!o)
@@ -429,7 +434,12 @@ export class RoomView {
     for (const d of data.decor) {
       const g = new THREE.Group()
       g.add(this.kitUsed ? kitDecor(d.kind, this.ctx) : buildDecor(d.kind, this.ctx))
-      if (this.kitUsed) decorDetail(g, d.kind)
+      if (this.kitUsed) {
+        decorDetail(g, d.kind)
+        applyKindTint(g, d.kind)
+        calmPalette(g, 0.7)
+        addContactShadows(g)
+      }
       g.position.set(d.x + 0.5, 0, d.z + 0.5)
       g.rotation.y = (d.rot * Math.PI) / 2
       g.userData.pick = `decor:${d.id}`
@@ -1045,13 +1055,13 @@ export class RoomView {
     // A high key light and a low fill is what separates "a room at night" from "a flat diagram of a room".
     this.sun.intensity = lerp(6.6, 1.5)
     this.sun.color.set(n > 0.5 ? '#b9c6ff' : this.daylightColor || '#ffd9a8')
-    this.hemi.intensity = lerp(0.24, 0.2)
+    this.hemi.intensity = lerp(0.62, 0.22)
     this.hemi.color.set(n > 0.5 ? '#2c3a63' : '#cfe2f2')
-    this.hemi.groundColor.set(n > 0.5 ? '#1d1826' : '#6b5a45')
-    this.ambient.intensity = lerp(0.07, 0.09)
+    this.hemi.groundColor.set(n > 0.5 ? '#1d1826' : '#8a765c')
+    this.ambient.intensity = lerp(0.16, 0.1)
     this.rim.intensity = lerp(0.62, 0.42)
     this.rim.color.set(n > 0.5 ? '#6c86c8' : '#b9d4ee')
-    this.renderer.toneMappingExposure = lerp(1.46, 1.46)
+    this.renderer.toneMappingExposure = lerp(1.52, 1.42)
     for (const l of this.ctx.lamps) {
       const base = (l.userData.base as number) ?? 1
       const flick = l.userData.flicker ? 1 + Math.sin(performance.now() / 120) * 0.05 : 1
