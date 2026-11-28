@@ -158,3 +158,24 @@ Open after round 12:
   board). Fixing it properly means splitting the gallery in Blender into `board` + `print_*` with
   separate material slots.
 - floor plank seams still read 1:1 dark; wall blotchiness repeats across the wide face; no real GI.
+
+## Round 13 — the pale rectangle was the AO pass, not geometry
+
+Reading the boards in Blender settled it: `photo_wall` is a string, two nails, six polaroids and six
+clips. There is no backing board in the export at all (the flat panel in the preview render is a
+temp `ground-board` that gets deleted before writing the GLB). The rectangles on the plaster were
+never an object: they are SSAO's depth prepass baking hard-edged patches into the occlusion around
+every bright light — one box behind the desk lamp, one behind the candle, one behind the monitor.
+
+Evidence, in order: raycasts across the band all returned `wall_back_1` at 4.3m; the same band
+survived a pure-white untextured wall, survived anisotropy 4 → 8, survived normalScale 0, survived
+far-plane 80 → 12; it disappeared the moment the SSAO pass was removed, and in a wall-only frame the
+patches lined up exactly with the three light sources.
+
+So SSAO is gone for good; `docs` no longer lists it as a win. Contact decals + the baked wall
+falloff in `kit.ts` carry the grounding instead, and the plaster is finally clean.
+
+Floor seams in the same round: the 2px contact band under each board and the butt joint were at
+texel width once tiled three times over 6m, so they read as drawn black lines. They are now
+gradients, 26% instead of 34%, and the whole floor texture gets one blurred composite pass
+(`canvasTex(..., soften = 0.34)`) so the grain merges into itself instead of sitting on top.
