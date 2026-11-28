@@ -185,6 +185,9 @@ export class RoomView {
   private moved = 0
   private panning = false
   private lastTap = { t: 0, x: 0, y: 0 }
+  /** Render buffer scale, walked down when the frame budget is missed. */
+  private pixelCap = 1
+  private slowFrames = 0
   private mid = { x: 0, y: 0 }
 
   constructor(opts: ViewOptions) {
@@ -196,7 +199,11 @@ export class RoomView {
     const rendererName = debugRenderer ? String(gl.getParameter(debugRenderer.UNMASKED_RENDERER_WEBGL)) : ''
     const software = /swiftshader|llvmpipe|softpipe|software rasterizer/i.test(rendererName)
     this.softwareRenderer = software
-    this.renderer.setPixelRatio(software ? 0.75 : Math.min(window.devicePixelRatio || 1, 2))
+    // A 2x buffer plus bloom, bokeh and a grade pass is a 2880x1800 multi-pass frame: 41 fps at 1x
+    // dropped to 13 at 2x on an M4. Nothing here is aliasing-prone enough to be worth that, so the
+    // buffer caps at 1.5x and the loop walks it down further if the machine cannot keep up.
+    this.pixelCap = software ? 0.75 : Math.min(window.devicePixelRatio || 1, 1.5)
+    this.renderer.setPixelRatio(this.pixelCap)
     this.renderer.shadowMap.enabled = !software
     this.renderer.shadowMap.autoUpdate = false
     this.renderer.shadowMap.type = THREE.VSMShadowMap
@@ -1194,6 +1201,15 @@ export class RoomView {
     const dt = Math.min(0.05, (now - this.last) / 1000)
     this.last = now
     this.elapsed += dt
+    // Miss the budget for a second straight and give up resolution instead of frames: a slightly
+    // softer image that still moves beats a crisp slideshow.
+    this.slowFrames = dt > 0.024 ? this.slowFrames + 1 : Math.max(0, this.slowFrames - 2)
+    if (this.slowFrames > 40 && this.pixelCap > 0.8) {
+      this.pixelCap = Math.max(0.8, this.pixelCap - 0.25)
+      this.renderer.setPixelRatio(this.pixelCap)
+      this.pipeline?.setSize(this.renderer.domElement.clientWidth, this.renderer.domElement.clientHeight, this.pixelCap)
+      this.slowFrames = 0
+    }
     const t = this.elapsed
     this.stringLights?.update(now,!!this.opts.reduceMotion)
     const animated = !this.opts.reduceMotion
