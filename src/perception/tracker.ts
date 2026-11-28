@@ -15,7 +15,9 @@ const url = (p: string) => new URL(p, document.baseURI).href
 
 export async function createHandTracker(mode: 'VIDEO' | 'IMAGE' = 'VIDEO', preferCPU = false): Promise<HandTracker> {
   const { FilesetResolver, HandLandmarker } = await import('@mediapipe/tasks-vision')
+  performance.mark('li-hand-resolver-start')
   const fileset = await FilesetResolver.forVisionTasks(url('vision/wasm'))
+  performance.mark('li-hand-resolver-ready')
   const make = (delegate: 'GPU' | 'CPU') =>
     HandLandmarker.createFromOptions(fileset, {
       baseOptions: { modelAssetPath: url('vision/hand_landmarker.task'), delegate },
@@ -34,6 +36,7 @@ export async function createHandTracker(mode: 'VIDEO' | 'IMAGE' = 'VIDEO', prefe
     delegate = 'CPU'
     lm = await make('CPU')
   }
+  performance.mark('li-hand-graph-ready',{detail:{delegate}})
   let lastTs = -1
   return {
     delegate,

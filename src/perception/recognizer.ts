@@ -49,6 +49,8 @@ export class GestureRecognizer {
   private n = 0
   private present = false
   private lastHandT = 0
+  private drawingHand:Hand['handedness']|null=null
+  private rearm=false
   private pen = false
   private pinchSince: number | null = null
   private releaseSince: number | null = null
@@ -89,6 +91,16 @@ export class GestureRecognizer {
     const out: PerceptionEvent[] = []
     const hands = frame.hands.filter((h) => h.score >= c.minScore && h.points.length === 21).sort((a, b) => b.score - a.score)
 
+    const priorHand=this.drawingHand
+    const active=hands.find(h=>h.handedness===priorHand)
+    const outside=active?.points[8] && (active.points[8].x<=0 || active.points[8].x>=1 || active.points[8].y<=0 || active.points[8].y>=1)
+    if(priorHand && (!active || outside)){
+      if(this.pen)out.push(this.ev('pinch_end',t,1,this.lastPoint))
+      this.pen=false
+      this.pinchSince=this.releaseSince=null
+      this.rearm=true
+      this.drawingHand=null
+    }
     if (hands.length === 0) {
       if (this.present && t - this.lastHandT >= c.handLossMs) {
         if (this.pen) {
@@ -106,12 +118,14 @@ export class GestureRecognizer {
       this.present = true
       out.push(this.ev('hand_found', t, hands[0]!.score))
     }
-    const main = hands[0]!
+    const main = active ?? hands[0]!
 
     // ---- pen: pinch with hysteresis and a short hold, so one noisy frame never draws or lifts
     const ratio = pinchRatio(main)
     if (!this.pen) {
-      if (ratio < c.pinchOn) {
+      if(ratio>=c.pinchOff)this.rearm=false
+      if (ratio < c.pinchOn && !this.rearm) {
+        this.drawingHand=main.handedness
         this.pinchSince ??= t
         if (t - this.pinchSince >= c.pinchHoldMs) {
           this.pen = true
@@ -125,6 +139,7 @@ export class GestureRecognizer {
       if (t - this.releaseSince >= c.pinchHoldMs) {
         this.pen = false
         this.releaseSince = null
+        this.drawingHand=null
         out.push(this.ev('pinch_end', t, main.score, this.lastPoint))
       }
     } else this.releaseSince = null

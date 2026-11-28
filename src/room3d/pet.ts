@@ -221,7 +221,8 @@ export class Pet {
   private lookPitch=0
   follow(x:number,y:number){if(this.still)return;this.lookTime=.5;this.lookYaw=(x-.5)*1.3;this.lookPitch=(y-.5)*.35}
   faceCue(cue:'smile'|'blink'|'left'|'right'){
-    if(cue==='smile'||cue==='blink')this.nudge()
+    if(cue==='smile')this.respond('happy')
+    else if(cue==='blink'){this.waveTime=.65;this.nudge()}
     else this.follow(cue==='left'?.15:.85,.5)
   }
   respond(reaction:'greet'|'come'|'catch-heart'|'happy'){

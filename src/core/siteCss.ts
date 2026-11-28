@@ -251,11 +251,16 @@ function widgetRules(d: SiteDesign): string {
   const phone: string[] = []
   const desk: string[] = []
   for (const page of d.pages) {
-    for (const w of pageWidgets(d, page.id)) {
+    const items=pageWidgets(d,page.id)
+    if(page.free)desk.push(`[data-page="${page.id}"]{position:relative;display:block;min-height:${Math.max(640,...items.map((w,i)=>(w.layout.canvasY??i*180)+(w.layout.heightPx??230)+40))}px}`)
+    for (const [index,w] of items.entries()) {
       const sel = `.w-${w.id}`
       const span = Math.min(w.layout.span, page.columns)
       const decl = [`grid-column:span ${span}`]
       if (w.layout.layer || w.layout.offsetX || w.layout.offsetY) desk.push(`${sel}{position:relative;left:${w.layout.offsetX??0}px;top:${w.layout.offsetY??0}px;z-index:${w.layout.layer??0}}`)
+      if(page.free){const x=w.layout.canvasX??0
+        desk.push(`[data-page="${page.id}"] ${sel}{position:absolute;box-sizing:border-box;left:${x}%;top:${w.layout.canvasY??index*180}px;width:${Math.min(100-x,w.layout.widthPct??48)}%;height:${w.layout.heightPx??220}px;overflow:auto;z-index:${w.layout.layer??0};transform:rotate(${w.layout.angle??0}deg)}`)
+      }
       if (w.style.bg) decl.push(`background:${w.style.bg}`)
       if (w.style.fg) decl.push(`color:${w.style.fg}`)
       if (w.style.tilt) decl.push(`transform:rotate(${w.style.tilt * 0.8}deg)`)

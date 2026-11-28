@@ -21,6 +21,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
   const [slug, setSlug] = useState('')
   const [slugTouched, setSlugTouched] = useState(false)
   const [house, setHouse] = useState<House>('cabin')
+  const [outfit,setOutfit]=useState<'warm'|'cool'|'hidden'>('warm')
   const [style, setStyle] = useState<StyleId>('retro')
   const [demos, setDemos] = useState(false)
   const [live, setLive] = useState<RingHome[]>([])
@@ -37,14 +38,15 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
 
   const data: HomeData = useMemo(() => {
     const r = defaultRoom()
-    return { house, wall: r.wall, floor: r.floor, light: 'day', decor: r.decor, memory: [], welcome: false, pet: { enabled: true, name: petName, color: petColor } }
-  }, [house, petColor, petName])
+    return { outfit, house, wall: r.wall, floor: r.floor, light: 'day', decor: r.decor, memory: [], welcome: false, pet: { enabled: true, name: petName, color: petColor } }
+  }, [outfit, house, petColor, petName])
 
   const create = () => {
     const title = name.trim() || t('setup.defaultName')
     if (!slugOk) return setError(t('setup.addressBad'))
     const project = createProject({ lang: getLang(), title, slug: effectiveSlug, style, ghostName: petName.trim() || 'Boo', ghostColor: petColor })
     project.room = { ...project.room, house }
+    project.privateHome={outfit}
     const r = props.onDone(project)
     if (!r.ok) setError(r.reason)
   }
@@ -64,7 +66,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
       </button>
       <main class="setup">
         <div class="setup-hero">
-          <h1>{t('setup.hero')}</h1>
+          <h1>{lang==='zh'?'互联网很大，留一小块地方给自己。':'The internet is vast. Keep a little place for yourself.'}</h1>
           <p class="muted">{lang==='zh'?'我是 Boo，钥匙给你。先给家起个名字，进门后我带你认认路。':"I’m Boo. Here’s your key. Give this place a name and I’ll show you around."}</p>
         </div>
 
@@ -105,6 +107,25 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
           )}
         </div>
 
+
+
+        <fieldset class="field">
+          <legend class="field-label">{t('setup.house')}</legend>
+          <div class="choice-row">
+            {HOUSES.map((h) => (
+              <button type="button" key={h} class={`chip ${house === h ? 'selected' : ''}`} aria-pressed={house === h} onClick={() => setHouse(h)}>
+                <img class="house-sketch" src={new URL('art/house-'+h+'.svg',document.baseURI).href} alt=""/>{t(`house.${h}` as Key)}
+              </button>
+            ))}
+          </div>
+        </fieldset>
+        <fieldset class="field"><legend>{lang==='zh'?'玄关镜 · 今天穿什么？':'Hall mirror · What feels like you?'}</legend><div class="choice-row">{(['warm','cool','hidden'] as const).map((v,i)=><button class="chip" aria-pressed={v===outfit} onClick={()=>setOutfit(v)}>{(lang==='zh'?['杏色上衣','蓝色上衣','只看房间']:['Apricot shirt','Blue shirt','Room only'])[i]}</button>)}</div></fieldset>
+        <Field label={lang==='zh'?'门牌上写什么？':t('setup.name')}>
+          <input value={name} maxLength={80} placeholder={t('setup.namePh')} onInput={(e) => setName(e.currentTarget.value)} />
+        </Field>
+
+        <details class="more-opts">
+          <summary>{ta('setup.more')}</summary>
         <fieldset class="field">
           <legend class="field-label">{ta('setup.style')}</legend>
           <div class="style-pick">
@@ -117,13 +138,6 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
           </div>
           <span class="field-hint">{ta('setup.styleHint')}</span>
         </fieldset>
-
-        <Field label={t('setup.name')}>
-          <input value={name} maxLength={80} placeholder={t('setup.namePh')} onInput={(e) => setName(e.currentTarget.value)} />
-        </Field>
-
-        <details class="more-opts">
-          <summary>{ta('setup.more')}</summary>
         <Field label={t('setup.address')} hint={t('setup.addressHint', { slug: effectiveSlug || '…' })}>
           <input
             value={effectiveSlug}
@@ -139,16 +153,7 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
           />
         </Field>
 
-        <fieldset class="field">
-          <legend class="field-label">{t('setup.house')}</legend>
-          <div class="choice-row">
-            {HOUSES.map((h) => (
-              <button type="button" key={h} class={`chip ${house === h ? 'selected' : ''}`} aria-pressed={house === h} onClick={() => setHouse(h)}>
-                {t(`house.${h}` as Key)}
-              </button>
-            ))}
-          </div>
-        </fieldset>
+
 
         <Field label={t('setup.petName')}>
           <input value={petName} maxLength={24} onInput={(e) => setPetName(e.currentTarget.value)} />

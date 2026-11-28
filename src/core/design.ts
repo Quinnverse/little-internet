@@ -131,6 +131,9 @@ export type WidgetContent = z.infer<typeof WidgetContentSchema>
 export const WidgetLayoutSchema = z.object({
   /** Columns this widget spans on wide screens (clamped to the page's column count). */
   layer: z.number().int().min(0).max(20).optional(),
+  canvasX:z.number().min(0).max(98).optional(),canvasY:z.number().min(0).max(5000).optional(),
+  widthPct:z.number().min(8).max(100).optional(),heightPx:z.number().min(60).max(1800).optional(),
+  angle:z.number().min(-180).max(180).optional(),group:z.string().max(30).optional(),
   offsetX: z.number().int().min(-80).max(80).optional(),
   offsetY: z.number().int().min(-80).max(80).optional(),
   span: z.number().int().min(1).max(4),
@@ -160,6 +163,7 @@ export const SiteWidgetSchema = z.object({
 export type SiteWidget = z.infer<typeof SiteWidgetSchema>
 
 export const SitePageSchema = z.object({
+  free:z.boolean().optional(),
   id,
   slug: z.string().regex(PAGE_SLUG_PATTERN),
   title: line(40),

@@ -47,5 +47,6 @@ export function publicProjection(p: Project, which: DesignChoice = 'published'):
     guestbook: p.web.guestbook,
   }
   void shareableIds
-  return { ...p, posts, gifts, assets, recordings, room, web }
+  const {privateHome: _privateHome,...publicFields}=p
+  return { ...publicFields, posts, gifts, assets, recordings, room, web }
 }

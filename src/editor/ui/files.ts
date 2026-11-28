@@ -1,5 +1,4 @@
 import { restoreBackup } from '../../core/backup.ts'
-import { importSite } from '../../core/exportZip.ts'
 import type { Project, Result } from '../../core/schema.ts'
 import { pickFiles, readFileBytes } from '../download.ts'
 
@@ -8,6 +7,7 @@ export async function pickProjectFile(kind: 'site' | 'backup'): Promise<Result<P
   const [file] = await pickFiles('.zip,application/zip')
   if (!file) return null
   const bytes = await readFileBytes(file)
+  const {importSite}=await import('../../core/exportZip.ts')
   return kind === 'site' ? importSite(bytes) : restoreBackup(bytes)
 }
 

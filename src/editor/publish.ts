@@ -1,5 +1,4 @@
 import type { GuestNote } from '../core/design.ts'
-import { exportSite } from '../core/exportZip.ts'
 import type { Project } from '../core/schema.ts'
 import { idbGet, idbSet } from './idb.ts'
 
@@ -67,6 +66,7 @@ const auth = async (slug: string) => ({ Authorization: `Bearer ${await keyFor(sl
  */
 export async function publishSite(p: Project, server: string): Promise<string> {
   const url = siteUrl(p.site.slug, server)
+  const {exportSite}=await import('../core/exportZip.ts')
   const zip = exportSite(p, { baseUrl: url })
   const r = await fetch(`${base(server)}/api/sites/${p.site.slug}`, {
     method: 'PUT',

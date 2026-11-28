@@ -7,7 +7,7 @@ import { ta } from '../i18nAtelier.ts'
 import { assetUrl } from './common.tsx'
 import { iconSvg, type IconName } from './icons.tsx'
 
-export const PRIMARY_HOTSPOTS = ['diary', 'computer', 'voice', 'pet', 'window', 'door', 'shelf']
+export const PRIMARY_HOTSPOTS = ['diary', 'computer', 'voice', 'pet', 'window', 'door', 'shelf','records','wall','calendar']
 
 const HOT_ICON: Record<string, IconName> = {
   diary: 'pen',
@@ -26,6 +26,10 @@ export function toHomeData(p: Project): HomeData {
   const posts = new Map(p.posts.map((x) => [x.id, x]))
   const welcome = !!r.welcomeRecordingId && p.recordings.some((x) => x.id === r.welcomeRecordingId && x.visibility === 'public')
   return {
+    period:p.privateHome?.period, lampsOn:p.privateHome?.lampsOn,
+    outfit:p.privateHome?.outfit,
+    pins:p.privateHome?.pins?.map(pin=>{const a=p.assets.find(a=>a.id===pin.assetId);return {...pin,url:a&&assetUrl(a)}}),
+    sign:p.privateHome?.sign,
     house: r.house,
     wall: r.wall,
     floor: r.floor,
@@ -49,6 +53,7 @@ export function toHomeData(p: Project): HomeData {
 
 export function hotspotLabel(id: string, titles: Map<string, string>): string {
   if (id.startsWith('memory:')) return titles.get(id.slice(7)) ?? t('kind.book')
+  if(['records','wall','calendar'].includes(id))return ({records:'唱片机 · Records',wall:'照片墙 · Album',calendar:'日历 · Calendar'})[id]??id
   return t(`hot.${id}` as Key)
 }
 
@@ -105,7 +110,7 @@ export function Scene(props: SceneProps) {
     let view: RoomView
     try {
       view = new RoomView({
-        ownerAvatar: !!props.onCell,
+        ownerAvatar: !!props.onCell || !!props.drift,
         container: host.current!,
         label: (id) => hotspotLabel(id, titles()),
         icon: (id) => iconSvg(HOT_ICON[id] ?? 'book', id.startsWith('memory:') ? 12 : 18),
@@ -123,6 +128,7 @@ export function Scene(props: SceneProps) {
     }
     viewRef.current = view
     view.setData(latest.current.data)
+    if(props.onCell&&!props.drift)view.enterDoorway()
     view.setDecorMode(latest.current.decorate)
     props.onView?.(view)
     const off = onLangChange(() => view.refreshHotspots())

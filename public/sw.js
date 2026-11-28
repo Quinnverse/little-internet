@@ -5,6 +5,8 @@
 // owner-only data (guestbook inbox) or content that a closed door has to make unreachable.
 const PREVIEW_CACHE = 'li-preview'
 const SHELL_CACHE = 'li-shell-v2'
+const VISION_CACHE='li-vision-'+new URL(self.location.href).searchParams.get('vision')
+const VISION_FILES=/^vision\/(?:hand_landmarker\.task|face_landmarker\.task|wasm\/vision_wasm_(?:module_)?internal\.(?:js|wasm))$/
 const NEVER = /(^|\/)(api|ring|vision)(\/|$)|\/healthz$|\/@[a-z0-9-]+(\/|$)/
 
 self.addEventListener('install', () => self.skipWaiting())
@@ -13,7 +15,7 @@ self.addEventListener('activate', (event) =>
     // Older versions cached everything, API responses included. Drop those caches.
     caches
       .keys()
-      .then((keys) => Promise.all(keys.filter((k) => k.startsWith('li-shell-') && k !== SHELL_CACHE).map((k) => caches.delete(k))))
+      .then((keys) => Promise.all(keys.filter((k) => (k.startsWith('li-shell-') && k !== SHELL_CACHE) || (k.startsWith('li-vision-') && k!==VISION_CACHE)).map((k) => caches.delete(k))))
       .then(() => self.clients.claim()),
   ),
 )
@@ -23,6 +25,19 @@ self.addEventListener('fetch', (event) => {
   if (req.method !== 'GET') return
   const url = new URL(req.url)
   if (url.origin !== self.location.origin) return
+  const root=new URL(self.registration.scope)
+  if(url.pathname.startsWith(root.pathname) && VISION_FILES.test(url.pathname.slice(root.pathname.length)) && !url.search && !req.headers.has('range')){
+    event.respondWith((async()=>{
+      let cache
+      try{cache=await caches.open(VISION_CACHE);const cached=await cache.match(req);if(cached)return cached}catch{}
+      const response=await fetch(req)
+      if(cache && response.status===200 && response.type==='basic'){
+        try{await cache.put(req,response.clone())}catch{}
+      }
+      return response
+    })())
+    return
+  }
   if (NEVER.test(url.pathname)) return
 
   const scope = new URL(self.registration.scope)

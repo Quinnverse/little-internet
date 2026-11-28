@@ -139,7 +139,22 @@ const StoredRecordingSchema = z
   .object({ ...RecordingBase, path: z.string() })
   .refine((r) => r.path === recordingPath(r.id, r.mime), 'unexpected recording path')
 
+const WallPinSchema = z.object({
+  moment:z.object({name:z.string().max(48),message:z.string().max(240)}).optional(),
+  mount:z.enum(['pin','tape']).optional(),
+  id, assetId:id.optional(),postId:id.optional(), text:z.string().max(240),
+  x:z.number().min(0).max(100),y:z.number().min(0).max(100),
+  size:z.number().min(10).max(70),rotation:z.number().min(-180).max(180),
+})
+export type WallPin=z.infer<typeof WallPinSchema>
 const ProjectShape = {
+  privateHome:z.object({
+    pins:z.array(WallPinSchema).max(150).optional(),
+    dates:z.array(z.object({id,day:z.iso.date(),name:z.string().max(100)})).max(200).optional(),
+    sign:z.string().max(48).optional(), wish:z.string().max(240).optional(),
+    period:z.enum(['auto','morning','afternoon','dusk','midnight']).optional(), lampsOn:z.boolean().optional(),
+    outfit:z.enum(['warm','cool','hidden']).optional(),paper:id.optional()
+  }).optional(),
   schemaVersion: z.literal(SCHEMA_VERSION),
   site: SiteSettingsSchema,
   ghost: GhostSettingsSchema,

@@ -4,6 +4,7 @@ import { compose, updateGhost, updateSite } from '../commands.ts'
 import { idbDelete } from '../idb.ts'
 import { resetState } from '../store.ts'
 import { ta } from '../i18nAtelier.ts'
+import {ambientVolume,primeSound,setAmbientVolume,startAmbient,stopAmbient} from './sfx.ts'
 import { Icon } from './icons.tsx'
 import { setLang, t, useLang, type Key } from '../i18n.ts'
 import { Field, GhostIcon, run, Sheet, type Ctx } from './common.tsx'
@@ -12,6 +13,9 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
   const lang = useLang()
   const { ctx } = props
   const { site, ghost } = ctx.project
+  const [volume,changeVolume]=useState(ambientVolume())
+  const [tab,setTab]=useState<'room'|'name'|'boo'|'device'>('room')
+  const zh=lang==='zh'
   const [title, setTitle] = useState(site.title)
   const [tagline, setTagline] = useState(site.tagline)
   const [slug, setSlug] = useState(site.slug)
@@ -28,7 +32,26 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
 
   return (
     <Sheet title={t('settings.title')} onClose={props.onClose}>
-      <div class="card">
+      <div class="home-handbook">
+        <nav aria-label={zh?'手册书签':'Handbook bookmarks'}>{(['room','name','boo','device'] as const).map((v,i)=><button type="button" aria-pressed={tab===v} onClick={()=>setTab(v)}>{(zh?['房间','门牌','Boo','本机']:['Room','Doorplate','Boo','Device'])[i]}</button>)}</nav>
+        <section key={tab}>
+        {tab==='room'&&<><h3>{zh?'屋里的光':'Light in the room'}</h3>
+        <div class="light-swatches">{(['morning','afternoon','dusk','midnight','auto'] as const).map((v,i)=><button class={'swatch-'+v} aria-pressed={(ctx.project.privateHome?.period??'auto')===v} onClick={()=>run(ctx,p=>({...p,privateHome:{...p.privateHome,period:v},room:{...p.room,light:v==='midnight'?'night':v==='auto'?'auto':'day'}}))}><i aria-hidden="true"/>{(zh?['清晨','午后','黄昏','深夜','随当地时间']:['Morning','Afternoon','Dusk','Midnight','Local time'])[i]}</button>)}</div>
+      <label class="field">{zh?'窗外的虫鸣':'Crickets outside'}<input aria-label={zh?'环境音量':'Room tone volume'} type="range" min="0" max="1" step=".05" value={volume} onInput={e=>{const v=+e.currentTarget.value;changeVolume(v);setAmbientVolume(v);if(v){primeSound();startAmbient()}else stopAmbient()}}/></label>
+      <label class="switch-row">
+        <input type="checkbox" checked={props.assist} onChange={(e) => props.setAssist(e.currentTarget.checked)} />
+        <span>
+          {ta('hud.assistAlways')} <span class="muted small">{ta('hud.assistHint')}</span>
+        </span>
+      </label>
+      <label class="switch-row">
+        <input type="checkbox" checked={props.flat} onChange={(e) => props.setFlat(e.currentTarget.checked)} />
+        <span>
+          {t('settings.low')} <span class="muted small">{t('settings.lowHint')}</span>
+        </span>
+      </label>
+</>}
+        {tab==='name'&&<>      <div class="card">
         <Field label={t('settings.name')}>
           <input value={title} maxLength={80} onInput={(e) => setTitle(e.currentTarget.value)} />
         </Field>
@@ -44,25 +67,8 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
         <button type="button" class="btn btn-primary" onClick={saveText}>{t('common.save')}</button>
       </div>
 
-      <h3>{t('settings.language')}</h3>
-      <div class="choice-row">
-        {(['en', 'zh'] as const).map((l) => (
-          <button
-            type="button"
-            key={l}
-            class={`chip ${lang === l ? 'selected' : ''}`}
-            aria-pressed={lang === l}
-            onClick={() => {
-              setLang(l)
-              run(ctx, updateSite({ lang: l }))
-            }}
-          >
-            {l === 'en' ? 'English' : '中文'}
-          </button>
-        ))}
-      </div>
-
-      <h3>{t('settings.petColor')}</h3>
+</>}
+        {tab==='boo'&&<>      <h3>{t('settings.petColor')}</h3>
       <div class="choice-row">
         {GHOST_COLORS.map((c) => (
           <button
@@ -81,6 +87,25 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
         <input type="checkbox" checked={ghost.enabled} onChange={(e) => run(ctx, updateGhost({ enabled: e.currentTarget.checked }))} />
         <span>{t('settings.petOn')}</span>
       </label>
+</>}
+        {tab==='device'&&<>      <h3>{t('settings.language')}</h3>
+      <div class="choice-row">
+        {(['en', 'zh'] as const).map((l) => (
+          <button
+            type="button"
+            key={l}
+            class={`chip ${lang === l ? 'selected' : ''}`}
+            aria-pressed={lang === l}
+            onClick={() => {
+              setLang(l)
+              run(ctx, updateSite({ lang: l }))
+            }}
+          >
+            {l === 'en' ? 'English' : '中文'}
+          </button>
+        ))}
+      </div>
+
       <h3>{ta('reset.title')}</h3>
       <div class="card card-warn">
         <p class="small">{ta('reset.body')}</p>
@@ -102,18 +127,8 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
           <Icon name="trash" size={18} /> {ta('reset.button')}
         </button>
       </div>
-      <label class="switch-row">
-        <input type="checkbox" checked={props.assist} onChange={(e) => props.setAssist(e.currentTarget.checked)} />
-        <span>
-          {ta('hud.assistAlways')} <span class="muted small">{ta('hud.assistHint')}</span>
-        </span>
-      </label>
-      <label class="switch-row">
-        <input type="checkbox" checked={props.flat} onChange={(e) => props.setFlat(e.currentTarget.checked)} />
-        <span>
-          {t('settings.low')} <span class="muted small">{t('settings.lowHint')}</span>
-        </span>
-      </label>
+</>}
+        </section></div>
     </Sheet>
   )
 }

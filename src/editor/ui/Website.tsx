@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
 import { backupFileName, createBackup } from '../../core/backup.ts'
-import { exportSite, siteExportFileName } from '../../core/exportZip.ts'
 import { publicProjection } from '../../core/privacy.ts'
 import type { Project } from '../../core/schema.ts'
 import { addLink, deleteLink, moveLink, normalizeUserUrl, publishDraft, setWebring } from '../commands.ts'
@@ -21,7 +20,8 @@ export function Website(props: { ctx: Ctx; onClose: () => void; onPreview: () =>
   const privEntries = p.posts.length - pub.posts.length
   const privPhotos = p.assets.length - pub.assets.length
 
-  const downloadSite = () => {
+  const downloadSite = async () => {
+    const {exportSite, siteExportFileName}=await import('../../core/exportZip.ts')
     saveBytes(exportSite(p), siteExportFileName(p))
     ctx.toast(t('web.downloaded'))
   }

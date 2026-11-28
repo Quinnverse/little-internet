@@ -587,6 +587,16 @@ def item_computer():
     bx(0.34, 0.26, 0.012, (0, 0.23, 0.205), "#2d5c8c", bevel=0.0, name="screen", mat=SCREEN())
     el(0.012, 0.012, 0.012, (0.17, 0.05, 0.2), "#7cf08a", name="led", mat=GLOW("#7cf08a", 3, "led"))
     el(0.1, 0.02, 0.012, (-0.12, 0.05, 0.2), CREAM2, name="floppy-slot")
+    # Recessed speaker perforations, vents and a small row of tactile controls.
+    for side in [-1,1]:
+        for col in range(9):
+            bx(.002,.085,.003,(side*.2505,.255,-.145+col*.015),WOOD_D,bevel=.0005,name="side-vent")
+    for row in range(2):
+        for col in range(11):
+            bx(.003,.003,.003,(-.17+.009*col,.074+row*.006,.202),INK,bevel=.001,name="speaker-grille")
+    for i in range(3):
+        bx(.014,.008,.008,(.068+i*.021,.064,.203),CREAM,bevel=.002,name="screen-control")
+    bx(.068,.018,.003,(-.16,.397,.202),BRASS,bevel=.002,name="brass-makers-plate")
     anchor("computer", (0, 0.5, 0.05))
 
 
@@ -643,6 +653,19 @@ def item_record_player():
     bx(0.01, 0.01, 0.2, (0.13, 0.13, -0.03), SILVER, bevel=0.002, rot=(0, 0, -0.35), name="tone-arm")
     bx(0.04, 0.012, 0.025, (0.07, 0.125, 0.07), INK, bevel=0.003, name="head-shell")
     el(0.012, 0.012, 0.012, (0.19, 0.08, 0.12), RED, name="start-knob")
+    # Pressed grooves, rim graduations, isolation feet and offset paper label.
+    for i in range(8):
+        to(0.061+i*0.011,0.0006,(-0.04,0.1005,0),"#36373a",name="groove",res=(56,4))
+    for i in range(32):
+        a=i*math.tau/32
+        bx(.002,.004,.003,(-.04+.159*math.cos(a),.085,.159*math.sin(a)),SILVER,bevel=0,name="strobe")
+    for x in [-.16,.16]:
+        for z in [-.12,.12]:
+            cy(.026,.014,(x,.007,z),INK,name="rubber-foot")
+    for i in range(4):
+        bx(.026-i*.003,.001,.0015,(-.04,.105,.018+i*.003),CREAM,bevel=0,name="liner-type")
+    for i in range(3):
+        bx(.13,.002,.003,(.005,.071,.145+i*.004),WOOD_D,bevel=0,name="veneer-inlay")
     anchor("record_player", (0, 0.14, 0))
 
 

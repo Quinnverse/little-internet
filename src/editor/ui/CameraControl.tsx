@@ -12,7 +12,8 @@ import { Icon } from './icons.tsx'
  * The only door to the camera. Off until pressed. While on it always shows a "Camera on" light, a mirrored preview
  * and a Stop button. Video never leaves the page: only simple gesture events do, and the router decides what they may do.
  */
-export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void; hint: string; immersive?:boolean; softwareRenderer?:boolean; onFace?:(cue:import('../../perception/face.ts').FaceCue)=>void }) {
+export function CameraControl(props: { onHands?:(hands:readonly Hand[])=>void; mode: Mode; onAction: (a: Action) => void; hint: string; immersive?:boolean; softwareRenderer?:boolean; onFace?:(cue:import('../../perception/face.ts').FaceCue)=>void }) {
+  const [stage,setStage]=useState(''),[mirror,setMirror]=useState(true)
   const [state, setState] = useState<CamState>('off')
   const [msg, setMsg] = useState('')
   const [hint, setHint] = useState<CamHint>('ok')
@@ -22,6 +23,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
   const [facePresent,setFacePresent] = useState(false)
   const trials:TrialSink = useRef(null)
   const [edge,setEdge]=useState(false)
+  const handFeed=useRef(props.onHands);handFeed.current=props.onHands
   const lastAction = useRef(0)
   const lastSeen = useRef(0)
   const [debug,setDebug]=useState(false)
@@ -61,7 +63,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
     if (!c || !g) return
     g.clearRect(0, 0, c.width, c.height)
     g.fillStyle = '#ffd36e'
-    for (const h of hands) for (const p of h.points) g.fillRect((1 - p.x) * c.width - 1.5, p.y * c.height - 1.5, 3, 3)
+    for (const h of hands) for (const p of h.points) g.fillRect((mirror ? 1-p.x : p.x) * c.width - 1.5, p.y * c.height - 1.5, 3, 3)
   }
 
   const start = async () => {
@@ -98,7 +100,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
             router.current.setMode(props.mode)
           }
         },
-        onHint: setHint,
+        onHint: setHint,onStage:setStage,mirror,
         hands,
         preferCPU: !!props.softwareRenderer,
         ...(face && props.onFace ? {onFace:(cue:import('../../perception/face.ts').FaceCue)=>{
@@ -109,6 +111,7 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
           props.onFace?.(cue)
         }} : {}),
         onFrame:(detected,present)=>{
+          handFeed.current?.(detected)
           setEdge(detected.some(hand=>hand.points.some(p=>p.x<.035 || p.x>.965 || p.y<.035 || p.y>.965)))
           setCount(detected.length)
           setFacePresent(present)
@@ -141,17 +144,18 @@ export function CameraControl(props: { mode: Mode; onAction: (a: Action) => void
       </div>
       {state === 'off' && !msg && <p class="muted small">{ta('cam.privacy')}</p>}
       {state === 'asking' && <p class="muted small" role="status">{ta('cam.asking')}</p>}
-      {state === 'loading' && <p class="muted small" role="status">{ta('cam.loading')}</p>}
+      {state === 'loading' && <p class="muted small" role="status">{ta('cam.loading')} {stage}</p>}
       {state === 'error' && <p class="error small" role="alert">{msg}</p>}
       {live && state !== 'asking' && <button class="btn btn-small" aria-expanded={preview} onClick={()=>setPreview(!preview)}>
         {preview ? (zh?'收起画面':'Hide preview') : (zh?'显示画面':'Show preview')}
       </button>}
+      {!live&&<label><input type="checkbox" checked={mirror} onChange={e=>setMirror(e.currentTarget.checked)}/>{zh?'镜像画面':'Mirror preview'}</label>}
       {props.immersive&&!live&&<details><summary>Perception options · 感知设置</summary>
         <label><input type="checkbox" checked={hands} onChange={e=>setHands(e.currentTarget.checked)}/> Hand gestures · 手势</label>
         <label><input type="checkbox" checked={face} onChange={e=>setFace(e.currentTarget.checked)}/> Face movements · 面部动作</label>
         <label><input type="checkbox" checked={debug} onChange={e=>setDebug(e.currentTarget.checked)}/> Debug preview · 调试预览</label></details>}
       <div class="cam-preview" hidden={!preview || (state !== 'loading' && state !== 'on')}>
-        <video ref={video} muted playsInline autoPlay aria-label={zh?'本机摄像头镜像画面':'Mirrored local camera preview'} />
+        <video style={{transform:mirror?'scaleX(-1)':'none'}} ref={video} muted playsInline autoPlay aria-label={zh?'本机摄像头镜像画面':'Mirrored local camera preview'} />
         {debug && <canvas ref={overlay} width={160} height={120} aria-hidden="true" />}
       </div>
       {state === 'on' && <div class="cam-feedback" role="status">

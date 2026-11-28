@@ -3,7 +3,7 @@ import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room
 import type { BuildCtx, MemoryLook, Shell, Wall } from './builders.ts'
 import type { Exterior } from './exterior.ts'
 import { screenTexture } from './builders.ts'
-import { floorTexture, labelTexture, WALL_COLORS } from './materials.ts'
+import { floorTexture, labelTexture, WALL_COLORS, sprigWallpaper } from './materials.ts'
 import { getModel } from './models.ts'
 
 /**
@@ -81,7 +81,13 @@ function cloneMats(root: THREE.Object3D, recolor?: (name: string) => string | nu
         c = (src as THREE.MeshStandardMaterial).clone()
         c.transparent = true
         const color = recolor?.(src.name)
-        if (color) c.color.set(color)
+        if (color) {
+          c.color.set(color)
+          c.map=sprigWallpaper()
+          c.onBeforeCompile=(shader)=>{
+            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 pointOnWall=(modelMatrix*vec4(position,1.)).xyz; vMapUv=vec2(pointOnWall.x+pointOnWall.z,pointOnWall.y)*.86;')
+          }
+        }
         map.set(src, c)
         out.push(c)
       }
@@ -122,7 +128,12 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   const doorPivot = group.getObjectByName('door_pivot') as THREE.Group
   doorPivot.userData.pick = 'door'
   const glass = group.getObjectByName('window_glass')
-  if (glass) glass.userData.pick = 'window'
+  if (glass) {
+    glass.userData.pick = 'window'
+    const pane=new THREE.Mesh(new THREE.PlaneGeometry(1.19,1.39),new THREE.MeshBasicMaterial({transparent:true}))
+    pane.name='view-through-window';pane.position.set(3.2,1.7,-.048);pane.userData.pick='window'
+    walls[0]!.group.add(pane);walls[0]!.mats.push(pane.material)
+  }
 
   // The owner's floor is a generated texture on a plane just above the model's plain floor.
   const modelFloor = root.getObjectByName('floor')
@@ -175,12 +186,12 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   const phone = put(g, 'rotary_phone', { at: [0.5, 0.645, 2.72], yaw: -0.4, pick: 'voice' })
   picks.push(machine, phone)
 
-  put(g, 'record_player', { at: [3.0, 0.8, 0.36] })
+  picks.push(put(g, 'record_player', { at: [3.0, 0.8, 0.36], pick:'records' }))
   put(g, 'lava_lamp', { at: [3.55, 0.8, 0.42] })
   picks.push(put(g, 'cd_disc', { at: [1.88, 0.775, 0.66], yaw: -0.5, pick: 'export' }))
-  put(g, 'photo_wall', { at: [1.0, 1.75, 0.0] })
+  picks.push(put(g, 'photo_wall', { at: [1.0, 1.75, 0.0], pick:'wall' }))
   put(g, 'wall_clock', { at: [3.2, 2.78, 0.0] })
-  put(g, 'calendar', { at: [0.0, 2.3, 0.5], yaw: Math.PI / 2 })
+  picks.push(put(g, 'calendar', { at: [0.0, 2.3, 0.5], yaw: Math.PI / 2, pick:'calendar' }))
 
   // The answering machine's light pulses when there is a welcome message; give it its own material.
   let led: THREE.MeshStandardMaterial | null = null

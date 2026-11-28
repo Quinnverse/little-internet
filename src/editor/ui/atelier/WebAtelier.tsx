@@ -256,6 +256,7 @@ export function WebAtelier(props: { ctx: Ctx; onClose: () => void }) {
           <Icon name="home" size={18} /> <span class="hide-sm">{ta('at.back')}</span>
         </button>
         <h1 class="at-title hide-sm">{ta('at.title')}</h1>
+
         <select class="at-page" aria-label={ta('pg.pages')} value={page.id} onChange={(e) => setPageId(e.currentTarget.value)}>
           {d.pages.map((x, i) => (
             <option key={x.id} value={x.id}>{i === 0 ? `${x.title || ta('pg.home')} ⌂` : x.title || x.slug}</option>
@@ -296,9 +297,18 @@ export function WebAtelier(props: { ctx: Ctx; onClose: () => void }) {
         )}
 
         <main class="at-center">
+          <button class="chip" aria-pressed={!!page.free} onClick={()=>apply(D.updatePage(page.id,{free:!page.free}))}>{p.site.lang==='zh'?(page.free?'自由画布':'响应式网格'):(page.free?'Free canvas':'Responsive grid')}</button>
           <PreviewFrame project={p} pageId={page.id} selected={selected} labels={labels} device={device} title={ta('at.previewLabel')} onAdjust={(id,dx,dy,resize,colWidth)=>{
             const w=d.widgets.find(item=>item.id===id)
             if(!w)return
+            if(page.free){
+              const delta=dx*100/(colWidth*page.columns),clamp=(n:number,min:number,max:number)=>Math.min(max,Math.max(min,n))
+              apply(prev=>({...prev,widgets:prev.widgets.map(item=>{
+                if(item.pageId!==page.id || (item.id!==id && (resize||!w.layout.group||item.layout.group!==w.layout.group)))return item
+                const l=item.layout,idx=pageWidgets(prev,page.id).findIndex(x=>x.id===item.id)
+                return {...item,layout:{...l,...(resize?{widthPct:clamp((l.widthPct??48)+delta,8,100),heightPx:clamp((l.heightPx??220)+dy,60,1800)}:{canvasX:clamp((l.canvasX??0)+delta,0,92),canvasY:clamp((l.canvasY??idx*180)+dy,0,5000)})}}
+              })}));return
+            }
             const limit=(n:number)=>Math.max(-80,Math.min(80,Math.round(n)))
             apply(D.setWidgetLayout(id,resize?{span:Math.min(page.columns,Math.max(1,w.layout.span+Math.round(dx/colWidth)))}:{offsetX:limit((w.layout.offsetX??0)+dx),offsetY:limit((w.layout.offsetY??0)+dy)}))
           }} onSelect={select} />
@@ -684,6 +694,10 @@ function Inspector(props: { ctx: Ctx; w: SiteWidget; d: SiteDesign; apply: Apply
       </Section>
 
       <Section title={ta('ed.layout')}>
+        {d.pages.find(pg=>pg.id===w.pageId)?.free&&<>
+          <Range label="↻" value={w.layout.angle??0} min={-180} max={180} onChange={v=>apply(D.setWidgetLayout(w.id,{angle:v}))}/>
+          <Field label={props.ctx.project.site.lang==='zh'?'群组名（同组一起移动）':'Group name (move together)'}><input maxLength={30} value={w.layout.group??''} onChange={e=>apply(D.setWidgetLayout(w.id,{group:e.currentTarget.value}))}/></Field>
+          <button onClick={()=>apply(D.setWidgetLayout(w.id,{canvasX:(100-(w.layout.widthPct??48))/2}))}>↔ {props.ctx.project.site.lang==='zh'?'居中':'Center'}</button></>}
         <Range label={props.ctx.project.site.lang==='zh'?'桌面图层':'Desktop layer'} value={w.layout.layer??0} min={0} max={20} onChange={v=>apply(D.setWidgetLayout(w.id,{layer:v}))}/>
         <Range label={props.ctx.project.site.lang==='zh'?'垂直偏移':'Vertical offset'} value={w.layout.offsetY??0} min={-80} max={80} onChange={v=>apply(D.setWidgetLayout(w.id,{offsetY:v}))}/>
         <Seg label={ta('ed.width')} value={Math.min(w.layout.span, pageCols)} options={([1, 2, 3, 4] as const).filter((n) => n <= pageCols).map((n) => [n, n === pageCols ? ta('ed.full') : `${n}/${pageCols}`] as const)} onChange={(v) => apply(D.setWidgetLayout(w.id, { span: v }))} />

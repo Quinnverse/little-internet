@@ -1,3 +1,5 @@
+import {windowLandscape} from './landscape.ts'
+import {boardTexture,type PinView} from './pinboard.ts'
 import * as THREE from 'three'
 import {
   FLOOR_SIZE,
@@ -31,6 +33,8 @@ import { Pet, type PetState } from './pet.ts'
 import { SLOT_POSES } from './slots.ts'
 
 export type HomeData = {
+  period?: string; lampsOn?:boolean
+  outfit?:'warm'|'cool'|'hidden';pins?:PinView[];sign?:string
   house: House
   wall: WallId
   floor: FloorId
@@ -71,6 +75,7 @@ const PAN_MIN = new THREE.Vector3(-0.5, 0.05, -0.5)
 const PAN_MAX = new THREE.Vector3(6.5, 2.4, 6.5)
 const TIP_SIDE: Record<string, string> = { diary: 'left', computer: 'top', shelf: 'top', voice: 'left' }
 const ANCHORS: Record<string, [number, number, number]> = {
+  records:[3,1,.36],wall:[1,1.9,.05],calendar:[.1,2.3,.5],
   diary: [0.62, 1.05, 0.5],
   computer: [1.4, 1.5, 0.45],
   voice: [0.4, 1.0, 2.4],
@@ -239,13 +244,52 @@ export class RoomView {
     const skinChanged =
       !prev || prev.house !== data.house || prev.wall !== data.wall || prev.floor !== data.floor || prev.welcome !== data.welcome || this.kitUsed !== kitReady()
     if (skinChanged) this.buildStatic(data)
-    if(this.avatar) this.avatar.group.visible=this.mode==='home'
+    if(this.avatar){this.avatar.group.visible=this.mode==='home'&&data.outfit!=='hidden';this.avatar.setVariant(data.outfit==='cool'?'cool':'warm')}
+    if(skinChanged || prev?.pins!==data.pins || prev?.sign!==data.sign)this.refreshBoard(data)
     this.buildDynamic(data)
-    this.setNight(isNightNow(data.light), true)
+    this.lampsOn=data.lampsOn??true
+    if(data.period)this.roomHour(data.period)
+    else this.setNight(isNightNow(data.light), true)
+    const pane=this.root.getObjectByName('view-through-window') as THREE.Mesh<THREE.PlaneGeometry,THREE.MeshBasicMaterial>|undefined
+    const period=data.period&&data.period!=='auto'?data.period:this.night?'midnight':'afternoon'
+    if(pane&&pane.userData.period!==period){
+      pane.userData.period=period;pane.material.map?.dispose()
+      const tex=new THREE.CanvasTexture(windowLandscape(512,512,period));tex.colorSpace=THREE.SRGBColorSpace
+      pane.material.map=tex;pane.material.needsUpdate=true
+    }
     this.buildHotspots()
     this.dirty = true
   }
 
+  private boardEpoch=0
+  private board?:THREE.Mesh<THREE.PlaneGeometry,THREE.MeshStandardMaterial>
+  private async refreshBoard(data:HomeData){
+    const epoch=++this.boardEpoch
+    if(this.board){this.board.removeFromParent();this.board.geometry.dispose();this.board.material.map?.dispose();this.board.material.dispose();this.board=undefined}
+    if(!data.pins?.length&&!data.sign)return
+    const texture=await boardTexture(data.pins??[],data.sign??'')
+    if(epoch!==this.boardEpoch||this.disposed){texture.dispose();return}
+    this.board=new THREE.Mesh(new THREE.PlaneGeometry(1.6,.9),new THREE.MeshStandardMaterial({map:texture,roughness:.95}))
+    this.board.position.set(1,1.93,.14);this.board.userData.pick='wall'
+    this.root.add(this.board);this.dirty=true
+  }
+
+  private route:{x:number;z:number}[]=[]
+  private walkTo(x:number,z:number){
+    if(!this.avatar)return
+    const pos=this.avatar.position
+    const start={x:Math.floor(pos.x),z:Math.floor(pos.z)}
+    const paths=[[start]],visited=new Set([start.x+','+start.z])
+    for(const path of paths){
+      const last=path[path.length-1]!
+      if(last.x===x&&last.z===z){this.route=path.slice(1);this.avatar.goTo(start.x+.5,start.z+.5);return}
+      for(const [dx,dz] of [[1,0],[-1,0],[0,1],[0,-1]] as const){
+        const nx=last.x+dx,nz=last.z+dz,key=nx+','+nz
+        if(nx<0||nz<0||nx>=FLOOR_SIZE||nz>=FLOOR_SIZE||visited.has(key)||isReservedCell(nx,nz)||this.data?.decor.some(d=>d.x===nx&&d.z===nz))continue
+        visited.add(key);paths.push([...path,{x:nx,z:nz}])
+      }
+    }
+  }
   private extendVilla(house:House) {
     if(house!=='villa')return
     this.shell.group.scale.x=1.42
@@ -669,7 +713,29 @@ export class RoomView {
     return true
   }
 
+  private returnPose?:{az:number;pol:number;radius:number;tgt:THREE.Vector3}
+  rememberView(){this.returnPose??={...this.want,tgt:this.want.tgt.clone()}}
+  returnToRoom(){const p=this.returnPose;if(p)this.flyTo(p.az,p.pol,p.radius,p.tgt);this.returnPose=undefined}
+  private following=false
+  showResident(){this.following=!this.following;if(this.avatar){this.avatar.group.visible=true;this.want.tgt.copy(this.avatar.position);this.want.tgt.y=.65;this.want.radius=3.3;this.dirty=true}}
+  capturePhoto(aspect:number){
+    this.renderer.render(this.scene,this.camera)
+    const src=this.renderer.domElement
+    const w=Math.min(src.width,src.height*aspect),h=w/aspect
+    const c=document.createElement('canvas');c.width=w;c.height=h
+    c.getContext('2d')?.drawImage(src,(src.width-w)/2,(src.height-h)/2,w,h,0,0,w,h)
+    return c.toDataURL('image/jpeg',.92)
+  }
+  enterDoorway() {
+    // The door is at x=0, z=4.5. Look from just inside it toward the lit desk.
+    this.camera.fov=62
+    this.camera.updateProjectionMatrix()
+    const target=new THREE.Vector3(2.85,1.13,1.0)
+    this.jump(-.62,1.43,4.05,target)
+  }
   resetView() {
+    this.camera.fov=32
+    this.camera.updateProjectionMatrix()
     this.want.az = nearestAz(this.az, Math.PI / 4)
     this.want.pol = this.basePol
     this.want.radius = this.baseRadius
@@ -695,7 +761,11 @@ export class RoomView {
     if (!p) return
     // Look slightly below the object so it sits in the upper part of the screen.
     this.want.tgt.copy(p).add(new THREE.Vector3(0, -0.35, 0))
-    this.want.radius = Math.max(2.4, this.baseRadius * 0.3)
+    if(['computer','records','wall','diary','calendar'].includes(id)){
+      this.want.az=nearestAz(this.az,.08)
+      this.want.tgt.copy(p)
+      this.want.radius=this.camera.fov>45?1.85:2.65
+    }else this.want.radius = Math.max(2.4, this.baseRadius * 0.3)
     this.want.pol = Math.max(this.basePol, 1.05)
     this.dirty = true
   }
@@ -872,7 +942,7 @@ export class RoomView {
         const z = Math.floor(p.z)
         if (x >= 0 && z >= 0 && x < FLOOR_SIZE && z < FLOOR_SIZE) {
           if(this.decorMode) this.opts.onCell?.(x,z)
-          else if (!isReservedCell(x,z) && !this.data?.decor.some(d=>d.x===x && d.z===z)) this.avatar?.goTo(x+.5,z+.5)
+          else if (!isReservedCell(x,z) && !this.data?.decor.some(d=>d.x===x && d.z===z)) this.walkTo(x,z)
           this.dirty=true
         }
       }
@@ -889,20 +959,30 @@ export class RoomView {
     this.dirty = true
   }
 
+  recordPlaying=false
+  private lampsOn=true
+  private daylightColor=''
+  roomHour(period:string){
+    const h=period==='auto'?new Date().getHours():({morning:7,afternoon:14,dusk:18,midnight:0}[period]??14)
+    this.daylightColor=h>=17&&h<21?'#f6a073':h<10?'#ffe1b9':'#fff0d2'
+    this.setNight(h<5||h>=20)
+    this.sun.position.x=h<10?-3:7;this.dirty=true
+  }
+
   private applyLight() {
     const n = this.nightMix
     const lerp = (a: number, b: number) => a + (b - a) * n
     this.sun.intensity = lerp(2.6, 0.55)
-    this.sun.color.set(n > 0.5 ? '#9db4ff' : '#fff0d2')
-    this.hemi.intensity = lerp(0.95, 0.38)
+    this.sun.color.set(n > 0.5 ? '#9db4ff' : this.daylightColor || '#fff0d2')
+    this.hemi.intensity = lerp(1.16, 0.84)
     this.hemi.color.set(n > 0.5 ? '#35467a' : '#e2f1ff')
     this.hemi.groundColor.set(n > 0.5 ? '#2a2236' : '#c9b79c')
-    this.ambient.intensity = lerp(0.12, 0.08)
+    this.ambient.intensity = lerp(0.24, 0.30)
     this.renderer.toneMappingExposure = lerp(1.0, 1.15)
     for (const l of this.ctx.lamps) {
       const base = (l.userData.base as number) ?? 1
       const flick = l.userData.flicker ? 1 + Math.sin(performance.now() / 120) * 0.05 : 1
-      l.intensity = base * (0.04 + 0.96 * n) * flick
+      l.intensity = Number(this.lampsOn) * base * (0.04 + 0.96 * n) * flick
     }
     for (const g of this.ctx.glows) g.mat.emissiveIntensity = lerp(g.day, g.night)
     this.renderer.domElement.style.setProperty('--night', String(n))
@@ -943,6 +1023,7 @@ export class RoomView {
     const t = this.elapsed
     const animated = !this.opts.reduceMotion
 
+    if(this.following && this.avatar && !this.returnPose && !this.decorMode){this.want.tgt.copy(this.avatar.position);this.want.tgt.y=.62}
     // Camera easing.
     const k = 1 - Math.exp(-dt * 7)
     const before = [this.az, this.pol, this.radius, this.tgt.x, this.tgt.y, this.tgt.z]
@@ -994,7 +1075,9 @@ export class RoomView {
       this.dirty = true
     }
 
+    if(this.avatar&&!this.avatar.moving&&this.route.length){const next=this.route.shift()!;this.avatar.goTo(next.x+.5,next.z+.5);this.dirty=true}
     if (animated) {
+      if(this.recordPlaying){const disc=this.root.getObjectByName('record');if(disc)disc.rotation.y+=dt*3.49}
       this.avatar?.update(dt,t)
       this.pet.update(dt, t)
       if (this.led && this.data?.welcome) this.led.emissiveIntensity = 0.7 + (Math.sin(t * 3) + 1) * 0.5

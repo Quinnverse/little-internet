@@ -338,8 +338,21 @@ export function createApp(opts: AppOptions): {
       'Accept-Ranges': 'bytes',
       Vary: 'Accept-Encoding',
     }
+    // Vision assets have stable filenames. Validate the local copy before transferring megabytes again.
+    if(root===resolve(opts.appDir??'') && rel.startsWith('/vision/') && !range){
+      const tag='W/"'+st.size.toString(16)+'-'+Math.floor(st.mtimeMs).toString(16)+'"'
+      headers.ETag=tag
+      if(req.headers['if-none-match']===tag){res.writeHead(304,headers);return void res.end()}
+    }
     const ext = extname(file).toLowerCase()
     const accept = String(req.headers['accept-encoding'] ?? '')
+    if(!range && root===resolve(opts.appDir??'') && rel.startsWith('/vision/wasm/') && ext==='.wasm' && /\bbr\b/.test(accept) && existsSync(file+'.br')){
+      headers['Content-Encoding']='br'
+      headers['Content-Length']=statSync(file+'.br').size
+      res.writeHead(200,headers)
+      if(req.method==='HEAD')return void res.end()
+      return void createReadStream(file+'.br').pipe(res)
+    }
     const enc = !range && COMPRESSIBLE.has(ext) && st.size > 1024 && st.size < 20 * 1024 * 1024 ? (/\bbr\b/.test(accept) ? 'br' : /\bgzip\b/.test(accept) ? 'gzip' : '') : ''
     if (enc) {
       const key = `${enc}:${file}:${st.mtimeMs}:${st.size}`

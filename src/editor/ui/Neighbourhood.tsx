@@ -1,6 +1,5 @@
 import { useEffect, useState } from 'preact/hooks'
 import { backupFileName, createBackup } from '../../core/backup.ts'
-import { exportSite, siteExportFileName } from '../../core/exportZip.ts'
 import type { Project } from '../../core/schema.ts'
 import { addAsset, addLink, compose, setGuestbookSnapshot, setWebring } from '../commands.ts'
 import { saveBytes } from '../download.ts'
@@ -307,6 +306,7 @@ export function MoveSheet(props: { ctx: Ctx; onClose: () => void }) {
       next = setGuestbookSnapshot(notes)(p)
       ctx.replace(next)
     }
+    const {exportSite, siteExportFileName}=await import('../../core/exportZip.ts')
     saveBytes(exportSite(next), siteExportFileName(next))
     ctx.toast(t('web.downloaded'))
   }

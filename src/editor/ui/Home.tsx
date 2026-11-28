@@ -1,8 +1,14 @@
+import {stopAmbient} from './sfx.ts'
+import {TapeShelf} from './TapeShelf.tsx'
+import {assetUrl} from './common.tsx'
+import {MemoryWall} from './MemoryWall.tsx'
+import {ListeningRoom} from './ListeningRoom.tsx'
+import {NightWindow} from './NightWindow.tsx'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { publicProjection } from '../../core/privacy.ts'
 import type { Post, Project } from '../../core/schema.ts'
 import type { RoomView } from '../../room3d/view.ts'
-import { moveDecor, updateRoomSkin, updateSite, type Command } from '../commands.ts'
+import { moveDecor, updateSite, type Command } from '../commands.ts'
 import { setLang, t, useLang } from '../i18n.ts'
 import { run, type Ctx } from './common.tsx'
 import { Decorate } from './Decorate.tsx'
@@ -19,7 +25,7 @@ import { WebAtelier } from './atelier/WebAtelier.tsx'
 import { ComputerSheet, DoorSheet, MoveSheet, republish, WalkSheet, type ComputerChoice } from './Neighbourhood.tsx'
 import { ta } from '../i18nAtelier.ts'
 import { hasKey, savedServer, siteStatus, siteUrl } from '../publish.ts'
-import { LIGHTS } from '../../core/room.ts'
+
 import { Sheet } from './common.tsx'
 import { PEOPLE_ON, PeopleSheet } from './PeopleSheet.tsx'
 import {CameraControl} from './CameraControl.tsx'
@@ -27,6 +33,8 @@ import { flushOutbox, inbox as fetchInbox } from '../people.ts'
 
 type Panel =
   | null
+  | { kind:'sky'; letter?:{name:string;message:string} }
+  | { kind: 'wall'|'records'|'calendar'|'desktop'|'cinema' }
   | { kind: 'entry'; post?: Post }
   | { kind: 'journal'; archive?: import('../../core/archive.ts').PostKind }
   | { kind: 'voice' }
@@ -58,6 +66,7 @@ const flatPref = () => {
 }
 
 export function Home(props: { ctx: Ctx }) {
+  useEffect(()=>{const quiet=()=>{if(document.hidden)stopAmbient()};document.addEventListener('visibilitychange',quiet);return ()=>{document.removeEventListener('visibilitychange',quiet);stopAmbient()}},[])
   const { ctx } = props
   const lang = useLang()
   const [panel, setPanel] = useState<Panel>(null)
@@ -74,6 +83,9 @@ export function Home(props: { ctx: Ctx }) {
   const [immersed,setImmersed]=useState(false)
   const [tour,setTour]=useState(()=>{try{return localStorage.getItem('boo-tour:'+ctx.project.site.slug)?-1:0}catch{return -1}})
   const finishTour=()=>{setTour(-1);try{localStorage.setItem('boo-tour:'+ctx.project.site.slug,'1')}catch{}}
+  const [toolsOpen,setToolsOpen]=useState(false)
+  const [date,setDate]=useState(''),[occasion,setOccasion]=useState('')
+  const [aspect,setAspect]=useState(1.5)
   const [peek, setPeek] = useState(false)
   // Letters: the server is contacted only after the owner has opened People once on this device.
   const [perceive,setPerceive]=useState(false)
@@ -150,11 +162,11 @@ export function Home(props: { ctx: Ctx }) {
 
   const close = () => {
     setPanel(null)
-    view?.resetView()
+    view?.returnToRoom()
   }
 
   const open = (p: Panel, focus?: string) => {
-    if (focus) view?.focus(focus)
+    if (focus){view?.rememberView();view?.focus(focus)}
     // Boo walks over to keep you company where you are working.
     const spot = focus && ({ diary: 'desk', computer: 'desk', voice: 'desk', shelf: 'shelf', window: 'window', door: 'door' } as Record<string, 'desk' | 'shelf' | 'window' | 'door'>)[focus]
     if (spot) view?.pet.attend(spot, 12)
@@ -177,8 +189,7 @@ export function Home(props: { ctx: Ctx }) {
       case 'diary':
         return open({ kind: 'entry' }, 'diary')
       case 'computer':
-        view?.focus('computer')
-        return setPreviewing(ctx.project.web.published ? 'published' : 'draft')
+        return open({kind:'desktop'},'computer')
       case 'export':
         return open({ kind: 'move' }, 'export')
       case 'voice':
@@ -189,6 +200,7 @@ export function Home(props: { ctx: Ctx }) {
       case 'shelf':
         // The shelf is where reading notes live; the Journal button opens the whole archive.
         return open({ kind: 'journal', archive: 'reading' }, 'shelf')
+      case 'records':case 'wall':case 'calendar':return open({kind:id},id)
       case 'window':
         return open({ kind: 'light' })
       case 'door':
@@ -297,6 +309,7 @@ export function Home(props: { ctx: Ctx }) {
         }}>♡ {lang==='zh'?'递给 Boo 一颗心':'Give Boo a heart'}</button>}
         {caught&&<button class="btn" onClick={()=>{setCaught(false);setHeartLetter(true);open({kind:'people'})}}>♥ {lang==='zh'?'写一封爱心信':'Make a heart letter'}</button>}
       </div>}
+      {!!unread&&!panel&&!decorating&&!immersed&&<button class="letter-at-door" onClick={()=>onPick('pet')}>✉ {lang==='zh'?'接过 Boo 的信':'Take the letter from Boo'}</button>}
       {tour>=0 && !panel && !immersed && !perceive && <aside class="welcome-tour">
         <strong>{'Boo'}</strong><p>{(lang==='zh'?['我给你留了灯。点一块空地，我们一起走进去。','书桌上有一本空白手账。写下今天想留住的一件小事，也可以只留给自己。','想念朋友时就打开信箱。交换好友码，选一张信纸，写一句话或放一颗爱心。']:['I left the light on. Tap an empty floor tile and walk in with me.','There’s a fresh page on the desk. Write one thing you want to remember. You can keep it private.','Missing someone? Open Letters, exchange friend codes, then send a note or a single heart.'])[tour]}</p>
         <button class="chip" onClick={()=>tour===2?finishTour():setTour(tour+1)}>{tour===2?(lang==='zh'?'开始探索':'Explore'):(lang==='zh'?'继续':'Next')}</button> <button class="chip" onClick={finishTour}>{lang==='zh'?'自己逛逛':'Skip tour'}</button></aside>}
@@ -306,6 +319,9 @@ export function Home(props: { ctx: Ctx }) {
           {ctx.project.site.tagline && <p>{ctx.project.site.tagline}</p>}
         </div>
         <div class="hud-actions">
+          <button class="round" aria-expanded={toolsOpen} aria-label={lang==='zh'?'家园菜单':'Home menu'} onClick={()=>setToolsOpen(!toolsOpen)}>☰</button>
+          {toolsOpen&&<><button class="chip" onClick={()=>{setTour(0);setToolsOpen(false)}}>{lang==='zh'?'跟 Boo 逛逛':'Tour with Boo'}</button>
+          <button class="chip" onClick={()=>view?.showResident()}>{lang==='zh'?'找到小人':'Find resident'}</button>
           <button class="round" aria-label={lang==='zh'?'切换沉浸模式':'Toggle immersive view'} aria-pressed={immersed} onClick={()=>setImmersed(!immersed)}>{immersed?'↩':'⛶'}</button>
           <button class="round" aria-label="Boo perception" aria-pressed={perceive} onClick={()=>setPerceive(!perceive)}><Icon name="eye" size={18}/></button>
           <button type="button" class="round" onClick={toggleLang} aria-label={t('hud.lang')} title={t('hud.lang')}>
@@ -314,7 +330,7 @@ export function Home(props: { ctx: Ctx }) {
           <button type="button" class="round" onClick={() => open({ kind: 'settings' })} aria-label={t('hud.settings')} title={t('hud.settings')}>
             <Icon name="gear" size={20} />
           </button>
-        </div>
+        </>}</div>
       </header>
 
       {!decorating && !flatMode && <p class="hud-hint">{t('hud.hint')}</p>}
@@ -393,7 +409,18 @@ export function Home(props: { ctx: Ctx }) {
         />
       )}
       {panel?.kind === 'people' && <PeopleSheet ctx={ctx} heartDraft={heartLetter} onClose={()=>{setHeartLetter(false);close()}} onUnread={setUnread} />}
-      {panel?.kind === 'light' && <LightSheet ctx={ctx} onClose={close} />}
+      {panel?.kind==='light'&&<Sheet title={lang==='zh'?'窗边':'By the window'} onClose={close}><div class="choice-row">{(['morning','afternoon','dusk','midnight','auto'] as const).map((v,i)=><button onClick={()=>{ctx.apply(p=>({...p,room:{...p.room,light:v==='auto'?'auto':v==='midnight'?'night':'day'},privateHome:{...p.privateHome,period:v}}))}}>{lang==='zh'?['清晨','午后','黄昏','深夜','当地时间'][i]:v}</button>)}<button aria-pressed={ctx.project.privateHome?.lampsOn??true} onClick={()=>ctx.apply(p=>({...p,privateHome:{...p.privateHome,lampsOn:!(p.privateHome?.lampsOn??true)}}))}>{lang==='zh'?'开关灯':'Switch lamps'}</button><button onClick={()=>setPanel({kind:'sky'})}>{lang==='zh'?'去看星星':'Step outside'}</button></div></Sheet>}
+      <ListeningRoom ctx={ctx} open={panel?.kind==='records'} close={close} playing={v=>{if(view)view.recordPlaying=v}}/>
+      {panel?.kind==='wall'&&<MemoryWall ctx={ctx} close={close} openLetter={letter=>{view?.focus('window');setPanel({kind:'sky',letter})}}/>}
+      {panel?.kind==='sky'&&<NightWindow ctx={ctx} close={close} letter={panel.letter}/>}
+      {panel?.kind==='desktop'&&<Sheet title="Little Internet OS" onClose={close}><div class="crt-desktop" style={ctx.project.assets.some(a=>a.id===ctx.project.privateHome?.paper)?{backgroundImage:'url('+assetUrl(ctx.project.assets.find(a=>a.id===ctx.project.privateHome?.paper)!)+')',backgroundSize:'cover'}:{}}>
+        <button onClick={()=>{setPanel(null);setPreviewing(ctx.project.web.published?'published':'draft')}}>▣ My Website</button>
+        <button onClick={()=>{setPanel(null);setAtelier(true)}}>✎ Website Atelier</button>
+        {([['cinema','Movie Collection'],['calendar','Calendar'],['journal','Memories'],['wall','Photo Album'],['records','Record Shelf'],['sky','Night Window'],['walk','Internet Neighbors'],['settings','Settings']] as const).map(([kind,label])=><button onClick={()=>setPanel({kind})}>{label}</button>)}</div><label>▧ {lang==='zh'?'桌面壁纸':'Wallpaper'} <select value={ctx.project.privateHome?.paper??''} onChange={e=>{const id=e.currentTarget.value;ctx.apply(p=>({...p,privateHome:{...p.privateHome,paper:id||undefined}}))}}><option value="">—</option>{ctx.project.posts.flatMap(post=>post.imageIds.map((id,i)=><option value={id}>{post.title} · {i+1}</option>))}</select></label></Sheet>}
+      {panel?.kind==='cinema'&&<TapeShelf ctx={ctx} close={close}/>}
+      {panel?.kind==='calendar'&&<Sheet title={lang==='zh'?'值得记住的日子':'Days worth keeping'} onClose={close}><form onSubmit={e=>{e.preventDefault();const r=ctx.apply(p=>({...p,privateHome:{...p.privateHome,dates:[...(p.privateHome?.dates??[]),{id:'d'+crypto.randomUUID().replaceAll('-','').slice(0,12),day:date,name:occasion.trim()}]}}));if(r.ok)setOccasion('');else ctx.toast(r.reason,'error')}}><input required type="date" value={date} onInput={e=>setDate(e.currentTarget.value)}/><input required maxLength={100} value={occasion} placeholder={lang==='zh'?'这一天有什么特别？':'What is special about this day?'} onInput={e=>setOccasion(e.currentTarget.value)}/><button>＋</button></form>
+      {[...(ctx.project.privateHome?.dates??[])].sort((a,b)=>a.day.localeCompare(b.day)).map(d=><p>{d.day} · {d.name} <button onClick={()=>ctx.apply(p=>({...p,privateHome:{...p.privateHome,dates:p.privateHome?.dates?.filter(x=>x.id!==d.id)}}))}>×</button></p>)}</Sheet>}
+      {immersed&&view&&<div class="photo-tools"><select aria-label="Photo aspect ratio" value={aspect} onChange={e=>setAspect(+e.currentTarget.value)}><option value="1">1∶1</option><option value="1.5">3∶2</option><option value={16/9}>16∶9</option></select><button onClick={()=>{const a=document.createElement('a');a.download='little-internet-home.jpg';a.href=view.capturePhoto(aspect);a.click()}}>{lang==='zh'?'拍照':'Take photo'}</button></div>}
       {previewing && <Preview direct onDecorate={()=>{setPreviewing(false);setAtelier(true)}} project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
       {atelier && (
         <WebAtelier
@@ -418,37 +445,13 @@ function DockBtn(props: { icon: IconName; label: string; onClick: () => void; te
   )
 }
 
-function LightSheet(props: { ctx: Ctx; onClose: () => void }) {
-  const { ctx } = props
-  const cur = ctx.project.room.light
-  const icon: Record<(typeof LIGHTS)[number], IconName> = { auto: 'reset', day: 'sun', night: 'moon' }
-  return (
-    <Sheet title={t('light.title')} onClose={props.onClose}>
-      <p class="muted small">{t('light.hint')}</p>
-      <div class="choice-row">
-        {LIGHTS.map((l) => (
-          <button
-            type="button"
-            key={l}
-            class={`chip ${cur === l ? 'selected' : ''}`}
-            aria-pressed={cur === l}
-            onClick={() => run(ctx, updateRoomSkin({ light: l }))}
-          >
-            <Icon name={icon[l]} size={18} /> {t(`light.${l}`)}
-          </button>
-        ))}
-      </div>
-    </Sheet>
-  )
-}
-
 /** The same objects as plain cards, for devices without WebGL or when the owner turns 3D off. */
 function FlatHome(props: { ctx: Ctx; onPick: (id: string) => void }) {
   const items: [string, IconName][] = [
     ['diary', 'pen'],
     ['computer', 'computer'],
     ['voice', 'phone'],
-    ['shelf', 'book'],
+    ['shelf', 'book'],['wall','book'],['records','phone'],['calendar','book'],
     ['pet', 'ghost'],
     ['window', 'sun'],
     ['door', 'door'],
@@ -461,7 +464,7 @@ function FlatHome(props: { ctx: Ctx; onPick: (id: string) => void }) {
         {items.map(([id, icon]) => (
           <button type="button" key={id} class="flat-card" onClick={() => props.onPick(id)}>
             <Icon name={icon} size={28} />
-            <span>{t(`hot.${id}` as 'hot.diary')}</span>
+            <span>{({wall:'照片墙 · Album',records:'唱片机 · Records',calendar:'日历 · Calendar'})[id]??t(`hot.${id}` as 'hot.diary')}</span>
           </button>
         ))}
       </div>

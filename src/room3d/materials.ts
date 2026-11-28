@@ -158,3 +158,20 @@ export function labelTexture(lines: string[], bg: string, fg: string): THREE.Can
   t.colorSpace = THREE.SRGBColorSpace
   return t
 }
+
+
+export function sprigWallpaper(){
+  return canvasTex((g,size)=>{
+    g.fillStyle='#fffaf1';g.fillRect(0,0,size,size)
+    for(let row=0;row<4;row++)for(let col=-1;col<4;col++){
+      g.save();g.translate(66+col*128+(row%2)*64,64+row*128);g.rotate(((row+col)%3-1)*.29)
+      g.strokeStyle='#b6b39d';g.lineWidth=1.3;g.beginPath();g.moveTo(-8,28);g.bezierCurveTo(12,10,-9,-5,8,-22);g.stroke()
+      for(let j=0;j<5;j++){
+        const side=j%2?-1:1
+        g.fillStyle=j%2?'#c5c6aa':'#aebda7';g.beginPath();g.ellipse(side*5,18-j*8,6,2.4,side*-.65,0,Math.PI*2);g.fill()
+      }
+      for(let j=0;j<5;j++){const a=j*2*Math.PI/5;g.fillStyle='#d4afa3';g.beginPath();g.ellipse(7+3*Math.cos(a),-19+3*Math.sin(a),2.6,2,a,0,Math.PI*2);g.fill()}
+      g.restore()
+    }
+  },1)
+}

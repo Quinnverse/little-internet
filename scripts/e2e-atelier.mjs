@@ -124,6 +124,7 @@ await page.locator('.sheet-head button[aria-label="Close"]').last().click()
 
 // ---- 1-3: CRT → Decorate my website
 await page.locator('button.hotspot[data-id=\"computer\"]').evaluate((el) => el.click())
+await page.locator('.crt-desktop').getByRole('button',{name:'My Website'}).click()
 await page.locator('.preview-frame').waitFor()
 await page.locator('.preview-bar').getByRole('button',{name:'Decorate my website'}).click()
 await page.locator('.atelier').waitFor()
@@ -315,7 +316,9 @@ check('backup restores the website layout in a fresh browser', restored > 0 && (
 // Start over: deleting this device's copy brings back the first screen and stays deleted after reload
 await fp.locator('.at-bar button').first().click()
 fp.once('dialog', (d) => d.accept())
+await fp.getByRole('button', { name: 'Home menu' }).click()
 await fp.getByRole('button', { name: 'Settings', exact: true }).click()
+await fp.getByRole('button',{name:'Device',exact:true}).click()
 await fp.getByRole('button', { name: 'Delete this home from this device' }).click()
 await fp.locator('.setup').waitFor({ timeout: 15000 })
 await fp.waitForTimeout(1200)

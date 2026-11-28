@@ -27,7 +27,7 @@ export function useProjectStore(): Store {
   const [state, setState] = useState<StoreState>({ status: 'loading' })
   const [saveError, setSaveError] = useState<string | null>(null)
   const current = useRef<Project | null>(null)
-  const timer = useRef<number | undefined>(undefined)
+
 
   useEffect(() => {
     let cancelled = false
@@ -52,21 +52,14 @@ export function useProjectStore(): Store {
   }, [])
 
   const scheduleSave = useCallback((p: Project) => {
-    window.clearTimeout(timer.current)
-    timer.current = window.setTimeout(() => {
-      if (resetState.on) return
-      idbSet(KEY, p).then(
-        () => setSaveError(null),
-        (e) => setSaveError(`Could not save on this device: ${String(e)}`),
-      )
-    }, 300)
+    if(resetState.on)return
+    void idbSet(KEY,p).then(()=>setSaveError(null),e=>setSaveError('Could not save on this device: '+String(e)))
   }, [])
 
   // Flush pending save when the page is hidden (mobile browsers may kill it).
   useEffect(() => {
     const flush = () => {
       if (document.visibilityState === 'hidden' && current.current && !resetState.on) {
-        window.clearTimeout(timer.current)
         idbSet(KEY, current.current).catch(() => {})
       }
     }

@@ -336,6 +336,7 @@ export function LetterAtelier(props: {
     return (
       <Sheet title={ta('let.sendTitle')} onClose={() => setMode('edit')} wide>
         <div class="letter-send">
+          <p class="postscript">{getLang()==='zh'?'先读一遍。把它寄给谁，由你决定。':'Read it once before you seal the envelope.'}</p>
           <div class="letter-preview" dangerouslySetInnerHTML={{ __html: letterToSvg(letter, { width: 280 }) }} role="img" aria-label={letterSummary(letter, getLang()) || ta('let.title')} />
           <div class="letter-send-form">
             {props.friends.length === 0 ? (

@@ -45,7 +45,7 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
   const [text, setText] = useState('')
   const [busy, setBusy] = useState(false)
   const [bctx, setBctx] = useState<BooContext>(EMPTY_CONTEXT)
-  const [model,setModel] = useState(false)
+  const [model,setModel] = useState(()=>{try{return localStorage.getItem('boo-chat-consent:'+ctx.project.site.slug)==='yes'}catch{return false}})
   const [share,setShare] = useState(false)
   const [modelError,setModelError] = useState(false)
   const chat = useRef<{role:string;content:string}[]>([])
@@ -73,7 +73,7 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
       const messages=[...chat.current.slice(-10),{role:'user',content:q}]
       try {
         warm=await converse(ctx.project.site.slug,messages,share?out.reply.cards.slice(0,3).map(c=>c.title+' · '+c.date+' · '+c.excerpt).join('\n'):'')
-        chat.current=[...messages,{role:'assistant',content:warm}]
+        chat.current=[...messages,{role:'assistant',content:warm.slice(0,2000)}]
       } catch {setModelError(true)}
     }
     setBusy(false)
@@ -199,7 +199,7 @@ export function OwnerGhost(props: { ctx: Ctx; onClose: () => void; onWrite?: () 
       </button>
       {showVoice && (
         <div class="card boo-voice">
-          <label><input type="checkbox" checked={model} onChange={e=>{chat.current=[];setModel(e.currentTarget.checked);setModelError(false)}}/>{lang==='zh'?'将对话发送给主人配置的模型':'Send this conversation to the configured model'}</label>
+          <label><input type="checkbox" checked={model} onChange={e=>{chat.current=[];setModel(e.currentTarget.checked);try{localStorage.setItem('boo-chat-consent:'+ctx.project.site.slug,e.currentTarget.checked?'yes':'no')}catch{};setModelError(false)}}/>{lang==='zh'?'将对话发送给主人配置的模型':'Send this conversation to the configured model'}</label>
           {model && <label><input type="checkbox" checked={share} onChange={e=>{chat.current=[];setShare(e.currentTarget.checked)}}/>{lang==='zh'?'允许发送匹配档案的标题、日期和摘录':'Include matched archive titles, dates and excerpts'}</label>}
         </div>
       )}

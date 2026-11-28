@@ -74,6 +74,7 @@ if (immersive) {
   await closeSheet(b)
   await b.ctx.setOffline(true)
   await a.page.bringToFront()
+  await a.page.getByRole('button',{name:'Home menu'}).tap()
   await a.page.getByRole('button',{name:'Boo perception'}).tap()
   if (process.env.HEART_VIDEO) {
     await a.page.getByRole('button',{name:/Use camera/}).tap()
@@ -104,8 +105,7 @@ if (immersive) {
   await b.ctx.setOffline(false)
   await b.page.getByText('A letter arrived.',{exact:true}).waitFor({timeout:35000})
   await b.page.screenshot({path:join(SHOTS,'boo-delivers.png')})
-  await b.page.getByRole('button',{name:'Show what I can tap'}).click()
-  await b.page.locator('.hotspot[data-id="pet"]').click()
+  await b.page.getByRole('button',{name:/Take the letter from Boo/}).click()
 } else {
   await closeSheet(b)
   await openPeople(b, 'Inbox')

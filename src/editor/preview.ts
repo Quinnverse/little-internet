@@ -1,6 +1,5 @@
 // Preview is the real generated site (Requirement 6): we put generateSite's output in
 // Cache Storage and the service worker serves it under <app>/preview/.
-import { generateSite } from '../core/generate.ts'
 import type { DesignChoice } from '../core/privacy.ts'
 import type { Project } from '../core/schema.ts'
 
@@ -36,6 +35,7 @@ export async function updatePreview(project: Project, design: DesignChoice = 'pu
   if (!previewSupported()) throw new Error('Preview needs a browser with service workers.')
   await navigator.serviceWorker.ready
   const base = new URL('preview/', document.baseURI)
+  const {generateSite}=await import('../core/generate.ts')
   const files = generateSite(project, { design })
   const cache = await caches.open(PREVIEW_CACHE)
   const wanted = new Set([...files.keys()].map((p) => new URL(p, base).href))

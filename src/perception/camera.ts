@@ -25,6 +25,8 @@ let activeCamera: CameraSession | null = null
 export class CameraSession {
   private epoch=0
   private face: import('./face.ts').FaceTracker|null=null
+  private firstFrame=true
+  private firstAction=true
   private lastVideoTime = -1
   private lastFace=0
   private stream: MediaStream | null = null
@@ -49,6 +51,8 @@ export class CameraSession {
     onState: (s: CamState, message?: string) => void
     onHint?: (h: CamHint) => void
     preferCPU?: boolean
+    mirror?:boolean
+    onStage?:(s:string)=>void
     hands?: boolean
     onFace?: (cue:import('./face.ts').FaceCue)=>void
     onFrame?: (hands: readonly Hand[], facePresent:boolean) => void
@@ -57,7 +61,7 @@ export class CameraSession {
   constructor(video: HTMLVideoElement, cb: CameraSession['cb'], sessionId: string) {
     this.video = video
     this.cb = cb
-    this.rec = new GestureRecognizer(sessionId)
+    this.rec = new GestureRecognizer(sessionId,{mirror:cb.mirror??true})
   }
 
   get delegate() {
@@ -69,6 +73,9 @@ export class CameraSession {
     activeCamera?.stop()
     activeCamera = this
     const epoch=++this.epoch
+    for(const key of ['start','hand-resolver-start','hand-resolver-ready','hand-graph-ready','first-frame','first-action','feedback-frame'])performance.clearMarks('li-'+key)
+    performance.mark('li-start')
+    this.firstFrame=true;this.firstAction=true
     this.lastVideoTime = -1
     this.cb.onState('asking')
     try {
@@ -89,11 +96,13 @@ export class CameraSession {
       await this.video.play()
       if(epoch!==this.epoch)return
       if (this.cb.hands !== false) {
+        this.cb.onStage?.('Hand model · 手部模型')
         const tracker = await createHandTracker('VIDEO', this.cb.preferCPU)
         if (epoch !== this.epoch) { tracker.close(); return }
         this.tracker = tracker
       }
       if(this.cb.onFace){
+        this.cb.onStage?.('Face model · 面部模型')
         const {createFaceTracker}=await import('./face.ts')
         if(epoch!==this.epoch)return
         const face=await createFaceTracker()
@@ -154,14 +163,22 @@ export class CameraSession {
         this.cb.onState('error', 'Hand tracking interrupted. Restart the camera to retry.')
         return
       }
-      if(this.face && t0-this.lastFace>=Math.max(80,this.ema*3)){
+      if(this.face && t0-this.lastFace>=Math.max(48,this.ema*1.5)){
         this.lastFace=t0
         try{const cue=this.face.detect(this.video,t0);if(cue)this.cb.onFace?.(cue)}catch{this.stop();this.cb.onState('error','Face tracking interrupted. Start again to retry.');return}
       }
+      if(this.firstFrame){performance.mark('li-first-frame');this.firstFrame=false}
       this.cb.onFrame?.(hands, this.face?.present ?? false)
       if (hands.length) this.sawHandAt = t0
       this.handsNow = hands.length
-      for (const e of this.rec.feed({ t: t0, hands })) this.cb.onEvent(e)
+      for (const e of this.rec.feed({ t: t0, hands })) {
+        this.cb.onEvent(e)
+        if(this.firstAction && ['heart','wave','open_palm','thumbs_up'].includes(e.eventType)){
+          this.firstAction=false
+          performance.mark('li-first-action',{detail:{kind:e.eventType,inferenceStart:t0}})
+          requestAnimationFrame(()=>performance.mark('li-feedback-frame'))
+        }
+      }
       this.checkHint(t0)
     }
     const cost = performance.now() - t0

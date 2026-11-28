@@ -39,3 +39,7 @@ image, GIF or text from GeoCities archives or other sites is copied or shipped.
 The locally served MediaPipe Face Landmarker float16 v1 bundle is by Google (Apache-2.0). Its SHA-256 is
 `64184e229b263107bc2b804c6625db1341ff2bb731874b0bcc2fe6544e0bc9ff`.
 [Google model file](https://storage.googleapis.com/mediapipe-models/face_landmarker/face_landmarker/float16/1/face_landmarker.task) · [Task and model cards](https://ai.google.dev/edge/mediapipe/solutions/vision/face_landmarker).
+
+## V6 room update
+
+The CRT controls, vents and speaker grille and the grooved record player are authored in the project's Blender source and distributed under the repository MIT licence. House selection illustrations and browser-synthesised room tone come from this project's earlier experience-integration branch. Owner recordings, album art and photographs are local user media. The reference videos, commercial album covers and game art are not included in the build.

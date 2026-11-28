@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef } from 'preact/hooks'
-import { renderPreviewPage } from '../../../core/generate.ts'
+import { renderPreviewPage } from '../../../core/siteFiles.ts'
 import { MIME_EXT, type Project } from '../../../core/schema.ts'
 import { blobUrl } from '../common.tsx'
 
@@ -28,7 +28,7 @@ const EDITOR_CSS = `[data-w]{cursor:pointer;transition:outline-color .12s}
 [data-w]:hover{outline:2px dashed rgba(255,106,61,.7);outline-offset:4px}
 [data-w].li-sel{outline:3px solid #ff6a3d;outline-offset:4px}
 [data-w].li-sel::after{content:attr(data-label);position:absolute;top:-30px;left:-3px;z-index:9;font:700 11px/1 system-ui,sans-serif;background:#ff6a3d;color:#fff;padding:5px 8px;border-radius:6px 6px 6px 0;white-space:nowrap;pointer-events:none}
-[data-w].li-sel{position:relative}
+
 a,button,input,textarea{pointer-events:none}
 audio{pointer-events:auto}`
 
@@ -86,7 +86,7 @@ export function PreviewFrame(props: {
             handle.textContent=resize?'↔':'✥'
             handle.title=resize?'Resize / 调整宽度':'Move / 移动'
             handle.style.cssText='position:absolute;bottom:4px;'+(resize?'right:4px':'left:4px')+';z-index:30;pointer-events:auto;touch-action:none;cursor:grab'
-            widget.style.position='relative'
+            if(doc.defaultView?.getComputedStyle(widget).position!=='absolute')widget.style.position='relative'
             widget.append(handle)
             let start:{x:number;y:number}|null=null
             handle.ondragstart=e=>e.preventDefault()
