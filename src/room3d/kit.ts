@@ -4,7 +4,7 @@ import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room
 import type { BuildCtx, MemoryLook, Shell, Wall } from './builders.ts'
 import type { Exterior } from './exterior.ts'
 import { screenTexture } from './builders.ts'
-import { floorTexture, glowTexture, labelTexture, WALL_COLORS, sprigWallpaper } from './materials.ts'
+import { floorRoughness, floorTexture, glowTexture, labelTexture, plasterWallpaper, weaveTexture, woodDetailTexture, WALL_COLORS } from './materials.ts'
 import { getModel } from './models.ts'
 
 /**
@@ -43,6 +43,34 @@ function need(name: string): THREE.Group {
   if (!m) throw new Error(`model ${name} is not loaded`)
   calmPalette(m)
   return m
+}
+
+/**
+ * A modelled surface has no UVs — the GLB only ships POSITION and NORMAL — so detail has to be projected
+ * from world position, picking the plane the fragment's normal faces. Without this every sofa, chair and
+ * cabinet renders as one flat colour, which is most of why the room read as a toy next to the references.
+ */
+function surfaceDetail(root: THREE.Object3D, kind: 'weave' | 'wood') {
+  const f = kind === 'weave' ? 9.5 : 2.4
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    const list = Array.isArray(mesh.material) ? mesh.material : [mesh.material]
+    for (const src of list) {
+      const m = src as THREE.MeshStandardMaterial
+      if (!m || m.userData.detailed || m.transparent || m.emissiveMap) continue
+      m.userData.detailed = true
+      m.map = kind === 'weave' ? weaveTexture() : woodDetailTexture()
+      m.map.userData.roomOwned = true
+      m.onBeforeCompile = (shader) => {
+        shader.vertexShader = shader.vertexShader.replace(
+          '#include <uv_vertex>',
+          '#include <uv_vertex>\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vMapUv=(wn.y>wn.x&&wn.y>wn.z?vec2(wp.x,wp.z):(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y)))*' + f.toFixed(3) + ';',
+        )
+      }
+      m.needsUpdate = true
+    }
+  })
 }
 
 function put(parent: THREE.Object3D, name: string, o: Opts = {}): THREE.Group {
@@ -171,10 +199,12 @@ function cloneMats(root: THREE.Object3D, recolor?: (name: string) => string | nu
         const color = recolor?.(src.name)
         if (color) {
           c.color.set(color)
-          c.map=sprigWallpaper()
+          c.map=plasterWallpaper()
           c.map.userData.roomOwned=true
           c.onBeforeCompile=(shader)=>{
-            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 pointOnWall=(modelMatrix*vec4(position,1.)).xyz; vMapUv=vec2(pointOnWall.x+pointOnWall.z,pointOnWall.y)*1.65;')
+            // Object-space axonometric projection: no UVs ship with the GLB, and the old world-space
+            // (x+z) trick skewed the print on the walls that run the other way.
+            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vMapUv=(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y))*0.44;')
           }
         }
         c.userData.roomOwned=true
@@ -232,7 +262,11 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
     walls[0]!.group.add(drapes.group)
     walls[0]!.mats.push(drapes.cloth)
   }
-  const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(6.12,6.12),new THREE.MeshStandardMaterial({color:'#eae0cc',roughness:.97}))
+  // A flat, evenly lit plane at the top of the frame is the fastest way to make a room look like a
+  // cardboard box, so the ceiling gets the same plaster tooth as the walls and a tone below the walls.
+  const ceilMap = plasterWallpaper()
+  ceilMap.repeat.set(2.4, 2.4)
+  const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(6.12,6.12),new THREE.MeshStandardMaterial({color:'#d7cdbb',map:ceilMap,roughness:1}))
   ceiling.rotation.x=Math.PI/2
   ceiling.position.set(3,3.16,3)
   ceiling.name='interior-ceiling'
@@ -248,7 +282,7 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   // The owner's floor is a generated texture on a plane just above the model's plain floor.
   const modelFloor = root.getObjectByName('floor')
   if (modelFloor) modelFloor.visible = false
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshStandardMaterial({ map: floorTexture(floorId), roughness: 0.75 }))
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshStandardMaterial({ map: floorTexture(floorId), roughnessMap: floorRoughness(floorId), roughness: 1.0 }))
   floor.rotation.x = -Math.PI / 2
   floor.position.set(3, 0.002, 3)
   floor.receiveShadow = true
@@ -270,6 +304,15 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   put(g, 'side_table', { at: [0.46, 0, 2.5] })
   put(g, 'pet_bed', { at: [4.5, 0, 3.5] })
   put(g, 'rug', { at: [2.9, 0, 3.0] })
+  // Texture the flat-coloured pieces: upholstery weaves, timber grain.
+  for (const n of ['desk', 'bookshelf', 'dresser', 'side_table', 'stool', 'mini_bookcase']) {
+    const o = g.getObjectByName(n)
+    if (o) surfaceDetail(o, 'wood')
+  }
+  for (const n of ['office_chair', 'armchair', 'rug', 'pet_bed', 'basket']) {
+    const o = g.getObjectByName(n)
+    if (o) surfaceDetail(o, 'weave')
+  }
 
   const computer = put(g, 'computer', { at: [1.4, 0.775, 0.3], yaw: 0.12, pick: 'computer' })
   picks.push(computer)
