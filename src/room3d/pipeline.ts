@@ -4,6 +4,7 @@ import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
+import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
 
 /** The difference between "a lit 3D scene" and "a photograph of a room" is almost entirely after the
  *  render: light bleeds off the lamps, corners hold a little darkness, and the grade pulls the whole
@@ -48,6 +49,7 @@ const Grade = {
 
 export type Pipeline = {
   render: () => void
+  setFocus: (d: number) => void
   setSize: (w: number, h: number, dpr: number) => void
   dispose: () => void
   setBackground: (night: boolean) => void
@@ -109,6 +111,11 @@ export function createPipeline(renderer: THREE.WebGLRenderer, scene: THREE.Scene
   const renderPass = new RenderPass(scene, camera)
   composer.addPass(renderPass)
 
+  // Depth of field, very shallow: the reference rooms are shot on a long lens and the far wall falls
+  // off just enough to keep the furniture reading as an object in a space rather than a diagram.
+  const bokeh = opts.lowPower ? null : new BokehPass(scene, camera, { focus: 13, aperture: 0.00028, maxblur: 0.006 })
+  if (bokeh) composer.addPass(bokeh)
+
   // Light has to be allowed to exceed white before it bleeds, or every lamp turns into a white blob.
   const bloom = new UnrealBloomPass(new THREE.Vector2(w, h), opts.lowPower ? 0.18 : 0.26, 0.55, 1.16)
   composer.addPass(bloom)
@@ -132,12 +139,16 @@ export function createPipeline(renderer: THREE.WebGLRenderer, scene: THREE.Scene
       grade.uniforms.uTime.value = (performance.now() - t0) / 1000
       composer.render()
     },
+    setFocus(d) {
+      if (bokeh) (bokeh.uniforms as Record<string, { value: number }>).focus!.value = d
+    },
     setSize(nw, nh, dpr) {
       composer.setPixelRatio(dpr)
       composer.setSize(nw, nh)
       renderPass.setSize(nw * dpr, nh * dpr)
       grade.uniforms.uRes.value.set(nw * dpr, nh * dpr)
       bloom.setSize(nw * dpr, nh * dpr)
+      bokeh?.setSize(nw * dpr, nh * dpr)
     },
     setBackground(night) {
       scene.background = night ? bgNight() : bgDay()

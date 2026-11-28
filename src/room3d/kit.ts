@@ -4,7 +4,7 @@ import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room
 import type { BuildCtx, MemoryLook, Shell, Wall } from './builders.ts'
 import type { Exterior } from './exterior.ts'
 import { screenTexture } from './builders.ts'
-import { floorRoughness, floorTexture, glowTexture, labelTexture, plasterWallpaper, weaveTexture, woodDetailTexture, WALL_COLORS } from './materials.ts'
+import { ball, floorRoughness, floorTexture, glowTexture, labelTexture, plasterWallpaper, weaveTexture, woodDetailTexture, WALL_COLORS } from './materials.ts'
 import { getModel } from './models.ts'
 
 /**
@@ -40,7 +40,12 @@ function calmPalette(root: THREE.Object3D) {
 
 function need(name: string): THREE.Group {
   const m = getModel(name)
-  if (!m) throw new Error(`model ${name} is not loaded`)
+  // A missing model used to throw and take the whole room down with it — one asset deleted from
+  // models.generated.ts and the visitor got an empty shell. Degrade to an empty group instead.
+  if (!m) {
+    if (name !== 'missing') console.warn(`[kit] model ${name} is not loaded; skipping`)
+    return new THREE.Group()
+  }
   calmPalette(m)
   return m
 }
@@ -343,6 +348,17 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   picks.push(put(g, 'record_player', { at: [3.0, 0.8, 0.36], pick:'records' }))
   put(g, 'lava_lamp', { at: [3.55, 0.8, 0.42] })
   picks.push(put(g, 'cd_disc', { at: [1.88, 0.775, 0.66], yaw: -0.5, pick: 'export' }))
+
+  // Set dressing. A room that is exactly the furniture the product ships reads as a showroom; four
+  // small, off-axis objects are enough to make it read as somewhere a person actually lives.
+  // They are not pickable and carry no state, so they cannot get in the way of the owner's own things.
+  put(g, 'keepsake_book', { at: [3.15, 0.0, 2.05], yaw: 0.42 }).scale.setScalar(0.92)
+  put(g, 'keepsake_book', { at: [0.95, 0, 1.95], yaw: -0.7 }).scale.setScalar(0.8)
+  put(g, 'basket', { at: [5.42, 0, 0.95], yaw: 0.3 })
+  const scrap = ball(0.055, '#efe7d7')
+  scrap.position.set(4.95, 0.055, 1.55)
+  scrap.rotation.set(0.4, 0.9, 0.2)
+  g.add(scrap)
   picks.push(put(g, 'photo_wall', { at: [1.0, 1.75, 0.0], pick:'wall' }))
   put(g, 'wall_clock', { at: [3.2, 2.78, 0.0] })
   picks.push(put(g, 'calendar', { at: [0.0, 2.3, 0.5], yaw: Math.PI / 2, pick:'calendar' }))

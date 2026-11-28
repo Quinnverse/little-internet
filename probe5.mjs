@@ -1,0 +1,15 @@
+import { chromium } from 'playwright'
+const b = await chromium.launch({ channel: 'chrome' })
+const p = await b.newPage({ viewport: { width: 1440, height: 900 }, deviceScaleFactor: 2 })
+const logs = []
+p.on('console', m => logs.push(m.type() + ': ' + m.text()))
+p.on('pageerror', e => logs.push('PAGEERROR: ' + e.message))
+await p.goto('http://localhost:5174/', { waitUntil: 'load' })
+await p.waitForTimeout(1500)
+await p.getByText('试试示范家园').click()
+await p.waitForTimeout(2500)
+const names = await p.getByText('The Book Nook').count()
+if (names) await p.getByText('The Book Nook').first().click()
+await p.waitForTimeout(9000)
+console.log(logs.filter(l => !l.includes('[vite]')).slice(0, 25).join('\n'))
+await b.close()

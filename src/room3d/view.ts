@@ -182,7 +182,7 @@ export class RoomView {
     this.renderer.setPixelRatio(software ? 0.75 : Math.min(window.devicePixelRatio || 1, 2))
     this.renderer.shadowMap.enabled = !software
     this.renderer.shadowMap.autoUpdate = false
-    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
+    this.renderer.shadowMap.type = THREE.PCFShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.08
     this.pipeline = software
@@ -1130,6 +1130,7 @@ export class RoomView {
       ceiling.visible=this.mode==='home'&&this.radius<3.4
     }
     this.camera.lookAt(this.tgt)
+    this.pipeline?.setFocus(this.radius)
 
     // Walls between the camera and the room fade out.
     let fading = false

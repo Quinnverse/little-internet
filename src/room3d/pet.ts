@@ -134,7 +134,7 @@ export class Pet {
       this.body.remove(c)
       ;(c as THREE.Mesh).geometry?.dispose()
     }
-    model.scale.setScalar(0.62)
+    model.scale.setScalar(0.5)
     model.traverse((o) => {
       const m = o as THREE.Mesh
       if (!m.isMesh) return
