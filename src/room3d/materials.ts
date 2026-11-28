@@ -4,7 +4,7 @@ import type { FloorId, WallId } from '../core/room.ts'
 
 export const WALL_COLORS: Record<WallId, string> = {
   cream: '#e7dac2',
-  sage: '#a2ae9c',
+  sage: '#a8a794',
   blush: '#d7bab0',
   sky: '#abc1cd',
   plum: '#a49aac',

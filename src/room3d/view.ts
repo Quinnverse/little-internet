@@ -1007,15 +1007,15 @@ export class RoomView {
     const n = this.nightMix
     const lerp = (a: number, b: number) => a + (b - a) * n
     // A high key light and a low fill is what separates "a room at night" from "a flat diagram of a room".
-    this.sun.intensity = lerp(5.2, 1.5)
+    this.sun.intensity = lerp(6.6, 1.5)
     this.sun.color.set(n > 0.5 ? '#b9c6ff' : this.daylightColor || '#ffd9a8')
-    this.hemi.intensity = lerp(0.36, 0.24)
+    this.hemi.intensity = lerp(0.24, 0.2)
     this.hemi.color.set(n > 0.5 ? '#2c3a63' : '#cfe2f2')
     this.hemi.groundColor.set(n > 0.5 ? '#1d1826' : '#6b5a45')
-    this.ambient.intensity = lerp(0.10, 0.10)
+    this.ambient.intensity = lerp(0.07, 0.09)
     this.rim.intensity = lerp(0.62, 0.42)
     this.rim.color.set(n > 0.5 ? '#6c86c8' : '#b9d4ee')
-    this.renderer.toneMappingExposure = lerp(1.14, 1.26)
+    this.renderer.toneMappingExposure = lerp(1.12, 1.24)
     for (const l of this.ctx.lamps) {
       const base = (l.userData.base as number) ?? 1
       const flick = l.userData.flicker ? 1 + Math.sin(performance.now() / 120) * 0.05 : 1

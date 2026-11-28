@@ -349,6 +349,7 @@ export function Home(props: { ctx: Ctx }) {
         <strong>{'Boo'}</strong><p>{(lang==='zh'?['我给你留了灯。点一块空地，我们一起走进去。','书桌上有一本空白手账。写下今天想留住的一件小事，也可以只留给自己。','想念朋友时就打开信箱。交换好友码，选一张信纸，写一句话或放一颗爱心。']:['I left the light on. Tap an empty floor tile and walk in with me.','There’s a fresh page on the desk. Write one thing you want to remember. You can keep it private.','Missing someone? Open Letters, exchange friend codes, then send a note or a single heart.'])[tour]}</p>
         <button class="chip" onClick={()=>tour===2?finishTour():setTour(tour+1)}>{tour===2?(lang==='zh'?'开始探索':'Explore'):(lang==='zh'?'继续':'Next')}</button> <button class="chip" onClick={finishTour}>{lang==='zh'?'自己逛逛':'Skip tour'}</button></aside>}
       <header class="hud-top">
+        <div class="hud-scrim" aria-hidden="true"/>
         <div class={`home-title${quietTitle ? ' is-quiet' : ''}`} hidden={immersed}>
           <h1>{ctx.project.site.title}</h1>
           {ctx.project.site.tagline && <p>{ctx.project.site.tagline}</p>}
