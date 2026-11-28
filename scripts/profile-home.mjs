@@ -4,13 +4,13 @@ import { execFileSync } from 'node:child_process'
 import { writeFileSync } from 'node:fs'
 import os from 'node:os'
 const software = process.env.GL === 'software'
-const browser = await chromium.launch({ headless:false, args:[
+const browser = await chromium.launch({channel:process.env.PW_CHANNEL, headless:false, args:[
   ...(software ? ['--use-angle=swiftshader','--enable-unsafe-swiftshader'] : []),
   ...(process.env.PROFILE_VIDEO ? ['--use-file-for-fake-video-capture='+process.env.PROFILE_VIDEO] : []),
   '--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream',
 ]})
 try {
-  const context = await browser.newContext({locale:'en-US',viewport:{width:960,height:700},permissions:['camera']})
+  const context = await browser.newContext({locale:'en-US',viewport:{width:960,height:700}})
   const page = await context.newPage()
   const browserCDP = await browser.newBrowserCDPSession()
   const result = {browser:browser.version(), cpu:os.cpus()[0].model, resolution:'960x700 DPR1',
@@ -46,15 +46,17 @@ try {
       cpuOneCorePercent:+(100000*sec/(after.t-before.t)).toFixed(1),browserRssMiB:after.rss}
     console.log(name,result.stages[name])
   }
+  await page.getByRole('button',{name:'Skip tour'}).click()
   await measure('home');result.ordinaryVisionRequests=models.slice()
+  await page.getByRole('button',{name:'Home menu'}).click()
   await page.getByRole('button',{name:'Boo perception'}).click()
   for(const [name,hand,face] of [['hands',true,false],['face',false,true],['both',true,true]]){
-    const options=page.locator('.home-perception details')
+    const options=page.locator('.home-perception details').first()
     await options.locator('summary').click()
     await page.getByLabel(/Hand gestures ·/).setChecked(hand)
     await page.getByLabel(/Face movements/).setChecked(face)
     await page.getByRole('button',{name:/Use camera/}).click()
-    await page.locator('.cam-live').waitFor({timeout:120000})
+    await page.waitForFunction(()=>performance.getEntriesByName('li-first-frame').length>0,null,{timeout:30000}).catch(async e=>{console.error(await page.locator('.home-perception').innerText());throw e})
     await measure(name)
     const track=await page.evaluateHandle(()=>document.querySelector('.home-perception video').srcObject.getTracks()[0])
     await page.getByRole('button',{name:/Stop camera/}).click()

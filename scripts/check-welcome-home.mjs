@@ -3,10 +3,11 @@ import assert from 'node:assert/strict'
 import {mkdirSync} from 'node:fs'
 const dir=process.env.SHOTS||'.v6-review'
 mkdirSync(dir,{recursive:true})
-const b=await chromium.launch({headless:process.env.HEADFUL!=='1',channel:process.env.PW_CHANNEL})
+const b=await chromium.launch({...(process.env.TEST_PROXY?{proxy:{server:process.env.TEST_PROXY}}:{}),headless:process.env.HEADFUL!=='1',channel:process.env.PW_CHANNEL})
 try{
  const p=await b.newPage({viewport:{width:1600,height:900},locale:'en-US',...(process.env.VIDEOS?{recordVideo:{dir:process.env.VIDEOS,size:{width:1280,height:720}}}:{})})
- p.setDefaultTimeout(10000)
+ p.setDefaultTimeout(15000)
+ p.setDefaultNavigationTimeout(90000)
  p.on('pageerror',e=>console.error('PAGE',e.message))
  await p.goto(process.env.BASE??'http://localhost:4360/')
  await p.getByRole('button',{name:'Try a demo home'}).click()
