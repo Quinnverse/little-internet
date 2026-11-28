@@ -28,6 +28,7 @@ import {
 import { buildExterior, type Exterior } from './exterior.ts'
 import { kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
 import { getAnimations, getModel, kitReady } from './models.ts'
+import { glowTexture } from './materials.ts'
 import { Avatar } from './avatar.ts'
 import { box } from './materials.ts'
 import { Pet, type PetState } from './pet.ts'
@@ -102,9 +103,13 @@ export class RoomView {
   private dynamic = new THREE.Group()
   private shell!: Shell
   private ctx: BuildCtx = { lamps: [], glows: [] }
-  private sun = new THREE.DirectionalLight('#fff1d6', 2.4)
-  private hemi = new THREE.HemisphereLight('#dff0ff', '#c9b79c', 0.9)
-  private ambient = new THREE.AmbientLight('#ffffff', 0.2)
+  private sun = new THREE.DirectionalLight('#ffd9a8', 3.2)
+  private hemi = new THREE.HemisphereLight('#cfe2f2', '#6b5a45', 0.42)
+  private ambient = new THREE.AmbientLight('#ffe9cf', 0.1)
+  /** Cool light from the far corner: gives every piece of furniture a readable edge instead of a flat silhouette. */
+  private rim = new THREE.DirectionalLight('#b9d4ee', 0.55)
+  /** Slow dust in the air. Cheap, but it is most of what makes a still room feel inhabited. */
+  private dust?: THREE.Points
   private data: HomeData | null = null
   private night = false
   private nightMix = 0
@@ -175,8 +180,9 @@ export class RoomView {
     this.renderer.setPixelRatio(software ? 0.75 : Math.min(window.devicePixelRatio || 1, 2))
     this.renderer.shadowMap.enabled = !software
     this.renderer.shadowMap.autoUpdate = false
-    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
+    this.renderer.toneMappingExposure = 1.08
     const el = this.renderer.domElement
     el.className = 'room-canvas'
     el.style.touchAction = 'none'
@@ -184,7 +190,7 @@ export class RoomView {
     opts.container.prepend(el)
     this.hotLayer = opts.container
 
-    this.scene.add(this.root, this.dynamic, this.hemi, this.ambient, this.sun, this.sun.target, this.fill)
+    this.scene.add(this.root, this.dynamic, this.hemi, this.ambient, this.sun, this.sun.target, this.fill, this.rim, this.rim.target)
     this.sun.position.set(8, 9, -8)
     this.sun.target.position.set(3, 0, 3)
     this.sun.castShadow = true
@@ -196,9 +202,14 @@ export class RoomView {
     sc.bottom = -9
     sc.near = 1
     sc.far = 40
-    this.sun.shadow.bias = -0.0005
-    this.sun.shadow.normalBias = 0.03
-    this.sun.shadow.radius = 4
+    this.sun.shadow.bias = -0.0004
+    this.sun.shadow.normalBias = 0.02
+    this.sun.shadow.radius = 5
+    // The cool rim sits opposite the window, so the light has a direction across the room.
+    this.rim.position.set(-5.5, 4.2, 10)
+    this.rim.target.position.set(3, 1.2, 3)
+    this.rim.castShadow = false
+    this.makeDust()
 
     this.pet = new Pet('white', opts.reduceMotion)
     if (kitReady()) this.pet.useModel(getModel('pet_ghost')!, getAnimations('pet_ghost'))
@@ -995,20 +1006,52 @@ export class RoomView {
   private applyLight() {
     const n = this.nightMix
     const lerp = (a: number, b: number) => a + (b - a) * n
-    this.sun.intensity = lerp(2.6, 0.55)
-    this.sun.color.set(n > 0.5 ? '#9db4ff' : this.daylightColor || '#fff0d2')
-    this.hemi.intensity = lerp(1.16, 0.84)
-    this.hemi.color.set(n > 0.5 ? '#35467a' : '#e2f1ff')
-    this.hemi.groundColor.set(n > 0.5 ? '#2a2236' : '#c9b79c')
-    this.ambient.intensity = lerp(0.24, 0.30)
-    this.renderer.toneMappingExposure = lerp(1.0, 1.15)
+    // A high key light and a low fill is what separates "a room at night" from "a flat diagram of a room".
+    this.sun.intensity = lerp(5.2, 1.5)
+    this.sun.color.set(n > 0.5 ? '#b9c6ff' : this.daylightColor || '#ffd9a8')
+    this.hemi.intensity = lerp(0.36, 0.24)
+    this.hemi.color.set(n > 0.5 ? '#2c3a63' : '#cfe2f2')
+    this.hemi.groundColor.set(n > 0.5 ? '#1d1826' : '#6b5a45')
+    this.ambient.intensity = lerp(0.10, 0.10)
+    this.rim.intensity = lerp(0.62, 0.42)
+    this.rim.color.set(n > 0.5 ? '#6c86c8' : '#b9d4ee')
+    this.renderer.toneMappingExposure = lerp(1.14, 1.26)
     for (const l of this.ctx.lamps) {
       const base = (l.userData.base as number) ?? 1
       const flick = l.userData.flicker ? 1 + Math.sin(performance.now() / 120) * 0.05 : 1
-      l.intensity = Number(this.lampsOn) * base * (0.04 + 0.96 * n) * flick
+      // Lamps keep a low ember in daylight so the room never loses its warm pools.
+      l.intensity = Number(this.lampsOn) * base * (0.3 + 0.7 * n) * 1.7 * flick
+      const halo = l.userData.halo as THREE.Sprite | undefined
+      if (halo) (halo.material as THREE.SpriteMaterial).opacity = Number(this.lampsOn) * (0.06 + 0.5 * n)
     }
     for (const g of this.ctx.glows) g.mat.emissiveIntensity = lerp(g.day, g.night)
+    if (this.dust) (this.dust.material as THREE.PointsMaterial).opacity = lerp(0.11, 0.34)
     this.renderer.domElement.style.setProperty('--night', String(n))
+  }
+
+  private makeDust() {
+    const count = 150
+    const pos = new Float32Array(count * 3)
+    for (let i = 0; i < count; i++) {
+      pos[i * 3] = Math.random() * 6
+      pos[i * 3 + 1] = 0.15 + Math.random() * 2.9
+      pos[i * 3 + 2] = Math.random() * 6
+    }
+    const geo = new THREE.BufferGeometry()
+    geo.setAttribute('position', new THREE.BufferAttribute(pos, 3))
+    const m = new THREE.PointsMaterial({
+      size: 0.022,
+      map: glowTexture(),
+      color: '#ffe4bd',
+      transparent: true,
+      opacity: 0.4,
+      depthWrite: false,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+    })
+    this.dust = new THREE.Points(geo, m)
+    this.dust.frustumCulled = false
+    this.scene.add(this.dust)
   }
 
   // ---------------------------------------------------------------- loop
@@ -1060,8 +1103,9 @@ export class RoomView {
     this.camera.position.set(this.tgt.x + this.radius * sp * Math.sin(this.az), this.tgt.y + this.radius * Math.cos(this.pol), this.tgt.z + this.radius * sp * Math.cos(this.az))
     const ceiling=this.shell?.group.getObjectByName('interior-ceiling')
     if(ceiling){
-      const p=this.camera.position
-      ceiling.visible=this.mode==='home'&&p.y<3.16&&p.x>=0&&p.x<=(this.data?.house==='villa'?8.52:6)&&p.z>=0&&p.z<=6
+      // A cutaway room has no ceiling: keeping it only for the inside-the-room camera stops it from
+      // swallowing the top third of the frame.
+      ceiling.visible=this.mode==='home'&&this.radius<3.4
     }
     this.camera.lookAt(this.tgt)
 
@@ -1106,6 +1150,7 @@ export class RoomView {
 
     if(this.avatar&&!this.avatar.moving&&this.route.length){const next=this.route.shift()!;this.avatar.goTo(next.x+.5,next.z+.5);this.dirty=true}
     if (animated) {
+      if (this.dust) this.dust.rotation.y = t * 0.018
       if(this.recordPlaying){const disc=this.root.getObjectByName('record');if(disc)disc.rotation.y+=dt*3.49}
       this.avatar?.update(dt,t)
       this.pet.update(dt, t)

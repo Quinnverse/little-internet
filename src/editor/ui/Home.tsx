@@ -4,6 +4,7 @@ import {assetUrl} from './common.tsx'
 import {MemoryWall} from './MemoryWall.tsx'
 import {ListeningRoom} from './ListeningRoom.tsx'
 import {NightWindow} from './NightWindow.tsx'
+import {GiftRitual} from './GiftRitual.tsx'
 import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { publicProjection } from '../../core/privacy.ts'
 import type { Post, Project } from '../../core/schema.ts'
@@ -44,6 +45,7 @@ type Panel =
   | { kind: 'computer' }
   | { kind: 'publishing' }
   | { kind: 'door' }
+  | { kind: 'gift' }
   | { kind: 'walk' }
   | { kind: 'move' }
   | { kind: 'settings' }
@@ -71,6 +73,28 @@ export function Home(props: { ctx: Ctx }) {
   useEffect(()=>{const quiet=()=>{if(document.hidden)stopAmbient()};document.addEventListener('visibilitychange',quiet);return ()=>{document.removeEventListener('visibilitychange',quiet);stopAmbient()}},[])
   const { ctx } = props
   const lang = useLang()
+  // The room keeps its own clock. It is the cheapest thing that makes a still room feel inhabited,
+  // and it means "dusk" is something that happens to you rather than a setting you operate.
+  const [clock, setClock] = useState(() => new Date())
+  const [quietTitle, setQuietTitle] = useState(false)
+  const [showHint, setShowHint] = useState(true)
+  const [giftInvite, setGiftInvite] = useState(false)
+  const zhUI = lang === 'zh'
+  useEffect(() => {
+    if (window.location.hash === '#gift') setPanel({ kind: 'gift' })
+    const t = window.setTimeout(() => setGiftInvite(true), 16000)
+    return () => window.clearTimeout(t)
+  }, [])
+  useEffect(() => {
+    const id = window.setInterval(() => setClock(new Date()), 20000)
+    const a = window.setTimeout(() => setQuietTitle(true), 9000)
+    const b = window.setTimeout(() => setShowHint(false), 14000)
+    return () => {
+      window.clearInterval(id)
+      window.clearTimeout(a)
+      window.clearTimeout(b)
+    }
+  }, [])
   const [panel, setPanel] = useState<Panel>(null)
   const [previewing, setPreviewing] = useState<false | 'published' | 'draft'>(false)
   const [atelier, setAtelier] = useState(() => typeof location !== 'undefined' && location.hash === '#atelier')
@@ -325,7 +349,7 @@ export function Home(props: { ctx: Ctx }) {
         <strong>{'Boo'}</strong><p>{(lang==='zh'?['我给你留了灯。点一块空地，我们一起走进去。','书桌上有一本空白手账。写下今天想留住的一件小事，也可以只留给自己。','想念朋友时就打开信箱。交换好友码，选一张信纸，写一句话或放一颗爱心。']:['I left the light on. Tap an empty floor tile and walk in with me.','There’s a fresh page on the desk. Write one thing you want to remember. You can keep it private.','Missing someone? Open Letters, exchange friend codes, then send a note or a single heart.'])[tour]}</p>
         <button class="chip" onClick={()=>tour===2?finishTour():setTour(tour+1)}>{tour===2?(lang==='zh'?'开始探索':'Explore'):(lang==='zh'?'继续':'Next')}</button> <button class="chip" onClick={finishTour}>{lang==='zh'?'自己逛逛':'Skip tour'}</button></aside>}
       <header class="hud-top">
-        <div class="home-title" hidden={immersed}>
+        <div class={`home-title${quietTitle ? ' is-quiet' : ''}`} hidden={immersed}>
           <h1>{ctx.project.site.title}</h1>
           {ctx.project.site.tagline && <p>{ctx.project.site.tagline}</p>}
         </div>
@@ -333,38 +357,39 @@ export function Home(props: { ctx: Ctx }) {
           <button class="round" aria-expanded={toolsOpen} aria-label={lang==='zh'?'家园菜单':'Home menu'} onClick={()=>setToolsOpen(!toolsOpen)}>☰</button>
           {toolsOpen&&<><button class="chip" onClick={()=>{setTour(0);setToolsOpen(false)}}>{lang==='zh'?'跟 Boo 逛逛':'Tour with Boo'}</button>
           <button class="chip" onClick={()=>view?.showResident()}>{lang==='zh'?'找到小人':'Find resident'}</button>
+          {!flatMode && <button class="chip" aria-pressed={inspect} onClick={()=>setInspect(!inspect)}>{lang==='zh'?'观察家具':'Inspect furniture'}</button>}
+          {!flatMode && <button class="chip" onClick={()=>view?.rotateBy(-Math.PI / 4)}>{lang==='zh'?'向左转':'Turn left'}</button>}
+          {!flatMode && <button class="chip" onClick={()=>view?.rotateBy(Math.PI / 4)}>{lang==='zh'?'向右转':'Turn right'}</button>}
           <button class="round" aria-label={lang==='zh'?'切换沉浸模式':'Toggle immersive view'} aria-pressed={immersed} onClick={()=>setImmersed(!immersed)}>{immersed?'↩':'⛶'}</button>
           <button class="round" aria-label="Boo perception" aria-pressed={perceive} onClick={()=>setPerceive(!perceive)}><Icon name="eye" size={18}/></button>
           <button type="button" class="round" onClick={toggleLang} aria-label={t('hud.lang')} title={t('hud.lang')}>
             <Icon name="globe" size={18} /><span class="lang-text">{lang === 'en' ? '中文' : 'EN'}</span>
           </button>
-          <button type="button" class="round" onClick={() => open({ kind: 'settings' })} aria-label={t('hud.settings')} title={t('hud.settings')}>
-            <Icon name="gear" size={20} />
-          </button>
         </>}</div>
       </header>
 
-      {!decorating && !flatMode && <p class="hud-hint">{t('hud.hint')}</p>}
+      {showHint && !decorating && !flatMode && <p class="hud-hint">{t('hud.hint')}</p>}
 
       {!decorating && !immersed && (
+        <>
+        <div class="hud-clock" aria-label={zhUI ? '屋里现在的时间' : 'Time in the room'}>
+          <span class="dial" aria-hidden="true"><i style={{ transform: `rotate(${(shownHour(currentPeriod(ctx)) % 12) * 30 + shownMinute(currentPeriod(ctx)) * 0.5}deg)` }} /></span>
+          <b>{shownTime(ctx, clock, lang)}</b>
+          <span>{dayPart(currentPeriod(ctx) === 'auto' ? clock.getHours() : PERIOD_HOUR[currentPeriod(ctx) as keyof typeof PERIOD_HOUR], zhUI)}</span>
+        </div>
         <nav class="dock" aria-label="Home">
-          {!flatMode && (
-            <>
-              <DockBtn icon="eye" label={ta('hud.hints')} onClick={() => setPeek((v) => !v)} />
-          <button class="chip" aria-pressed={inspect} onClick={()=>setInspect(!inspect)}>{lang==='zh'?'观察家具':'Inspect furniture'}</button>
-          <DockBtn icon="rotl" label={t('hud.rotateL')} onClick={() => view?.rotateBy(-Math.PI / 4)} />
-              <DockBtn icon="rotr" label={t('hud.rotateR')} onClick={() => view?.rotateBy(Math.PI / 4)} />
-            </>
-          )}
-          <button type="button" class="dock-main" onClick={() => onPick('diary')}>
+          <button type="button" class="dock-btn dock-write" onClick={() => onPick('diary')} aria-label={t('hud.write')}>
             <Icon name="pen" size={20} /> <span>{t('hud.write')}</span>
           </button>
+          <i class="dock-sep" aria-hidden="true" />
           <DockBtn icon="book" label={t('hud.journal')} onClick={() => open({ kind: 'journal' })} text />
           <DockBtn icon="sofa" label={t('hud.decorate')} onClick={startDecorate} text />
-          <DockBtn icon="globe" label={lang==='zh'?'网站管理':'Website tools'} onClick={()=>open({kind:'computer'})} />
-          <DockBtn icon="palette" label={ta('crt.decorate')} onClick={() => setAtelier(true)} />
-          <DockBtn icon="mail" label={ta('mail.dock')} onClick={() => open({ kind: 'people' })} badge={unread} />
+          <DockBtn icon="globe" label={zhUI ? '网站' : 'Website'} onClick={() => open({ kind: 'computer' })} text />
+          <DockBtn icon="palette" label={zhUI ? '工坊' : 'Atelier'} onClick={() => setAtelier(true)} text />
+          <DockBtn icon="mail" label={zhUI ? '信箱' : 'Letters'} onClick={() => open({ kind: 'people' })} badge={unread} text />
+          <DockBtn icon="gear" label={t('hud.settings')} onClick={() => open({ kind: 'settings' })} text />
         </nav>
+        </>
       )}
 
       {decorating && <Decorate ctx={ctx} apply={applyDeco} undo={undo} undoable={undoable} selected={selected} setSelected={setSelected} onDone={endDecorate} />}
@@ -424,6 +449,7 @@ export function Home(props: { ctx: Ctx }) {
       <ListeningRoom ctx={ctx} open={panel?.kind==='records'} close={close} playing={v=>{if(view)view.recordPlaying=v}}/>
       {panel?.kind==='wall'&&<MemoryWall ctx={ctx} close={close} openLetter={letter=>{view?.focus('window');setPanel({kind:'sky',letter})}}/>}
       {panel?.kind==='sky'&&<NightWindow ctx={ctx} close={close} letter={panel.letter}/>}
+      {panel?.kind==='gift'&&<GiftRitual ctx={ctx} close={close} lang={lang} onKeep={()=>{ctx.apply(p=>({...p,posts:[{id:randomId(),slug:'a-little-light',title:'A little light',body:'',createdAt:new Date().toISOString(),visibility:'private',imageIds:[],kind:'gift',tags:['gift'],fields:{},starred:false}],privateHome:{...p.privateHome,lampsOn:true}}))}}/>}
       {panel?.kind==='desktop'&&<Sheet title="Little Internet OS" onClose={close}><div class="crt-bezel"><div class="crt-status"><span>Little Internet OS</span><time>{new Date().toLocaleDateString(lang)}</time></div><div class="crt-desktop" style={ctx.project.assets.some(a=>a.id===ctx.project.privateHome?.paper)?{backgroundImage:'url('+assetUrl(ctx.project.assets.find(a=>a.id===ctx.project.privateHome?.paper)!)+')',backgroundSize:'cover'}:{}}>
         <button onClick={()=>{setPanel(null);setPreviewing(ctx.project.web.published?'published':'draft')}}><Icon name="computer"/>{lang==='zh'?'我的网站':'My Website'}</button>
         <button onClick={()=>{setPanel(null);setAtelier(true)}}><Icon name="palette"/>{lang==='zh'?'网站工坊':'Website Atelier'}</button>
@@ -432,6 +458,7 @@ export function Home(props: { ctx: Ctx }) {
       {panel?.kind==='calendar'&&<Sheet title={lang==='zh'?'值得记住的日子':'Days worth keeping'} onClose={close}><form onSubmit={e=>{e.preventDefault();const r=ctx.apply(p=>({...p,privateHome:{...p.privateHome,dates:[...(p.privateHome?.dates??[]),{id:'d'+crypto.randomUUID().replaceAll('-','').slice(0,12),day:date,name:occasion.trim()}]}}));if(r.ok)setOccasion('');else ctx.toast(r.reason,'error')}}><input required type="date" value={date} onInput={e=>setDate(e.currentTarget.value)}/><input required maxLength={100} value={occasion} placeholder={lang==='zh'?'这一天有什么特别？':'What is special about this day?'} onInput={e=>setOccasion(e.currentTarget.value)}/><button>＋</button></form>
       {[...(ctx.project.privateHome?.dates??[])].sort((a,b)=>a.day.localeCompare(b.day)).map(d=><p>{d.day} · {d.name} <button onClick={()=>ctx.apply(p=>({...p,privateHome:{...p.privateHome,dates:p.privateHome?.dates?.filter(x=>x.id!==d.id)}}))}>×</button></p>)}</Sheet>}
       {immersed&&view&&<div class="photo-tools"><select aria-label="Photo aspect ratio" value={aspect} onChange={e=>setAspect(+e.currentTarget.value)}><option value="1">1∶1</option><option value="1.5">3∶2</option><option value={16/9}>16∶9</option></select><button onClick={()=>{const a=document.createElement('a');a.download='little-internet-home.jpg';a.href=view.capturePhoto(aspect);a.click()}}>{lang==='zh'?'保存照片':'Download photo'}</button><button onClick={keepRoomPhoto}>{lang==='zh'?'收入相册':'Keep in album'}</button></div>}
+      {giftInvite&&!panel&&<button class="gift-invite" onClick={()=>{setGiftInvite(false);setPanel({kind:'gift'})}}><span class="gi-k">a sealed envelope</span><b>{lang==='zh'?'有人在门口留了个东西':'Someone left something at the door'}</b><span class="gi-a">{lang==='zh'?'拆开':'open'} →</span></button>}
       {previewing && <Preview direct onDecorate={()=>{setPreviewing(false);setAtelier(true)}} project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
       {atelier && (
         <WebAtelier
@@ -444,6 +471,32 @@ export function Home(props: { ctx: Ctx }) {
       )}
     </div>
   )
+}
+
+const PERIOD_HOUR = { morning: 7, afternoon: 14, dusk: 18, midnight: 23 } as const
+
+/** If the owner pinned a time of day, the clock agrees with the light. Nothing breaks a room faster
+ *  than a "23:40" label over an afternoon-lit floor. */
+function currentPeriod(ctx: Ctx) {
+  return ctx.project.privateHome?.period ?? 'auto'
+}
+function shownHour(p: string) {
+  return p === 'auto' ? new Date().getHours() : PERIOD_HOUR[p as keyof typeof PERIOD_HOUR] ?? new Date().getHours()
+}
+function shownMinute(p: string) {
+  return p === 'auto' ? new Date().getMinutes() : p === 'midnight' ? 40 : 12
+}
+function shownTime(ctx: Ctx, clock: Date, lang: string) {
+  const p = currentPeriod(ctx)
+  const d = p === 'auto' ? clock : new Date(2020, 0, 1, PERIOD_HOUR[p as keyof typeof PERIOD_HOUR] ?? 12, p === 'midnight' ? 40 : 12)
+  return d.toLocaleTimeString(lang === 'zh' ? 'zh-CN' : 'en-GB', { hour: '2-digit', minute: '2-digit', hour12: false })
+}
+
+/** The clock reads as a place, not a timestamp: "21:40 · evening" says more than "21:40". */
+function dayPart(h: number, zh: boolean) {
+  const zhParts = ['深夜', '深夜', '深夜', '深夜', '深夜', '清晨', '清晨', '清晨', '上午', '上午', '上午', '上午', '正午', '午后', '午后', '午后', '午后', '黄昏', '黄昏', '黄昏', '夜里', '夜里', '夜里', '深夜']
+  const enParts = ['late night', 'late night', 'late night', 'late night', 'late night', 'early morning', 'early morning', 'early morning', 'morning', 'morning', 'morning', 'morning', 'noon', 'afternoon', 'afternoon', 'afternoon', 'afternoon', 'dusk', 'dusk', 'dusk', 'evening', 'evening', 'evening', 'late night']
+  return zh ? zhParts[Math.min(23, Math.max(0, h))] : enParts[Math.min(23, Math.max(0, h))]
 }
 
 function DockBtn(props: { icon: IconName; label: string; onClick: () => void; text?: boolean; badge?: number }) {

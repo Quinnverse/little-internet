@@ -3,20 +3,20 @@ import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.j
 import type { FloorId, WallId } from '../core/room.ts'
 
 export const WALL_COLORS: Record<WallId, string> = {
-  cream: '#f1e3c8',
-  sage: '#b6ccae',
-  blush: '#eec3bd',
-  sky: '#b7d3e6',
-  plum: '#b9a2c6',
+  cream: '#e7dac2',
+  sage: '#a2ae9c',
+  blush: '#d7bab0',
+  sky: '#abc1cd',
+  plum: '#a49aac',
 }
 
 export const WALL_SWATCH = WALL_COLORS
 
 export const FLOOR_SWATCH: Record<FloorId, string> = {
-  oak: '#c9965c',
-  walnut: '#7b5336',
-  tile: '#dcd6c8',
-  checker: '#8aa092',
+  oak: '#b8844f',
+  walnut: '#63412c',
+  tile: '#d3ccbd',
+  checker: '#82958a',
 }
 
 export function mat(color: string | number, opts: Partial<THREE.MeshStandardMaterialParameters> = {}) {
@@ -160,17 +160,33 @@ export function labelTexture(lines: string[], bg: string, fg: string): THREE.Can
 }
 
 
+/**
+ * A fine, low-contrast sprig print. The old version was four big stamps per tile, which read as wallpaper
+ * in a doll house. This one runs at roughly twice the frequency and half the contrast, so from the camera
+ * it reads as printed paper and only resolves when you lean in — which is what the reference rooms do.
+ */
 export function sprigWallpaper(){
   return canvasTex((g,size)=>{
-    g.fillStyle='#fffaf1';g.fillRect(0,0,size,size)
-    for(let row=0;row<4;row++)for(let col=-1;col<4;col++){
-      g.save();g.translate(66+col*128+(row%2)*64,64+row*128);g.rotate(((row+col)%3-1)*.29)
-      g.strokeStyle='#b6b39d';g.lineWidth=1.3;g.beginPath();g.moveTo(-8,28);g.bezierCurveTo(12,10,-9,-5,8,-22);g.stroke()
-      for(let j=0;j<5;j++){
+    g.fillStyle='#fffaf2';g.fillRect(0,0,size,size)
+    // paper grain, so the wall is never a flat fill under the key light
+    for(let i=0;i<5200;i++){
+      const x=Math.random()*size,y=Math.random()*size
+      g.fillStyle=`rgba(${170+Math.random()*40},${160+Math.random()*40},${140+Math.random()*40},.05)`
+      g.fillRect(x,y,1.4,1.4)
+    }
+    const step=64
+    for(let row=-1;row<10;row++)for(let col=-1;col<10;col++){
+      const x=col*step+(row%2)*step/2,y=row*step
+      g.save();g.translate(x,y);g.rotate(((row+col)%3-1)*.22)
+      g.strokeStyle='#cfc8b4';g.lineWidth=.9
+      g.beginPath();g.moveTo(-3,14);g.bezierCurveTo(6,6,-4,-2,4,-11);g.stroke()
+      for(let j=0;j<4;j++){
         const side=j%2?-1:1
-        g.fillStyle=j%2?'#c5c6aa':'#aebda7';g.beginPath();g.ellipse(side*5,18-j*8,6,2.4,side*-.65,0,Math.PI*2);g.fill()
+        g.fillStyle=j%2?'#d8d2bd':'#c6c9b4'
+        g.beginPath();g.ellipse(side*3,9-j*4,3.2,1.2,side*-.65,0,Math.PI*2);g.fill()
       }
-      for(let j=0;j<5;j++){const a=j*2*Math.PI/5;g.fillStyle='#d4afa3';g.beginPath();g.ellipse(7+3*Math.cos(a),-19+3*Math.sin(a),2.6,2,a,0,Math.PI*2);g.fill()}
+      g.fillStyle='#d6b7ab'
+      for(let j=0;j<4;j++){const a=j*Math.PI/2+.4;g.beginPath();g.ellipse(3.6+1.5*Math.cos(a),-9+1.5*Math.sin(a),1.3,1,a,0,Math.PI*2);g.fill()}
       g.restore()
     }
   },1)

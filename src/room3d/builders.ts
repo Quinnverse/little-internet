@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room.ts'
-import { ball, box, cyl, floorTexture, labelTexture, mat, place, WALL_COLORS } from './materials.ts'
+import { ball, box, cyl, floorTexture, glowTexture, labelTexture, mat, place, WALL_COLORS } from './materials.ts'
 
 export type BuildCtx = {
   /** Warm lights that are only on when it is dark. */
@@ -33,6 +33,15 @@ function addLamp(ctx: BuildCtx, parent: THREE.Object3D, x: number, y: number, z:
   l.userData.base = intensity
   parent.add(l)
   ctx.lamps.push(l)
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture(), color, transparent: true, opacity: 0.5, depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }))
+  s.name = 'lamp-halo'
+  s.scale.setScalar(0.55 + Math.min(0.9, intensity * 0.05))
+  s.position.copy(l.position)
+  l.userData.halo = s
+  parent.add(s)
   return l
 }
 

@@ -4,7 +4,7 @@ import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room
 import type { BuildCtx, MemoryLook, Shell, Wall } from './builders.ts'
 import type { Exterior } from './exterior.ts'
 import { screenTexture } from './builders.ts'
-import { floorTexture, labelTexture, WALL_COLORS, sprigWallpaper } from './materials.ts'
+import { floorTexture, glowTexture, labelTexture, WALL_COLORS, sprigWallpaper } from './materials.ts'
 import { getModel } from './models.ts'
 
 /**
@@ -14,9 +14,34 @@ import { getModel } from './models.ts'
 
 type Opts = { at?: [number, number, number]; yaw?: number; pick?: string }
 
+/**
+ * The Blender kit ships with poster-paint colours: a neon book spine next to a mint record player reads
+ * like a toy. Pulling saturation back a quarter and taking the edge off the brightest values is enough
+ * to make the same geometry read as a room someone actually lives in.
+ */
+function calmPalette(root: THREE.Object3D) {
+  if (root.userData.calmed) return
+  root.userData.calmed = true
+  const seen = new Set<THREE.Material>()
+  root.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      const mat = m as THREE.MeshStandardMaterial
+      if (!mat || seen.has(mat) || !mat.color) continue
+      seen.add(mat)
+      if (/^emissive_/.test(mat.name) || mat.name === 'screen') continue
+      const h = { h: 0, s: 0, l: 0 }
+      mat.color.getHSL(h)
+      if (h.s > 0.3) mat.color.setHSL(h.h, Math.min(0.5, h.s * 0.68), Math.min(0.64, h.l * 0.9))
+    }
+  })
+}
+
 function need(name: string): THREE.Group {
   const m = getModel(name)
   if (!m) throw new Error(`model ${name} is not loaded`)
+  calmPalette(m)
   return m
 }
 
@@ -63,7 +88,21 @@ function lamp(ctx: BuildCtx, parent: THREE.Object3D, x: number, y: number, z: nu
   l.userData.base = intensity
   parent.add(l)
   ctx.lamps.push(l)
+  halo(l, parent, color, intensity)
   return l
+}
+
+/** A soft additive halo. Without it a point light only brightens surfaces; the bulb itself stays a dull dot. */
+function halo(l: THREE.PointLight, parent: THREE.Object3D, color: string, intensity: number) {
+  const s = new THREE.Sprite(new THREE.SpriteMaterial({
+    map: glowTexture(), color, transparent: true, opacity: 0.5, depthWrite: false,
+    blending: THREE.AdditiveBlending,
+  }))
+  s.name = 'lamp-halo'
+  s.scale.setScalar(0.55 + Math.min(0.9, intensity * 0.05))
+  s.position.copy(l.position)
+  l.userData.halo = s
+  parent.add(s)
 }
 
 // ---------------------------------------------------------------- the room shell
@@ -87,7 +126,7 @@ function cloneMats(root: THREE.Object3D, recolor?: (name: string) => string | nu
           c.map=sprigWallpaper()
           c.map.userData.roomOwned=true
           c.onBeforeCompile=(shader)=>{
-            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 pointOnWall=(modelMatrix*vec4(position,1.)).xyz; vMapUv=vec2(pointOnWall.x+pointOnWall.z,pointOnWall.y)*.86;')
+            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 pointOnWall=(modelMatrix*vec4(position,1.)).xyz; vMapUv=vec2(pointOnWall.x+pointOnWall.z,pointOnWall.y)*1.65;')
           }
         }
         c.userData.roomOwned=true
@@ -123,6 +162,14 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   const walls: Wall[] = defs.map((d) => {
     const g = take(d.names)
     group.add(g)
+    // The shell has to cast shadows, or the window stops being a light source: everything ends up
+    // uniformly lit and the room reads as a drawing instead of a place.
+    g.traverse((o) => {
+      const mesh = o as THREE.Mesh
+      if (!mesh.isMesh) return
+      mesh.castShadow = true
+      mesh.receiveShadow = true
+    })
     return { group: g, inward: d.inward, point: d.point, mats: cloneMats(g, recolor), alpha: 1 }
   })
   // the window shows the sky by day; it is lit warm only from outside
