@@ -2,6 +2,7 @@ import {windowLandscape} from './landscape.ts'
 import {LetterLights} from './letterLights.ts'
 import {boardTexture,type PinView} from './pinboard.ts'
 import * as THREE from 'three'
+import { createPipeline, type Pipeline } from './pipeline.ts'
 import {
   FLOOR_SIZE,
   isReservedCell,
@@ -110,6 +111,7 @@ export class RoomView {
   private rim = new THREE.DirectionalLight('#b9d4ee', 0.55)
   /** Slow dust in the air. Cheap, but it is most of what makes a still room feel inhabited. */
   private dust?: THREE.Points
+  private pipeline?: Pipeline
   private data: HomeData | null = null
   private night = false
   private nightMix = 0
@@ -183,6 +185,13 @@ export class RoomView {
     this.renderer.shadowMap.type = THREE.PCFSoftShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.08
+    this.pipeline = software
+      ? undefined
+      : createPipeline(this.renderer, this.scene, this.camera, {
+          w: opts.container.clientWidth || 1,
+          h: opts.container.clientHeight || 1,
+          dpr: this.renderer.getPixelRatio(),
+        })
     const el = this.renderer.domElement
     el.className = 'room-canvas'
     el.style.touchAction = 'none'
@@ -753,7 +762,7 @@ export class RoomView {
   private following=false
   showResident(){this.following=!this.following;if(this.avatar){this.avatar.group.visible=true;this.want.tgt.copy(this.avatar.position);this.want.tgt.y=.65;this.want.radius=3.3;this.dirty=true}}
   capturePhoto(aspect:number){
-    this.renderer.render(this.scene,this.camera)
+    this.paint()
     const src=this.renderer.domElement
     const w=Math.min(src.width,src.height*aspect),h=w/aspect
     const c=document.createElement('canvas');c.width=w;c.height=h
@@ -1015,7 +1024,7 @@ export class RoomView {
     this.ambient.intensity = lerp(0.07, 0.09)
     this.rim.intensity = lerp(0.62, 0.42)
     this.rim.color.set(n > 0.5 ? '#6c86c8' : '#b9d4ee')
-    this.renderer.toneMappingExposure = lerp(1.12, 1.24)
+    this.renderer.toneMappingExposure = lerp(1.46, 1.46)
     for (const l of this.ctx.lamps) {
       const base = (l.userData.base as number) ?? 1
       const flick = l.userData.flicker ? 1 + Math.sin(performance.now() / 120) * 0.05 : 1
@@ -1026,7 +1035,13 @@ export class RoomView {
     }
     for (const g of this.ctx.glows) g.mat.emissiveIntensity = lerp(g.day, g.night)
     if (this.dust) (this.dust.material as THREE.PointsMaterial).opacity = lerp(0.11, 0.34)
+    this.pipeline?.setBackground(n > 0.5)
     this.renderer.domElement.style.setProperty('--night', String(n))
+  }
+
+  private paint() {
+    if (this.pipeline) this.pipeline.render()
+    else this.renderer.render(this.scene, this.camera)
   }
 
   private makeDust() {
@@ -1061,6 +1076,7 @@ export class RoomView {
     const w = Math.max(1, c.clientWidth)
     const h = Math.max(1, c.clientHeight)
     this.renderer.setSize(w, h, false)
+    this.pipeline?.setSize(w, h, this.renderer.getPixelRatio())
     this.renderer.domElement.style.width = '100%'
     this.renderer.domElement.style.height = '100%'
     this.camera.aspect = w / h
@@ -1100,7 +1116,13 @@ export class RoomView {
     this.tgt.lerp(this.want.tgt, k)
     const camChanged = before.some((v, i) => Math.abs(v - [this.az, this.pol, this.radius, this.tgt.x, this.tgt.y, this.tgt.z][i]!) > 1e-5)
     const sp = Math.sin(this.pol)
-    this.camera.position.set(this.tgt.x + this.radius * sp * Math.sin(this.az), this.tgt.y + this.radius * Math.cos(this.pol), this.tgt.z + this.radius * sp * Math.cos(this.az))
+    // A room you are standing in never holds perfectly still. Two slow sines (one for the drift, one
+    // for the breath) are enough to stop the shot from reading as a screenshot.
+    const nowMs = performance.now()
+    const drift = Math.sin(nowMs * 0.00021) * 0.0135 + Math.sin(t * 0.00057) * 0.004
+    const breath = Math.sin(nowMs * 0.00034) * 0.006
+    const az = this.az + drift
+    this.camera.position.set(this.tgt.x + this.radius * sp * Math.sin(az), this.tgt.y + this.radius * Math.cos(this.pol) + breath, this.tgt.z + this.radius * sp * Math.cos(az))
     const ceiling=this.shell?.group.getObjectByName('interior-ceiling')
     if(ceiling){
       // A cutaway room has no ceiling: keeping it only for the inside-the-room camera stops it from
@@ -1173,7 +1195,7 @@ export class RoomView {
         this.renderer.shadowMap.needsUpdate = true
         this.lastShadowUpdate = now
       }
-      this.renderer.render(this.scene, this.camera)
+      this.paint()
       this.updateHotspots()
       this.dirty = false
     }
@@ -1191,6 +1213,7 @@ export class RoomView {
     el.removeEventListener('webglcontextlost', this.onLost)
     el.removeEventListener('webglcontextrestored', this.onRestored)
     disposeTree(this.scene)
+    this.pipeline?.dispose()
     this.renderer.dispose()
     // Release the GPU context now instead of waiting for garbage collection (contexts are a scarce resource).
     this.renderer.forceContextLoss()

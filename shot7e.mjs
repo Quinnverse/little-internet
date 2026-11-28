@@ -1,0 +1,18 @@
+import { chromium } from 'playwright'
+const OUT='/Users/zhangqiyun/Doubao/chats/2026-11-28/new-chat-1/shots'
+const b=await chromium.launch({channel:'chrome'})
+const page=await b.newPage({viewport:{width:1440,height:900},deviceScaleFactor:2})
+page.on('console',m=>{if(m.type()==='error')console.log('ERR:',m.text().slice(0,200))})
+page.on('pageerror',e=>console.log('PAGEERR:',String(e).slice(0,200)))
+await page.goto('http://localhost:5174/#gift',{waitUntil:'networkidle'})
+await page.getByText('试试示范家园').click()
+await page.getByText('The Book Nook').click()
+await page.waitForTimeout(7000)
+await page.screenshot({path:OUT+'/08-gift-seal.png'})
+await page.locator('.gr-env').click()
+await page.waitForTimeout(1200)
+await page.screenshot({path:OUT+'/09-gift-grid.png'})
+for(const i of [0,2,4,6,9]) await page.locator('.gr-flap').nth(i).click()
+await page.waitForTimeout(1400)
+await page.screenshot({path:OUT+'/10-gift-letter.png'})
+await b.close()

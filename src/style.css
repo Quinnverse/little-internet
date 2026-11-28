@@ -1126,3 +1126,8 @@ button.mail-row { cursor: pointer; }
 .scene{animation:room-in 1.1s cubic-bezier(.16,.84,.24,1) both}
 @keyframes room-in{from{opacity:0;filter:saturate(.9) brightness(1.06)}to{opacity:1;filter:none}}
 .hud-hint{color:rgba(247,238,218,.86);text-shadow:0 1px 3px rgba(20,12,4,.5);letter-spacing:.02em}
+
+/* The grain and the vignette moved into the render pipeline (see room3d/pipeline.ts), so the canvas
+   carries its own film look. Keeping the CSS copies on top would double both. */
+.scene::before { opacity: 0 !important; }
+.scene::after, .scene.is-night::after { background: none !important; }

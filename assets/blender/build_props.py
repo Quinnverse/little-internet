@@ -472,6 +472,39 @@ def triangles():
 HELPER_NAMES = ("ground", "target", "cam", "sun", "fill", "lamp")
 
 
+def bevel_pass(objs):
+    """A chamfer on every hard edge. Flat, perfectly sharp boxes read as programmer art: real objects
+    catch a thin line of light along their edges, and that line is most of what "expensive" means.
+    Width scales with the object so a book does not get a 6 mm fillet."""
+    for o in objs:
+        if o.type != "MESH" or o.name.split(".")[0] in HELPER_NAMES or o.name.startswith("ground"):
+            continue
+        try:
+            dims = [max(1e-4, d) for d in o.dimensions]
+        except Exception:
+            continue
+        w = max(0.0012, min(0.006, min(dims) * 0.035))
+        if any(m.type == "BEVEL" for m in o.modifiers):
+            continue
+        # A chamfer costs one ring of faces per edge, and a keyboard has thousands of tiny edges.
+        # Spend the triangles where they are visible: big panels get two segments, busy props one,
+        # and anything that would double in size gets nothing.
+        polys = max(1, len(o.data.polygons))
+        edges = max(1, len(o.data.edges))
+        seg = 2 if polys < 1500 else 1
+        if edges * seg / polys > 2.2:
+            seg = 1
+        if edges * seg / polys > 2.2:
+            continue
+        b = o.modifiers.new("chamfer", "BEVEL")
+        b.width = w
+        b.segments = seg
+        b.limit_method = "ANGLE"
+        b.angle_limit = math.radians(32)
+        b.use_clamp_overlap = True
+        b.harden_normals = False
+
+
 def export_glb(path, animations=False):
     for o in list(bpy.context.scene.objects):
         if o.name.split(".")[0] in HELPER_NAMES:
@@ -479,6 +512,7 @@ def export_glb(path, animations=False):
     for o in bpy.context.selected_objects:
         o.select_set(False)
     objs = [o for o in bpy.context.scene.objects if not o.hide_render]
+    bevel_pass(objs)
     for o in objs:
         o.select_set(True)
     bpy.context.view_layer.objects.active = objs[0]
@@ -527,19 +561,28 @@ def item_office_chair():
 def item_bookshelf():
     random.seed(7)
     W, D, H = 1.9, 0.5, 2.55
+    # Mid-tone carcass: with the dark wood the recessed shelves went to pure black and the new
+    # spines disappeared. A warm mid wood keeps the cavity readable under ambient light.
     for sx in (-0.92, 0.92):
-        bx(0.06, H, D, (sx, H / 2, D / 2), WOOD_D, bevel=0.01, name="side")
+        bx(0.06, H, D, (sx, H / 2, D / 2), "#9a6a42", bevel=0.01, name="side")
     for y in (0.03, 0.85, 1.65, 2.5):
-        bx(1.84, 0.05, D, (0, y, D / 2), WOOD, bevel=0.005, name="shelf")
-    bx(1.84, H, 0.02, (0, H / 2, 0.01), WOOD_D, bevel=0.0, name="back")
-    palette = ["#c95f4a", "#e3b34f", "#5f8fb3", "#7aa57a", "#8d6bb0", "#f0e6d2", "#d98a6c"]
+        bx(1.84, 0.05, D, (0, y, D / 2), "#a9764a", bevel=0.005, name="shelf")
+    bx(1.84, H, 0.02, (0, H / 2, 0.01), "#8d5f3c", bevel=0.0, name="back")
+    # Muted cloth spines with a cream label band. A row of flat saturated slabs is what makes a
+    # shelf read as toy furniture; two tones and a paper edge fix most of it.
+    palette = ["#9c5342", "#b8893f", "#4f748c", "#69876c", "#746195", "#cbbda4", "#a9715a"]
     for top in (0.055, 0.875, 1.675):
         x = -0.8
         while x < 0.7:
             w = random.uniform(0.04, 0.07)
             h = random.uniform(0.2, 0.3)
             if random.random() > 0.12:
-                bx(w, h, 0.24, (x + w / 2, top + h / 2, D / 2), random.choice(palette), bevel=0.0, name="book")
+                spine = random.choice(palette)
+                bx(w, h, 0.24, (x + w / 2, top + h / 2, D / 2), spine, bevel=0.004, name="book")
+                # One cream band on the spine is enough: it breaks the slab without paying for a
+                # page block and a title line on ninety books.
+                band_y = top + h * random.uniform(0.6, 0.78)
+                bx(w * 0.9, h * 0.085, 0.012, (x + w / 2, band_y, D / 2 + 0.121), "#e6d8bb", bevel=0.0, name="book-band")
             x += w + 0.004
     bx(0.6, 0.5, 0.36, (-0.4, 2.525 + 0.25, 0.28), "#c9a36d", bevel=0.03, name="wicker")
     co(0.1, 0.08, 0.14, (0.5, 2.525 + 0.07, 0.26), RED, name="pot")
@@ -747,7 +790,7 @@ def item_photo_album_open():
 
 def item_books_row():
     random.seed(11)
-    palette = ["#c95f4a", "#e3b34f", "#5f8fb3", "#7aa57a", "#8d6bb0", "#d98a6c", "#f0e6d2"]
+    palette = ["#9c5342", "#b8893f", "#4f748c", "#69876c", "#746195", "#a9715a", "#cbbda4"]
     x = -0.18
     for i in range(7):
         w = random.uniform(0.035, 0.06)
@@ -1484,7 +1527,8 @@ def build_item(name, glb_dir, rend_dir):
     shell = name.endswith("_room_shell")
     if shell:
         hide_front_walls()
-    three_quarter(name, rend_dir, ITEM_RES, ITEM_SAMPLES)
+    if not os.environ.get("NO_RENDER"):
+        three_quarter(name, rend_dir, ITEM_RES, ITEM_SAMPLES)
     if shell:
         for n in ("wall_front", "wall_right"):
             o = bpy.data.objects.get(n)
@@ -1682,7 +1726,7 @@ def main(argv):
             info = build_item(n, glb_dir, rend_dir)
             info["ok"] = True
             print(f"OK   {n}: {info['triangles']} tris, {info['glb_bytes'] // 1024} KB" + ("" if info["within_budget"] else "  OVER BUDGET"), flush=True)
-            if n == "pet_ghost":
+            if n == "pet_ghost" and not os.environ.get("NO_RENDER"):
                 for pn in pet_pose_renders(glb_dir, rend_dir):
                     print(f"OK   {pn}", flush=True)
         except Exception as e:  # keep going; one failing item must not hide the rest

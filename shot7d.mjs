@@ -1,0 +1,17 @@
+import { chromium } from 'playwright'
+const OUT='/Users/zhangqiyun/Doubao/chats/2026-11-28/new-chat-1/shots'
+const b=await chromium.launch({channel:'chrome'})
+const page=await b.newPage({viewport:{width:1440,height:900},deviceScaleFactor:2})
+page.on('console',m=>{if(m.type()==='error')console.log('ERR:',m.text().slice(0,160))})
+await page.goto('http://localhost:5174/',{waitUntil:'networkidle'})
+await page.getByText('试试示范家园').click()
+await page.getByText('The Book Nook').click()
+await page.waitForTimeout(11000)
+await page.screenshot({path:OUT+'/05-room-nook.png'})
+await page.locator('.dock-btn', {hasText:/Settings/}).first().click()
+await page.waitForTimeout(700)
+await page.screenshot({path:OUT+'/06-handbook.png'})
+await page.locator('.hb-chip', {hasText:/Midnight/}).first().click()
+await page.waitForTimeout(2600)
+await page.screenshot({path:OUT+'/07-night.png'})
+await b.close()

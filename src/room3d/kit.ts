@@ -55,6 +55,54 @@ function put(parent: THREE.Object3D, name: string, o: Opts = {}): THREE.Group {
   return g
 }
 
+/** Blender's shadow map only catches silhouettes; the soft pool where a leg meets the floor is what
+ *  tells the eye an object is standing on something. One radial texture, one flat quad per item. */
+let blobTex: THREE.CanvasTexture | null = null
+let blobMat: THREE.MeshBasicMaterial | null = null
+function blobMaterial() {
+  if (blobMat) return blobMat
+  const s = 128
+  const c = document.createElement('canvas')
+  c.width = c.height = s
+  const g = c.getContext('2d')!
+  const grad = g.createRadialGradient(s / 2, s / 2, 2, s / 2, s / 2, s / 2)
+  grad.addColorStop(0, 'rgba(24,15,8,0.86)')
+  grad.addColorStop(0.44, 'rgba(24,15,8,0.44)')
+  grad.addColorStop(1, 'rgba(28,18,10,0)')
+  g.fillStyle = grad
+  g.fillRect(0, 0, s, s)
+  blobTex = new THREE.CanvasTexture(c)
+  blobTex.colorSpace = THREE.SRGBColorSpace
+  blobMat = new THREE.MeshBasicMaterial({ map: blobTex, transparent: true, depthWrite: false, opacity: 0.95 })
+  blobMat.name = 'contact-shadow'
+  return blobMat
+}
+
+/** Drops a soft shadow under every floor-standing child of `parent` (cabinets, chairs, shelves). */
+export function groundShadows(parent: THREE.Object3D) {
+  const box = new THREE.Box3()
+  for (const child of parent.children) {
+    if (child.userData.shadowed) continue
+    box.setFromObject(child)
+    if (!Number.isFinite(box.min.y)) continue
+    const h = box.max.y - box.min.y
+    const w = box.max.x - box.min.x
+    const d = box.max.z - box.min.z
+    // Only things that actually stand on the floor and are tall enough to cast a pool.
+    if (box.min.y > 0.12 || h < 0.22) continue
+    const r = Math.max(w, d) * 0.62
+    if (r > 2.6) continue
+    const q = new THREE.Mesh(new THREE.PlaneGeometry(r * 2, r * 2), blobMaterial())
+    q.rotation.x = -Math.PI / 2
+    q.position.set((box.min.x + box.max.x) / 2, 0.012, (box.min.z + box.max.z) / 2)
+    q.renderOrder = 1
+    q.userData.kit = false
+    q.userData.shadowed = true
+    parent.add(q)
+    child.userData.shadowed = true
+  }
+}
+
 type GlowMode = 'day-room' | 'exterior'
 
 /** Lit materials follow the time of day: screens, bulbs, flames, windows. */
@@ -271,6 +319,7 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   registerGlows(g, ctx, 'day-room', led ?? undefined)
   lamp(ctx, g, 0.12, 1.1, 0.24, 1.6, '#ffc98a', 4.5) // desk lamp
   lamp(ctx, g, 1.4, 1.07, 0.9, 0.35, '#9cc7ff', 2.2) // screen glow
+  groundShadows(g)
   return { group: g, picks, led }
 }
 
