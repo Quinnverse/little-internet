@@ -7,7 +7,7 @@ function woodTexture(){
   if(!grainMap){
     grainMap=new THREE.TextureLoader().load(timberImage)
     grainMap.wrapS=grainMap.wrapT=THREE.RepeatWrapping
-    grainMap.anisotropy=4
+    grainMap.anisotropy=8
   }
   return grainMap
 }

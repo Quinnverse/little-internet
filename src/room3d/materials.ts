@@ -59,17 +59,30 @@ export function place<T extends THREE.Object3D>(o: T, x: number, y: number, z: n
   return o
 }
 
-function canvasTex(draw: (g: CanvasRenderingContext2D, s: number) => void, repeat: number): THREE.CanvasTexture {
+function canvasTex(draw: (g: CanvasRenderingContext2D, s: number) => void, repeat: number, soften = 0): THREE.CanvasTexture {
   const s = 512
   const c = document.createElement('canvas')
   c.width = c.height = s
   const g = c.getContext('2d')!
   draw(g, s)
+  if (soften > 0) {
+    // Drawn lines at 512px tile into a 3m floor at three repeats: every stroke ends up one texel wide
+    // on screen, which is why hand-drawn seams read as vector lines rather than as a photograph.
+    // Compositing a blurred copy back over itself pulls the edges into the grain without erasing them.
+    const tmp = document.createElement('canvas')
+    tmp.width = tmp.height = s
+    const tg = tmp.getContext('2d')!
+    tg.filter = `blur(${Math.round(soften * 2.4)}px)`
+    tg.drawImage(c, 0, 0)
+    g.globalAlpha = soften
+    g.drawImage(tmp, 0, 0)
+    g.globalAlpha = 1
+  }
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   t.repeat.set(repeat, repeat)
-  t.anisotropy = 4
+  t.anisotropy = 8
   return t
 }
 
@@ -85,7 +98,7 @@ export function photoTex(key: keyof typeof TEX, srgb = false): THREE.Texture {
   const t = new THREE.TextureLoader().load(TEX[key])
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace
-  t.anisotropy = 4
+  t.anisotropy = 8
   t.userData.roomOwned = true
   photoCache.set(key, t)
   return t
@@ -107,7 +120,7 @@ export function softenTex(key: keyof typeof TEX, blur: number, contrast = 1, bri
   const t = new THREE.CanvasTexture(canvas)
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   t.colorSpace = /_nor$/.test(key) ? THREE.NoColorSpace : THREE.SRGBColorSpace
-  t.anisotropy = 4
+  t.anisotropy = 8
   t.userData.roomOwned = true
   const img = new Image()
   img.onload = () => {
@@ -179,17 +192,25 @@ export function floorTexture(id: FloorId): THREE.CanvasTexture {
         }
       }
 
-      // bevel: a lit lip on the top edge, a contact shadow under the bottom one
-      g.fillStyle = 'rgba(255,238,210,.16)'
+      // bevel: a lit lip on the top edge, a contact shadow under the bottom one. The shadows are
+      // gradients rather than bands — a crisp 2px band was reading as a drawn black line once the
+      // texture was repeated across the floor.
+      g.fillStyle = 'rgba(255,238,210,.14)'
       g.fillRect(0, i * ph + 1, s, 2.4)
-      g.fillStyle = 'rgba(46,24,8,.30)'
-      g.fillRect(0, i * ph + 3.4, s, 2)
-      g.fillStyle = 'rgba(34,16,4,.42)'
-      g.fillRect(0, (i + 1) * ph - 3, s, 3)
+      const under = g.createLinearGradient(0, i * ph + 3, 0, i * ph + 9)
+      under.addColorStop(0, 'rgba(52,28,10,.30)')
+      under.addColorStop(1, 'rgba(52,28,10,0)')
+      g.fillStyle = under
+      g.fillRect(0, i * ph + 3, s, 6)
+      const over = g.createLinearGradient(0, (i + 1) * ph - 9, 0, (i + 1) * ph - 1)
+      over.addColorStop(0, 'rgba(38,18,5,0)')
+      over.addColorStop(1, 'rgba(38,18,5,.34)')
+      g.fillStyle = over
+      g.fillRect(0, (i + 1) * ph - 9, s, 8)
 
       // butt joint
       const jx = (((i * 97) % 5) + 1) * (s / 6)
-      g.fillStyle = 'rgba(40,20,6,.34)'
+      g.fillStyle = 'rgba(40,20,6,.26)'
       g.fillRect(jx, i * ph, 2.2, ph)
       g.fillStyle = 'rgba(255,236,205,.10)'
       g.fillRect(jx + 2.2, i * ph, 1.2, ph)
@@ -201,7 +222,7 @@ export function floorTexture(id: FloorId): THREE.CanvasTexture {
       g.fillStyle = `rgba(${Math.random() > 0.5 ? 255 : 40},${Math.random() > 0.5 ? 226 : 26},${Math.random() > 0.5 ? 200 : 12},.035)`
       g.fillRect(x, y, 1.6, 1.2)
     }
-  }, 3)
+  }, 3, 0.34)
 }
 
 /** Roughness companion for the floor: seams and grain catch the light differently from the boards. */
@@ -227,7 +248,7 @@ export function floorRoughness(id: FloorId): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c)
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   t.repeat.set(3, 3)
-  t.anisotropy = 4
+  t.anisotropy = 8
   return t
 }
 
@@ -346,7 +367,7 @@ export function weaveTexture(): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.anisotropy = 4
+  t.anisotropy = 8
   return t
 }
 
@@ -374,6 +395,6 @@ export function woodDetailTexture(): THREE.CanvasTexture {
   const t = new THREE.CanvasTexture(c)
   t.colorSpace = THREE.SRGBColorSpace
   t.wrapS = t.wrapT = THREE.RepeatWrapping
-  t.anisotropy = 4
+  t.anisotropy = 8
   return t
 }
