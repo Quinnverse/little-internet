@@ -319,6 +319,12 @@ function cloneMats(root: THREE.Object3D, recolor?: (name: string) => string | nu
             aoW*=mix(0.60,1.0,1.0-smoothstep(2.55,3.16,vWallP.y));
             float eW=min(min(vWallP.x,6.0-vWallP.x),min(vWallP.z,6.0-vWallP.z));
             aoW*=mix(0.68,1.0,smoothstep(0.0,0.55,eW));
+            // A 512px plaster tile at 0.33 runs out of interest after three metres, and the same blotch
+            // then shows up twice across a six metre wall — which the eye reads as a texture bug, not
+            // as plaster. Two long sine fields anchored in world space drift the tone by +-6% so the
+            // repeats never land on the same brightness.
+            float drift = sin(vWallP.x*1.55+1.7)*sin(vWallP.z*1.83-0.4)*(0.5+0.5*sin(vWallP.y*2.1+0.9));
+            aoW*=0.94+0.12*drift;
             diffuseColor.rgb*=aoW;`)
           }
         }
@@ -476,11 +482,28 @@ function tintObject(o: THREE.Object3D, hex: string) {
 
 // ---------------------------------------------------------------- built-in furniture
 
+  /** The desk ships twice over: the carcass, and two drawer nodes cut out of it in Blender. Give each a
+   *  horizontal pull direction taken from the piece it lives in, so a tap can slide it out. */
+  function registerDrawers(ctx: BuildCtx, group: THREE.Object3D) {
+    const centre = new THREE.Box3().setFromObject(group).getCenter(new THREE.Vector3())
+    group.traverse((o) => {
+      if (!/^drawer-[0-9]+$/.test(o.name)) return
+      const dc = new THREE.Box3().setFromObject(o).getCenter(new THREE.Vector3())
+      const d = dc.sub(centre)
+      d.y = 0
+      // Snap to the dominant axis: the drawer face is square to the carcass, so a diagonal slide would
+      // read as the whole desk skewing rather than a drawer coming out.
+      const dir = Math.abs(d.x) > Math.abs(d.z) ? new THREE.Vector3(Math.sign(d.x), 0, 0) : new THREE.Vector3(0, 0, Math.sign(d.z) || 1)
+      ctx.drawers.push({ node: o, dir, home: o.position.clone(), open: false, k: 0 })
+    })
+  }
+
 export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE.Group; picks: THREE.Object3D[]; led: THREE.MeshStandardMaterial | null } {
   const g = new THREE.Group()
   const picks: THREE.Object3D[] = []
 
-  put(g, 'desk', { at: [1.0, 0, 0.47] })
+  const desk = put(g, 'desk', { at: [1.0, 0, 0.47] })
+  registerDrawers(ctx, desk)
   put(g, 'office_chair', { at: [1.5, 0, 1.55], yaw: 0.25 })
   const shelf = put(g, 'bookshelf', { at: [5.0, 0, 0], pick: 'shelf' })
   picks.push(shelf)

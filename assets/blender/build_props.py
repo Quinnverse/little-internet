@@ -542,9 +542,15 @@ def item_desk():
         bx(0.05, H - 0.05, D - 0.04, (sx, (H - 0.05) / 2, 0), WOOD, name="leg-panel")
     bx(W - 0.1, 0.4, 0.03, (0, 0.5, -D / 2 + 0.02), WOOD_D, name="back")
     bx(0.55, 0.62, 0.74, (0.6, 0.4, 0.0), WOOD, name="drawer-block")
-    for y in (0.22, 0.46):
-        bx(0.48, 0.2, 0.02, (0.6, y, 0.38), WOOD_L, bevel=0.005, name="drawer-front")
-        el(0.025, 0.025, 0.025, (0.6, y, 0.395), BRASS, name="knob")
+    # Each drawer is its own node — face, knob and the box behind it joined together — so the app can
+    # slide it out on a tap. Exported as one merged block they could only ever be decoration.
+    for i, y in enumerate((0.22, 0.46), 1):
+        parts = [
+            bx(0.48, 0.2, 0.02, (0.6, y, 0.38), WOOD_L, bevel=0.005, name=f"drawer-face-{i}"),
+            el(0.025, 0.025, 0.025, (0.6, y, 0.395), BRASS, name=f"drawer-knob-{i}"),
+            bx(0.44, 0.15, 0.34, (0.6, y, 0.2), WOOD_D, bevel=0.003, name=f"drawer-box-{i}"),
+        ]
+        join(parts, f"drawer-{i}")
     anchor("desk", (0, H, 0))
 
 

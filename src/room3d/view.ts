@@ -113,7 +113,7 @@ export class RoomView {
   expose() { if (import.meta.env.DEV) { const w = window as unknown as Record<string, unknown>; w.__room = this.root; w.__cam = this.camera; w.THREE = THREE } }
   private dynamic = new THREE.Group()
   private shell!: Shell
-  private ctx: BuildCtx = { lamps: [], glows: [], winds: [] }
+  private ctx: BuildCtx = { lamps: [], glows: [], winds: [], drawers: [] }
   private sun = new THREE.DirectionalLight('#ffd9a8', 3.2)
   private hemi = new THREE.HemisphereLight('#cfe2f2', '#6b5a45', 0.42)
   /** Fake floor bounce: a second hemisphere whose "sky" is the colour of the floorboards, so everything
@@ -144,6 +144,9 @@ export class RoomView {
   /** Soft light that rides with the camera and fades in when you zoom close, so details stay readable. */
   private fill = new THREE.PointLight('#fff1dc', 0, 9, 1.4)
   private pickRoots: THREE.Object3D[] = []
+  /** Objects mid "I was touched" squash. A 3% scale for a fifth of a second is the cheapest way to make
+   *  every piece of furniture feel like it has weight instead of being a frozen collider. */
+  private pulses: { o: THREE.Object3D; t: number; s: THREE.Vector3 }[] = []
   private floorPlane = new THREE.Plane(new THREE.Vector3(0, 1, 0), 0)
   private decorMode = false
   private grid = new THREE.Group()
@@ -974,17 +977,62 @@ export class RoomView {
   }
 
   private hitId(e: PointerEvent): string | null {
+    return this.pickAt(e).id
+  }
+
+  /** The picked id and the mesh that was actually hit, so a tap can answer both the panel and the prop. */
+  private pickAt(e: PointerEvent): { id: string | null; obj: THREE.Object3D | null } {
     this.raycaster.setFromCamera(this.ndc(e), this.camera)
     const roots = this.mode === 'exterior' ? [this.pet.group] : [...this.pickRoots.filter((r) => this.pickable(r)), this.pet.group]
     const hits = this.raycaster.intersectObjects(roots, true)
     for (const h of hits) {
       let o: THREE.Object3D | null = h.object
       while (o) {
-        if (o.userData.pick) return o.userData.pick as string
+        if (o.userData.pick) return { id: o.userData.pick as string, obj: h.object }
         o = o.parent
       }
     }
-    return null
+    return { id: null, obj: null }
+  }
+
+  /** Slide out the drawer of the piece that was touched — the first one still closed, else close them.
+   *  A tap that only opens a settings sheet leaves the room feeling like a picture of a room. */
+  private pullDrawer(hit: THREE.Object3D | null) {
+    if (!hit) return
+    const near: typeof this.ctx.drawers = []
+    for (const d of this.ctx.drawers) {
+      let o: THREE.Object3D | null = hit
+      while (o) {
+        if (o === d.node || o === d.node.parent) { near.push(d); break }
+        o = o.parent
+      }
+    }
+    // Walk up from the hit until we meet the furniture that owns a drawer.
+    if (!near.length) {
+      for (const d of this.ctx.drawers) {
+        let up: THREE.Object3D | null = d.node
+        while (up && up.parent) {
+          up = up.parent
+          if (up === hit || up === hit.parent || up === (hit.parent?.parent ?? null)) { near.push(d); break }
+        }
+      }
+    }
+    if (!near.length) return
+    const closed = near.find((d) => !d.open)
+    if (closed) closed.open = true
+    else for (const d of near) d.open = false
+    sfx('paper')
+    this.dirty = true
+  }
+
+  private pulse(hit: THREE.Object3D | null) {
+    if (!hit) return
+    // Hop up to the piece of furniture rather than the sub-mesh that was hit, otherwise only a drawer
+    // front twitches and the desk behind it stays rigid.
+    let o: THREE.Object3D = hit
+    while (o.parent && o.parent !== this.root && o.parent !== this.dynamic) o = o.parent
+    if (this.pulses.some((p) => p.o === o)) return
+    this.pulses.push({ o, t: 0, s: o.scale.clone() })
   }
 
   private pickable(o: THREE.Object3D): boolean {
@@ -1009,10 +1057,12 @@ export class RoomView {
       if(hit){this.want.tgt.copy(hit.point);this.want.radius=2.2;this.dirty=true}
       return
     }
-    const id = this.hitId(e)
+    const { id, obj } = this.pickAt(e)
     if (id) {
       if (id === 'door') sfx('door')
       else if (id === 'diary' || id === 'calendar') sfx('paper')
+      this.pulse(obj)
+      this.pullDrawer(obj)
       this.opts.onPick(id)
       return
     }
@@ -1188,6 +1238,32 @@ export class RoomView {
         l.rotation.z = (rest?.z ?? 0) + a * Math.sin(this.lampPhase)
         l.position.y = (rest?.y ?? 0) + a * 0.6 * Math.sin(this.lampPhase * 1.3)
       }
+    }
+
+    for (const d of this.ctx.drawers) {
+      const goal = d.open ? 1 : 0
+      if (Math.abs(d.k - goal) < 0.002) { d.k = goal; continue }
+      // Second-order spring rather than a lerp: a drawer that slides out on an exponential ease looks
+      // like a UI transition, while one that overshoots a few millimetres and settles looks like wood.
+      d.v = (d.v ?? 0) + (goal - d.k) * 260 * dt - (d.v ?? 0) * 18 * dt
+      d.k = Math.min(1.08, Math.max(-0.08, d.k + (d.v ?? 0) * dt))
+      const e = d.k < 0 ? 0 : d.k
+      d.node.position.copy(d.home).addScaledVector(d.dir, 0.1 * e)
+      this.dirty = true
+    }
+
+    if (this.pulses.length) {
+      for (const p of this.pulses) {
+        p.t += dt
+        const k = p.t < 0.5 ? 1 + 0.032 * Math.sin(p.t * 26) * Math.exp(-p.t * 9) : 1
+        p.o.scale.set(p.s.x * k, p.s.y * (2 - k), p.s.z * k)
+      }
+      this.pulses = this.pulses.filter((p) => {
+        if (p.t < 0.5) return true
+        p.o.scale.copy(p.s)
+        return false
+      })
+      this.dirty = true
     }
 
     // Walls between the camera and the room fade out.

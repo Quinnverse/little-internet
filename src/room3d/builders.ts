@@ -9,6 +9,8 @@ export type BuildCtx = {
   glows: { mat: THREE.MeshStandardMaterial; day: number; night: number }[]
   /** Materials that breathe: curtains. Updated once per frame with the elapsed time. */
   winds: THREE.Material[]
+  /** Drawers that can be pulled out. Direction is unit, horizontal, pointing away from the carcass. */
+  drawers: { node: THREE.Object3D; dir: THREE.Vector3; home: THREE.Vector3; open: boolean; k: number; v?: number }[]
 }
 
 const WOOD = '#b57d4a'
