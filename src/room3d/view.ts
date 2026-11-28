@@ -116,6 +116,10 @@ export class RoomView {
   private ctx: BuildCtx = { lamps: [], glows: [], winds: [] }
   private sun = new THREE.DirectionalLight('#ffd9a8', 3.2)
   private hemi = new THREE.HemisphereLight('#cfe2f2', '#6b5a45', 0.42)
+  /** Fake floor bounce: a second hemisphere whose "sky" is the colour of the floorboards, so everything
+   *  facing down or across picks up a warm fill the way it would off a lit plank floor. Real GI would do
+   *  this; one extra light is 0.02ms and removes the plastic-doll look on the undersides. */
+  private bounce = new THREE.HemisphereLight('#c98f56', '#efe3c8', 0.09)
   private ambient = new THREE.AmbientLight('#ffe9cf', 0.1)
   /** Cool light from the far corner: gives every piece of furniture a readable edge instead of a flat silhouette. */
   private rim = new THREE.DirectionalLight('#b9d4ee', 0.55)
@@ -192,7 +196,7 @@ export class RoomView {
     this.renderer.setPixelRatio(software ? 0.75 : Math.min(window.devicePixelRatio || 1, 2))
     this.renderer.shadowMap.enabled = !software
     this.renderer.shadowMap.autoUpdate = false
-    this.renderer.shadowMap.type = THREE.PCFShadowMap
+    this.renderer.shadowMap.type = THREE.VSMShadowMap
     this.renderer.toneMapping = THREE.ACESFilmicToneMapping
     this.renderer.toneMappingExposure = 1.08
     this.pipeline = software
@@ -209,7 +213,7 @@ export class RoomView {
     opts.container.prepend(el)
     this.hotLayer = opts.container
 
-    this.scene.add(this.root, this.dynamic, this.hemi, this.ambient, this.sun, this.sun.target, this.fill, this.rim, this.rim.target)
+    this.scene.add(this.root, this.dynamic, this.hemi, this.bounce, this.ambient, this.sun, this.sun.target, this.fill, this.rim, this.rim.target)
     this.sun.position.set(8, 9, -8)
     this.sun.target.position.set(3, 0, 3)
     this.sun.castShadow = true
@@ -222,8 +226,9 @@ export class RoomView {
     sc.near = 1
     sc.far = 40
     this.sun.shadow.bias = -0.0004
-    this.sun.shadow.normalBias = 0.02
-    this.sun.shadow.radius = 5
+    this.sun.shadow.normalBias = 0.008
+    this.sun.shadow.radius = 2.2
+    this.sun.shadow.blurSamples = 14
     // The cool rim sits opposite the window, so the light has a direction across the room.
     this.rim.position.set(-5.5, 4.2, 10)
     this.rim.target.position.set(3, 1.2, 3)
