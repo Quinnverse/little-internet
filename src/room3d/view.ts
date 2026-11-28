@@ -2,6 +2,13 @@ import {windowLandscape} from './landscape.ts'
 import {LetterLights} from './letterLights.ts'
 import {boardTexture,type PinView} from './pinboard.ts'
 import * as THREE from 'three'
+
+/**
+ * 32 degrees is a dollhouse lens: parallel edges, no vanishing point, and it reads as a diagram.
+ * The reference footage is shot at roughly 45, slightly above eye level, which is what gives the
+ * room a foreground and a back wall instead of a floor plan.
+ */
+const HOME_FOV = 44
 import { primeSound, sfx, startAmbient } from '../editor/ui/sfx.ts'
 import { createPipeline, type Pipeline } from './pipeline.ts'
 import {
@@ -28,7 +35,7 @@ import {
   type Shell,
 } from './builders.ts'
 import { buildExterior, type Exterior } from './exterior.ts'
-import { kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
+import { decorDetail, kitDecor, kitExterior, kitExteriorGlows, kitFurniture, kitMemory, kitShell } from './kit.ts'
 import { getAnimations, getModel, kitReady } from './models.ts'
 import { glowTexture } from './materials.ts'
 import { Avatar } from './avatar.ts'
@@ -97,7 +104,7 @@ export function isNightNow(mode: LightMode, hour = new Date().getHours()): boole
 export class RoomView {
   readonly renderer: THREE.WebGLRenderer
   readonly scene = new THREE.Scene()
-  readonly camera = new THREE.PerspectiveCamera(32, 1, 0.04, 80)
+  readonly camera = new THREE.PerspectiveCamera(HOME_FOV, 1, 0.04, 80)
   private avatar?: Avatar
   readonly pet: Pet
   private opts: ViewOptions
@@ -157,12 +164,12 @@ export class RoomView {
   // Camera rig
   private az = Math.PI / 4
   private pol = 1.0
-  private radius = 12
+  private radius = 7.2
   private tgt = TARGET.clone()
-  private want = { az: Math.PI / 4, pol: 1.0, radius: 12, tgt: TARGET.clone() }
+  private want = { az: Math.PI / 4, pol: 1.0, radius: 7.2, tgt: TARGET.clone() }
   private vAz = 0
-  private baseRadius = 12
-  private basePol = 1.0
+  private baseRadius = 7.2
+  private basePol = 1.30
   private pointers = new Map<number, { x: number; y: number }>()
   private pinch = 0
   private downAt = { x: 0, y: 0, t: 0 }
@@ -422,6 +429,7 @@ export class RoomView {
     for (const d of data.decor) {
       const g = new THREE.Group()
       g.add(this.kitUsed ? kitDecor(d.kind, this.ctx) : buildDecor(d.kind, this.ctx))
+      if (this.kitUsed) decorDetail(g, d.kind)
       g.position.set(d.x + 0.5, 0, d.z + 0.5)
       g.rotation.y = (d.rot * Math.PI) / 2
       g.userData.pick = `decor:${d.id}`
@@ -791,7 +799,7 @@ export class RoomView {
     this.jump(-.62,1.43,4.05,target)
   }
   resetView() {
-    this.camera.fov=32
+    this.camera.fov=HOME_FOV
     this.camera.updateProjectionMatrix()
     this.want.az = nearestAz(this.az, Math.PI / 4)
     this.want.pol = this.basePol
@@ -1102,9 +1110,9 @@ export class RoomView {
     // Portrait screens stand farther back (and look more from above) to fit the whole room.
     const asp = w / h
     const old = this.baseRadius
-    this.baseRadius = Math.max(12.5, 4.6 / (Math.tan((this.camera.fov * Math.PI) / 360) * asp))
+    this.baseRadius = Math.max(7.2, 4.6 / (Math.tan((this.camera.fov * Math.PI) / 360) * asp))
     const oldPol = this.basePol
-    this.basePol = asp < 0.8 ? 0.86 : 1.0
+    this.basePol = asp < 0.8 ? 1.02 : 1.30
     if (Math.abs(this.want.radius - old) < 0.01) this.want.radius = this.baseRadius
     if (Math.abs(this.radius - old) < 0.01) this.radius = this.baseRadius
     if (Math.abs(this.want.pol - oldPol) < 0.01) this.want.pol = this.basePol
@@ -1218,7 +1226,9 @@ export class RoomView {
 
     {
       const near = clamp((4.6 - this.radius) / 3.2, 0, 1)
-      this.fill.intensity = near * near * (this.nightMix > 0.5 ? 9 : 13)
+      // A light bolted to the camera blows out whatever you zoom into: at 7 cd the sofa went pure
+      // white the moment the framing tightened. This is a lift, not a key light.
+      this.fill.intensity = near * near * (this.nightMix > 0.5 ? 0.5 : 0.75)
       this.fill.position.copy(this.camera.position)
     }
     if (animated || this.dirty || camChanged || fading || lightChanged) {

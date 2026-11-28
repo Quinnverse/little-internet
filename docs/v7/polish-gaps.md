@@ -55,3 +55,33 @@ Still missing for a true "game" hand-feel, in priority order:
 - drawer pull with eased overshoot (needs a rigged drawer node; GLB has it as one mesh today)
 - diary page settle (30 deg residual swing on open)
 - three cinematic camera presets (wide / desk / window) instead of free drag only
+
+## Round 9 — the flatness was a lens problem, then a material problem
+
+Two changes here, and the first is the one that mattered most.
+
+**Framing.** The camera was a 32 degree lens at 12 m: parallel edges, no vanishing point. That is a
+dollhouse render, and no amount of texture fixes it. The references are shot around 45 degrees from
+slightly above eye level, so the room gets a foreground, a back wall and a floor that recedes. Now
+44 degrees, radius ~7.2, and the top of the frame sits above the wall line, so the backdrop needed to
+stop being bright: a dark warm top reads as shadow over the ceiling and closes the composition.
+
+**Surfaces.** Everything was procedurally painted on canvas — which is why every wall was uniform
+sandpaper and every cabinet was one flat tint. Now real CC0 PBR from Poly Haven, inlined as 512/1024
+webp data URIs so an exported site keeps them: `brown_planks_04` (floor, 1k, normal + roughness
+tiled 3x), `white_stucco_02` (walls, normal at 0.17 so relief reads without going concrete),
+`oak_veneer_01` (wood, desaturated because the raw map is yellow-green under the warm key),
+`rough_linen` (fabric). Triplanar UVs are unchanged; normal and roughness maps now share the same
+`tuv`, which is what previously made them sample a nonexistent uv set.
+
+**Three bugs this exposed, all now fixed:**
+- `wool_boucle` is a *tartan*, not a boucle. It stamped a tablecloth on the sofa. Replaced with linen.
+- The fabric roughness map is dark, which turned the cloth into a mirror under the floor lamp. Cloth
+  is uniformly matte; a constant beats the map.
+- Decor items bypass `kitFurniture`, so they never ran the surface pass: the sofa was still a flat
+  white blob while the sofa's own material claimed a texture. `decorDetail()` now covers them.
+- And the real cause of the "white sofa": a point light parented to the camera at 13 cd. Zoom in and
+  the light sits 1 m from the object and clips it. It is a lift, not a key — 0.75 cd now.
+
+Still open: plank seams read slightly too dark at 1:1; wall blotches repeat visibly on very wide walls;
+pale decor still edges toward clipping in direct lamp light.

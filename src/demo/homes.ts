@@ -297,7 +297,7 @@ function bookNook(baseUrl: string): Project {
     widgets,
     decorations: [{ id: 'bn-lamp', kind: 'image', name: 'lamp.png', data: bookCover('#3d5a40', '#e7c98b', 7) }],
     button: BUTTONS['the-book-nook'],
-    room: { house: 'cabin', wall: 'sage', floor: 'walnut', light: 'auto', decor: [
+    room: { house: 'cabin', wall: 'cream', floor: 'oak', light: 'auto', decor: [
       { id: 'bookcase-1', kind: 'bookcase', x: 5, z: 1, rot: 3 },
       { id: 'lamp-1', kind: 'floorlamp', x: 2, z: 1, rot: 0 },
       { id: 'chair-1', kind: 'armchair', x: 3, z: 2, rot: 1 },

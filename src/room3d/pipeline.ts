@@ -17,7 +17,7 @@ const Grade = {
     uVignette: { value: 0.30 },
     uGrain: { value: 0.012 },
     uWarm: { value: 0.38 },
-    uContrast: { value: 1.04 },
+    uContrast: { value: 1.10 },
     uLift: { value: 0.008 },
   },
   vertexShader: /* glsl */ `
@@ -69,9 +69,12 @@ function backdrop(night: boolean): THREE.CanvasTexture {
     grad.addColorStop(0.55, '#12121f')
     grad.addColorStop(1, '#1b1720')
   } else {
-    grad.addColorStop(0, '#e3d6bd')
-    grad.addColorStop(0.5, '#efe3cc')
-    grad.addColorStop(1, '#f7edd9')
+    // The interior framing is taller than the walls, so the top of the frame is backdrop. A bright
+    // top made that band read as blown-out sky above a room; a dark warm top reads as shadow over
+    // the ceiling and closes the composition the way the reference footage does.
+    grad.addColorStop(0, '#3a2f24')
+    grad.addColorStop(0.42, '#7d6a52')
+    grad.addColorStop(1, '#efe2c9')
   }
   g.fillStyle = grad
   g.fillRect(0, 0, s, s)
@@ -86,7 +89,7 @@ function backdrop(night: boolean): THREE.CanvasTexture {
     }
   } else {
     // A little paper grain so the empty bands behind the room are not flat vector colour.
-    for (let i = 0; i < 4000; i++) {
+    for (let i = 0; i < 7000; i++) {
       g.fillStyle = `rgba(120,95,60,${Math.random() * 0.05})`
       g.fillRect(Math.random() * s, Math.random() * s, 1.6, 1.6)
     }

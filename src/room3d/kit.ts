@@ -4,7 +4,7 @@ import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room
 import type { BuildCtx, MemoryLook, Shell, Wall } from './builders.ts'
 import type { Exterior } from './exterior.ts'
 import { screenTexture } from './builders.ts'
-import { ball, floorRoughness, floorTexture, glowTexture, labelTexture, plasterWallpaper, weaveTexture, woodDetailTexture, WALL_COLORS } from './materials.ts'
+import { ball, floorRoughness, floorTexture, glowTexture, labelTexture, photoTex, WALL_COLORS } from './materials.ts'
 import { getModel } from './models.ts'
 
 /**
@@ -65,17 +65,42 @@ function surfaceDetail(root: THREE.Object3D, kind: 'weave' | 'wood') {
       const m = src as THREE.MeshStandardMaterial
       if (!m || m.userData.detailed || m.transparent || m.emissiveMap) continue
       m.userData.detailed = true
-      m.map = kind === 'weave' ? weaveTexture() : woodDetailTexture()
+      m.map = kind === 'weave' ? photoTex('wool_diff', true) : photoTex('wood_diff', true)
       m.map.userData.roomOwned = true
+      if (kind === 'wood') {
+        m.roughnessMap = photoTex('wood_rough')
+        m.roughness = 0.85
+      }
+      if (kind === 'weave') {
+        // Boucle, not a woven grid: the reference sofa reads as fibre under raking light, and a
+        // normal map is the only way to get that without extra geometry.
+        m.normalMap = photoTex('wool_nor')
+        m.normalScale.set(0.55, 0.55)
+        // The boucle roughness map is dark, which turned the sofa into a mirror under the floor lamp;
+        // cloth is uniformly matte, so a constant beats a map here.
+        m.roughness = 0.98
+      }
       m.onBeforeCompile = (shader) => {
         shader.vertexShader = shader.vertexShader.replace(
           '#include <uv_vertex>',
-          '#include <uv_vertex>\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vMapUv=(wn.y>wn.x&&wn.y>wn.z?vec2(wp.x,wp.z):(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y)))*' + f.toFixed(3) + ';',
+          '#include <uv_vertex>\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vec2 tuv=(wn.y>wn.x&&wn.y>wn.z?vec2(wp.x,wp.z):(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y)))*' + f.toFixed(3) + '; vMapUv=tuv;\n#ifdef USE_NORMALMAP\n vNormalMapUv=tuv;\n#endif\n#ifdef USE_ROUGHNESSMAP\n vRoughnessMapUv=tuv;\n#endif',
         )
       }
       m.needsUpdate = true
     }
   })
+}
+
+/**
+ * Decor items are placed straight from the GLB without going through kitFurniture, so they missed the
+ * surface pass and the reference sofa stayed a flat white blob. This gives them the same treatment.
+ */
+const DECOR_SURFACE: Record<string, 'wood' | 'weave'> = {
+  plant: 'wood', cactus: 'wood', armchair: 'weave', stool: 'wood', basket: 'weave', bookcase: 'wood', floorlamp: 'wood',
+}
+export function decorDetail(root: THREE.Object3D, kind: string) {
+  const k = DECOR_SURFACE[kind]
+  if (k) surfaceDetail(root, k)
 }
 
 function put(parent: THREE.Object3D, name: string, o: Opts = {}): THREE.Group {
@@ -204,12 +229,16 @@ function cloneMats(root: THREE.Object3D, recolor?: (name: string) => string | nu
         const color = recolor?.(src.name)
         if (color) {
           c.color.set(color)
-          c.map=plasterWallpaper()
+          c.map=photoTex('wall_diff',true)
           c.map.userData.roomOwned=true
+          c.normalMap=photoTex('wall_nor')
+          c.normalScale.set(0.17,0.17)
+          c.roughnessMap=photoTex('wall_rough')
+          c.roughness=1.0
           c.onBeforeCompile=(shader)=>{
             // Object-space axonometric projection: no UVs ship with the GLB, and the old world-space
             // (x+z) trick skewed the print on the walls that run the other way.
-            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vMapUv=(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y))*0.44;')
+            shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 wp=(modelMatrix*vec4(position,1.)).xyz; vec3 wn=abs(normalMatrix*normal); vec2 tuv=(wn.x>wn.z?vec2(wp.z,wp.y):vec2(wp.x,wp.y))*0.33; vMapUv=tuv;\n#ifdef USE_NORMALMAP\n vNormalMapUv=tuv;\n#endif\n#ifdef USE_ROUGHNESSMAP\n vRoughnessMapUv=tuv;\n#endif')
           }
         }
         c.userData.roomOwned=true
@@ -269,7 +298,7 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   }
   // A flat, evenly lit plane at the top of the frame is the fastest way to make a room look like a
   // cardboard box, so the ceiling gets the same plaster tooth as the walls and a tone below the walls.
-  const ceilMap = plasterWallpaper()
+  const ceilMap = photoTex('wall_diff', true)
   ceilMap.repeat.set(2.4, 2.4)
   const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(6.12,6.12),new THREE.MeshStandardMaterial({color:'#d7cdbb',map:ceilMap,roughness:1}))
   ceiling.rotation.x=Math.PI/2
@@ -287,7 +316,26 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
   // The owner's floor is a generated texture on a plane just above the model's plain floor.
   const modelFloor = root.getObjectByName('floor')
   if (modelFloor) modelFloor.visible = false
-  const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), new THREE.MeshStandardMaterial({ map: floorTexture(floorId), roughnessMap: floorRoughness(floorId), roughness: 1.0 }))
+  const oak = floorId === 'oak'
+  // One 1k plank patch across six metres made the boards read like a blurry gradient, so the patch
+  // repeats three times: roughly 30 cm boards at a believable grain scale.
+  const tile = (t: THREE.Texture) => {
+    const c = t.clone()
+    c.needsUpdate = true
+    c.repeat.set(3, 3)
+    c.userData.roomOwned = true
+    return c
+  }
+  const floorMat = new THREE.MeshStandardMaterial({
+    map: oak ? tile(photoTex('planks_diff', true)) : floorTexture(floorId),
+    roughnessMap: oak ? tile(photoTex('planks_rough')) : floorRoughness(floorId),
+    roughness: 1.0,
+  })
+  if (oak) {
+    floorMat.normalMap = tile(photoTex('planks_nor'))
+    floorMat.normalScale.set(0.55, 0.55)
+  }
+  const floor = new THREE.Mesh(new THREE.PlaneGeometry(6, 6), floorMat)
   floor.rotation.x = -Math.PI / 2
   floor.position.set(3, 0.002, 3)
   floor.receiveShadow = true

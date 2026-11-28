@@ -1,3 +1,4 @@
+import { TEX } from './textures.generated.ts'
 import * as THREE from 'three'
 import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js'
 import type { FloorId, WallId } from '../core/room.ts'
@@ -69,6 +70,24 @@ function canvasTex(draw: (g: CanvasRenderingContext2D, s: number) => void, repea
   t.wrapS = t.wrapT = THREE.RepeatWrapping
   t.repeat.set(repeat, repeat)
   t.anisotropy = 4
+  return t
+}
+
+const photoCache = new Map<string, THREE.Texture>()
+/**
+ * Polyhaven CC0 surfaces, inlined as data URIs in `textures.generated.ts`. They ship inside the room
+ * bundle, so an exported single-file site keeps its floor and walls instead of falling back to flat
+ * colour. Grayscale maps must not be tagged sRGB or the roughness arrives the wrong way round.
+ */
+export function photoTex(key: keyof typeof TEX, srgb = false): THREE.Texture {
+  const hit = photoCache.get(key)
+  if (hit) return hit
+  const t = new THREE.TextureLoader().load(TEX[key])
+  t.wrapS = t.wrapT = THREE.RepeatWrapping
+  t.colorSpace = srgb ? THREE.SRGBColorSpace : THREE.NoColorSpace
+  t.anisotropy = 4
+  t.userData.roomOwned = true
+  photoCache.set(key, t)
   return t
 }
 
@@ -239,25 +258,26 @@ export function plasterWallpaper(){
       g.fillStyle=`rgba(196,186,166,${0.005+Math.random()*0.007})`
       g.fillRect(x,0,w,size)
     }
-    // paper grain
-    for(let i=0;i<7000;i++){
+    // Paper grain. 7000 specks on a 2.3 m tile averaged out to uniform sandpaper, which the eye
+    // reads as noise rather than as a wall; fewer, softer specks plus the mottle carry the texture.
+    for(let i=0;i<2400;i++){
       const x=Math.random()*size,y=Math.random()*size
-      g.fillStyle=`rgba(${168+Math.random()*44},${158+Math.random()*44},${138+Math.random()*44},.028)`
-      g.fillRect(x,y,1.4,1.4)
+      g.fillStyle=`rgba(${168+Math.random()*44},${158+Math.random()*44},${138+Math.random()*44},.022)`
+      g.fillRect(x,y,2.2,2.2)
     }
     // quiet sprig print, half drop, ~30 cm apart given the shader's 1.19 m tile
     const step=192
     for(let row=-1;row<6;row++)for(let col=-1;col<6;col++){
       const x=col*step+(row%2)*step/2,y=row*step
       g.save();g.translate(x,y);g.rotate(((row+col)%3-1)*.22);g.scale(1.45,1.45)
-      g.strokeStyle='rgba(199,191,168,.3)';g.lineWidth=.8
+      g.strokeStyle='rgba(199,191,168,.17)';g.lineWidth=.9
       g.beginPath();g.moveTo(-3,14);g.bezierCurveTo(6,6,-4,-2,4,-11);g.stroke()
       for(let j=0;j<4;j++){
         const side=j%2?-1:1
-        g.fillStyle=j%2?'rgba(212,206,184,.24)':'rgba(190,195,170,.22)'
+        g.fillStyle=j%2?'rgba(212,206,184,.13)':'rgba(190,195,170,.12)'
         g.beginPath();g.ellipse(side*3,9-j*4,3.2,1.2,side*-.65,0,Math.PI*2);g.fill()
       }
-      g.fillStyle='rgba(206,178,166,.18)'
+      g.fillStyle='rgba(206,178,166,.10)'
       for(let j=0;j<4;j++){const a=j*Math.PI/2+.4;g.beginPath();g.ellipse(3.6+1.5*Math.cos(a),-9+1.5*Math.sin(a),1.3,1,a,0,Math.PI*2);g.fill()}
       g.restore()
     }
