@@ -162,6 +162,72 @@ function paper(c: AudioContext): void {
   }
 }
 
+/** The wall switch: a plastic click, then the filament catching. */
+function lampSwitch(c: AudioContext, on: boolean): void {
+  const now = c.currentTime
+  const n = noise(c, 0.03)
+  const band = c.createBiquadFilter()
+  band.type = 'bandpass'
+  band.Q.value = 1.6
+  band.frequency.value = on ? 2300 : 1800
+  const gain = c.createGain()
+  gain.gain.setValueAtTime(0.0001, now)
+  gain.gain.exponentialRampToValueAtTime(0.05, now + 0.004)
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.045)
+  n.connect(band).connect(gain).connect(c.destination)
+  n.start(now)
+  n.stop(now + 0.05)
+  if (on) {
+    // a filament answers half a beat later, and only when it is being switched on
+    const osc = c.createOscillator()
+    osc.type = 'triangle'
+    osc.frequency.value = 232
+    const g = c.createGain()
+    g.gain.setValueAtTime(0.0001, now + 0.06)
+    g.gain.exponentialRampToValueAtTime(0.012, now + 0.14)
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.3)
+    const low = c.createBiquadFilter()
+    low.type = 'lowpass'
+    low.frequency.value = 900
+    osc.connect(low).connect(g).connect(c.destination)
+    osc.start(now + 0.06)
+    osc.stop(now + 0.34)
+  }
+}
+
+/** Wrapping paper and one small bell: the gift's two beats. */
+function chime(c: AudioContext): void {
+  const now = c.currentTime
+  const n = noise(c, 0.26)
+  const band = c.createBiquadFilter()
+  band.type = 'bandpass'
+  band.Q.value = 0.6
+  band.frequency.setValueAtTime(2300, now)
+  band.frequency.exponentialRampToValueAtTime(1600, now + 0.2)
+  const gain = c.createGain()
+  gain.gain.setValueAtTime(0.006, now)
+  gain.gain.exponentialRampToValueAtTime(0.03, now + 0.03)
+  gain.gain.exponentialRampToValueAtTime(0.0001, now + 0.24)
+  n.connect(band).connect(gain).connect(c.destination)
+  n.start(now)
+  n.stop(now + 0.3)
+  for (const [freq, peak, dur] of [
+    [784, 0.02, 0.9],
+    [1176, 0.008, 0.7],
+  ] as const) {
+    const osc = c.createOscillator()
+    osc.type = 'sine'
+    osc.frequency.value = freq
+    const g = c.createGain()
+    g.gain.setValueAtTime(0.0001, now + 0.34)
+    g.gain.exponentialRampToValueAtTime(peak, now + 0.38)
+    g.gain.exponentialRampToValueAtTime(0.0001, now + 0.38 + dur)
+    osc.connect(g).connect(c.destination)
+    osc.start(now + 0.34)
+    osc.stop(now + 0.4 + dur)
+  }
+}
+
 /** One cricket, two or three dry chirps, a little way off in the garden. */
 function chirp(c: AudioContext, master: GainNode): void {
   const now = c.currentTime + Math.random() * 0.6
@@ -253,11 +319,14 @@ export function stopAmbient(): void {
   ambient = null
 }
 
-export function sfx(kind: 'door' | 'stamp' | 'paper'): void {
+export function sfx(kind: 'door' | 'stamp' | 'paper' | 'lamp' | 'lampOff' | 'chime'): void {
   if (muted) return
   const c = audio()
   if (!c) return
   if (kind === 'door') door(c)
   else if (kind === 'stamp') stamp(c)
+  else if (kind === 'lamp') lampSwitch(c, true)
+  else if (kind === 'lampOff') lampSwitch(c, false)
+  else if (kind === 'chime') chime(c)
   else paper(c)
 }

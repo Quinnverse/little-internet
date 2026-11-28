@@ -2,6 +2,7 @@ import {windowLandscape} from './landscape.ts'
 import {LetterLights} from './letterLights.ts'
 import {boardTexture,type PinView} from './pinboard.ts'
 import * as THREE from 'three'
+import { primeSound, sfx, startAmbient } from '../editor/ui/sfx.ts'
 import { createPipeline, type Pipeline } from './pipeline.ts'
 import {
   FLOOR_SIZE,
@@ -239,6 +240,11 @@ export class RoomView {
     el.addEventListener('webglcontextrestored', this.onRestored)
     el.addEventListener('contextmenu', (ev) => ev.preventDefault())
     el.addEventListener('pointerdown', this.onDown)
+    // Browsers only allow audio after a real gesture; latch onto the first one.
+        el.addEventListener('pointerdown', () => {
+      primeSound()
+      startAmbient()
+    }, { once: true })
     el.addEventListener('pointermove', this.onMove)
     el.addEventListener('pointerup', this.onUp)
     el.addEventListener('pointercancel', this.onUp)
@@ -283,6 +289,7 @@ export class RoomView {
     }
     if(prev?.lampsOn===false && data.lampsOn!==false && data.lightTrigger==='lamps')this.replayLights()
     this.stringLights?.lights(data.lampsOn!==false)
+    if (prev && prev.lampsOn !== data.lampsOn) sfx(data.lampsOn === false ? 'lampOff' : 'lamp')
     if(skinChanged || prev?.pins!==data.pins)this.refreshBoard(data)
     this.buildDynamic(data)
     this.lampsOn=data.lampsOn??true
@@ -974,6 +981,8 @@ export class RoomView {
     }
     const id = this.hitId(e)
     if (id) {
+      if (id === 'door') sfx('door')
+      else if (id === 'diary' || id === 'calendar') sfx('paper')
       this.opts.onPick(id)
       return
     }

@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'preact/hooks'
 import type { Ctx } from './common.tsx'
+import { primeSound, sfx } from './sfx.ts'
 
 /** A gift is not a card. It is a small ceremony: a sealed envelope, a sky, twelve chances to look
  *  closer, and one letter that stays. The room is the last beat — the thing you unwrap ends up on
@@ -68,7 +69,16 @@ export function GiftRitual({ ctx, close, onKeep, lang }: { ctx: Ctx; close: () =
     return () => window.removeEventListener('keydown', k)
   }, [close])
 
-  const flip = (i: number) => setOpened((o: number[]) => (o.includes(i) ? o : [...o, i]))
+  const flip = (i: number) => {
+    // Each panel is paper being torn, and the last needed panel rings the bell.
+    sfx('paper')
+    setOpened((o: number[]) => {
+      if (o.includes(i)) return o
+      const next = [...o, i]
+      if (next.length === 5) window.setTimeout(() => sfx('chime'), 260)
+      return next
+    })
+  }
   const enough = opened.length >= 5
 
   return (
@@ -83,7 +93,17 @@ export function GiftRitual({ ctx, close, onKeep, lang }: { ctx: Ctx; close: () =
             <h2>{zh ? '有人给你留了一点光' : 'Someone left you a little light'}</h2>
             <p>{zh ? '它来自一间你没去过的屋子。' : 'It comes from a room you have never been to.'}</p>
           </div>
-          <div class="gr-env" onClick={() => setStage('open')} role="button" tabIndex={0} aria-label={zh ? '拆开信封' : 'open the envelope'}>
+          <div
+            class="gr-env"
+            onClick={() => {
+              primeSound()
+              sfx('stamp')
+              setStage('open')
+            }}
+            role="button"
+            tabIndex={0}
+            aria-label={zh ? '拆开信封' : 'open the envelope'}
+          >
             <div class="gr-env-flap" />
             <div class="gr-env-fold" aria-hidden="true" />
             <div class="gr-stamp" aria-hidden="true"><span>12</span></div>
