@@ -289,7 +289,10 @@ export class RoomView {
     }
     if(prev?.lampsOn===false && data.lampsOn!==false && data.lightTrigger==='lamps')this.replayLights()
     this.stringLights?.lights(data.lampsOn!==false)
-    if (prev && prev.lampsOn !== data.lampsOn) sfx(data.lampsOn === false ? 'lampOff' : 'lamp')
+    if (prev && prev.lampsOn !== data.lampsOn) {
+      sfx(data.lampsOn === false ? 'lampOff' : 'lamp')
+      this.lampKick = 1
+    }
     if(skinChanged || prev?.pins!==data.pins)this.refreshBoard(data)
     this.buildDynamic(data)
     this.lampsOn=data.lampsOn??true
@@ -368,6 +371,10 @@ export class RoomView {
       const f = kitFurniture(this.ctx, data.welcome)
       this.led = f.led
       this.root.add(f.group)
+      this.lampNodes = ['floor_lamp', 'desk_lamp']
+        .map((n) => f.group.getObjectByName(n))
+        .filter((o): o is THREE.Object3D => !!o)
+      for (const l of this.lampNodes) l.userData.rest = { y: l.position.y, z: l.rotation.z }
       this.pickRoots.push(...f.picks, this.shell.doorPivot)
       const glass = this.shell.walls[0]!.group.getObjectByName('window_glass')
       if (glass) this.pickRoots.push(glass)
@@ -1013,6 +1020,9 @@ export class RoomView {
 
   recordPlaying=false
   private lampsOn=true
+  private lampNodes: THREE.Object3D[] = []
+  private lampKick = 0
+  private lampPhase = 0
   private daylightColor=''
   roomHour(period:string){
     const h=period==='auto'?new Date().getHours():({morning:7,afternoon:14,dusk:18,midnight:0}[period]??14)
@@ -1140,6 +1150,18 @@ export class RoomView {
     }
     this.camera.lookAt(this.tgt)
     this.pipeline?.setFocus(this.radius)
+    // A switched bulb shakes its stand for a moment. It is a 40 cm object, so the amplitude is tiny;
+    // what the eye reads is that the room answered the tap, not that a lamp wobbled.
+    if (this.lampKick > 0.0015 || Math.abs(this.lampNodes[0]?.rotation.z ?? 0) > 0.0005) {
+      this.lampKick *= Math.exp(-dt * 5.5)
+      this.lampPhase += dt * 24
+      const a = this.lampKick * 0.03
+      for (const l of this.lampNodes) {
+        const rest = l.userData.rest as { y: number; z: number } | undefined
+        l.rotation.z = (rest?.z ?? 0) + a * Math.sin(this.lampPhase)
+        l.position.y = (rest?.y ?? 0) + a * 0.6 * Math.sin(this.lampPhase * 1.3)
+      }
+    }
 
     // Walls between the camera and the room fade out.
     let fading = false

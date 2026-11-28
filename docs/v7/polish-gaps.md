@@ -37,3 +37,21 @@
 - 远端 `v7/refined-home` 仍未推送（GitHub 网络不通，`git push` 两次卡死）。
 - `npm run build` 全量四步尚未在本轮跑通（仅 `tsc --noEmit`）。
 - Kiroween 评委偏好调研（任务 #3）仍是 pending：只拿到 devpost 的 Potential Value / Implementation / Quality and Design 片段。
+
+## Round 8 — secondary motion (the "hand-feel" pass)
+
+The gap with the reference footage is not texture resolution any more; it is that **nothing in the
+reference stands perfectly still after being touched**. Three things were added, cheapest first:
+
+1. **Lamp settle.** Switching the bulb kicks its stand (`lampKick = 1`, decay `e^-5.5t`, ±0.03 rad at
+   24 rad/s) and it damps back to rest. Amplitude is deliberately at the edge of perception — you
+   should feel the room answer, not see a wobbling prop.
+2. **Grade breathing** (already in GradePass) and **camera idle drift** (already in view) are what
+   make a still frame read as filmed rather than rendered. Verified by screen recording, not by
+   screenshots: `shots/40-room-motion.webm`, 16.8 s, 1280x720.
+3. **Sound answers every verb.** See round 7 — door / paper / stamp / lamp / chime / ambient bed.
+
+Still missing for a true "game" hand-feel, in priority order:
+- drawer pull with eased overshoot (needs a rigged drawer node; GLB has it as one mesh today)
+- diary page settle (30 deg residual swing on open)
+- three cinematic camera presets (wide / desk / window) instead of free drag only
