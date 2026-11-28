@@ -13,6 +13,7 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
   const lang = useLang()
   const { ctx } = props
   const { site, ghost } = ctx.project
+  const [sign,setSign]=useState(ctx.project.privateHome?.sign??'HOME')
   const [volume,changeVolume]=useState(ambientVolume())
   const [tab,setTab]=useState<'room'|'name'|'boo'|'device'>('room')
   const zh=lang==='zh'
@@ -37,7 +38,12 @@ export function Settings(props: { ctx: Ctx; onClose: () => void; flat: boolean; 
         <section key={tab}>
         {tab==='room'&&<><h3>{zh?'屋里的光':'Light in the room'}</h3>
         <div class="light-swatches">{(['morning','afternoon','dusk','midnight','auto'] as const).map((v,i)=><button class={'swatch-'+v} aria-pressed={(ctx.project.privateHome?.period??'auto')===v} onClick={()=>run(ctx,p=>({...p,privateHome:{...p.privateHome,period:v},room:{...p.room,light:v==='midnight'?'night':v==='auto'?'auto':'day'}}))}><i aria-hidden="true"/>{(zh?['清晨','午后','黄昏','深夜','随当地时间']:['Morning','Afternoon','Dusk','Midnight','Local time'])[i]}</button>)}</div>
-      <label class="field">{zh?'窗外的虫鸣':'Crickets outside'}<input aria-label={zh?'环境音量':'Room tone volume'} type="range" min="0" max="1" step=".05" value={volume} onInput={e=>{const v=+e.currentTarget.value;changeVolume(v);setAmbientVolume(v);if(v){primeSound();startAmbient()}else stopAmbient()}}/></label>
+      <form class="light-letter-form" onSubmit={e=>{e.preventDefault();run(ctx,p=>({...p,privateHome:{...p.privateHome,sign:sign.trim()||'HOME'}}),t('settings.saved'))}}>
+        <label>{zh?'墙上的灯语':'Words in lights'} <input maxLength={48} value={sign} onInput={e=>setSign(e.currentTarget.value)}/></label>
+        <button class="chip">{zh?'挂到墙上':'Hang on wall'}</button>
+        <label>{zh?'什么时候亮起':'Light the letters'} <select value={ctx.project.privateHome?.lightTrigger??'enter'} onChange={e=>{const lightTrigger=e.currentTarget.value as 'enter'|'lamps'|'touch';run(ctx,p=>({...p,privateHome:{...p.privateHome,lightTrigger}}))}}>
+          <option value="enter">{zh?'回家时':'When I come home'}</option><option value="lamps">{zh?'开灯时':'With the lamps'}</option><option value="touch">{zh?'触碰灯串时':'When touched'}</option></select></label>
+      </form><label class="field">{zh?'窗外的虫鸣':'Crickets outside'}<input aria-label={zh?'环境音量':'Room tone volume'} type="range" min="0" max="1" step=".05" value={volume} onInput={e=>{const v=+e.currentTarget.value;changeVolume(v);setAmbientVolume(v);if(v){primeSound();startAmbient()}else stopAmbient()}}/></label>
       <label class="switch-row">
         <input type="checkbox" checked={props.assist} onChange={(e) => props.setAssist(e.currentTarget.checked)} />
         <span>

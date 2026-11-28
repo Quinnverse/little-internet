@@ -7,22 +7,22 @@ function load() {
   const handlers: Record<string, (e: unknown) => void> = {}
   const deleted: string[] = []
   const self = {
-    location: { origin: 'https://little.example' },
+    location: { origin: 'https://little.example', href: 'https://little.example/sw.js?vision=test' },
     registration: { scope: 'https://little.example/' },
     clients: { claim: () => Promise.resolve() },
     skipWaiting: () => undefined,
     addEventListener: (type: string, fn: (e: unknown) => void) => (handlers[type] = fn),
   }
   const caches = {
-    keys: () => Promise.resolve(['li-shell-v1', 'li-shell-v2', 'li-preview']),
+    keys: () => Promise.resolve(['li-shell-v1', 'li-shell-v2', 'li-preview','li-vision-old','li-vision-test']),
     delete: (k: string) => (deleted.push(k), Promise.resolve(true)),
-    open: () => Promise.resolve({ put: () => undefined, match: () => undefined }),
+    open: () => Promise.resolve({ put: async () => undefined, match: () => undefined }),
     match: () => Promise.resolve(undefined),
   }
-  vm.runInNewContext(readFileSync('public/sw.js', 'utf8'), { self, caches, URL, Response, fetch: () => Promise.resolve({ ok: true, type: 'basic', clone: () => ({}) }) })
+  vm.runInNewContext(readFileSync('public/sw.js', 'utf8'), { self, caches, URL, Response, fetch: () => Promise.resolve({ status:200, ok: true, type: 'basic', clone: () => ({}) }) })
   const takes = (url: string, method = 'GET') => {
     let taken = false
-    handlers.fetch!({ request: { method, url, mode: 'navigate' }, respondWith: () => (taken = true) })
+    handlers.fetch!({ request: { method, url, headers:new Headers(), mode: 'navigate' }, waitUntil:()=>{}, respondWith: () => (taken = true) })
     return taken
   }
   return { takes, handlers, deleted }
@@ -39,14 +39,18 @@ describe('service worker never caches private or closable content', () => {
     'https://little.example/ring/',
     'https://little.example/ring/moon/next',
     'https://little.example/healthz',
-    'https://little.example/vision/hand_landmarker.task',
-    'https://little.example/vision/wasm/vision_wasm_internal.wasm',
+    'https://little.example/vision/other.task',
+    'https://little.example/vision/hand_landmarker.task?custom=true',
   ])('leaves %s alone', (url) => expect(sw.takes(url)).toBe(false))
 
   it.each(['https://little.example/', 'https://little.example/index.html', 'https://little.example/assets/index-abc.js', 'https://little.example/preview/index.html'])(
     'still handles the app shell: %s',
     (url) => expect(sw.takes(url)).toBe(true),
   )
+
+  it.each(['vision/hand_landmarker.task','vision/face_landmarker.task','vision/wasm/vision_wasm_internal.wasm'])('caches the shipped inference asset %s',path=>{
+    expect(sw.takes('https://little.example/'+path)).toBe(true)
+  })
 
   it('ignores other origins and non-GET requests', () => {
     expect(sw.takes('https://elsewhere.example/x')).toBe(false)
@@ -57,6 +61,6 @@ describe('service worker never caches private or closable content', () => {
     let done: Promise<unknown> = Promise.resolve()
     sw.handlers.activate!({ waitUntil: (p: Promise<unknown>) => (done = p) })
     await done
-    expect(sw.deleted).toEqual(['li-shell-v1'])
+    expect(sw.deleted).toEqual(['li-shell-v1','li-vision-old'])
   })
 })

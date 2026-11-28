@@ -29,7 +29,7 @@ export function toHomeData(p: Project): HomeData {
     period:p.privateHome?.period, lampsOn:p.privateHome?.lampsOn,
     outfit:p.privateHome?.outfit,
     pins:p.privateHome?.pins?.map(pin=>{const a=p.assets.find(a=>a.id===pin.assetId);return {...pin,url:a&&assetUrl(a)}}),
-    sign:p.privateHome?.sign,
+    sign:p.privateHome?.sign, lightTrigger:p.privateHome?.lightTrigger,
     house: r.house,
     wall: r.wall,
     floor: r.floor,

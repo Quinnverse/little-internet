@@ -70,45 +70,6 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
           <p class="muted">{lang==='zh'?'我是 Boo，钥匙给你。先给家起个名字，进门后我带你认认路。':"I’m Boo. Here’s your key. Give this place a name and I’ll show you around."}</p>
         </div>
 
-        <div class="card demo-card">
-          {live.length > 0 && (
-            <div class="demo-links">
-              <p><strong>{ta('demo.visit')}</strong></p>
-              <ul>
-                {live.map((h) => (
-                  <li key={h.slug}>
-                    <a href={siteUrl(h.slug, '')} target="_blank" rel="noopener">{h.title}</a>
-                    <span class="muted small"> · {h.tagline}</span>
-                  </li>
-                ))}
-              </ul>
-            </div>
-          )}
-          <p>{ta('demo.pitch')}</p>
-          {!demos ? (
-            <button type="button" class="btn btn-block" onClick={() => setDemos(true)}>{ta('demo.try')}</button>
-          ) : (
-            <div class="demo-pick" role="group" aria-label={ta('demo.pick')}>
-              {DEMO_IDS.map((id) => (
-                <button
-                  type="button"
-                  key={id}
-                  class="btn btn-block"
-                  onClick={() => {
-                    const r = props.onDone(demoCopy(id, `${location.origin}/`))
-                    if (!r.ok) setError(r.reason)
-                  }}
-                >
-                  {DEMO_TITLES[id]}
-                </button>
-              ))}
-              <p class="muted small">{ta('demo.copyNote')}</p>
-            </div>
-          )}
-        </div>
-
-
-
         <fieldset class="field">
           <legend class="field-label">{t('setup.house')}</legend>
           <div class="choice-row">
@@ -184,6 +145,45 @@ export function Setup(props: { onDone: (p: Project) => Result<Project> }) {
         <button type="button" class="btn btn-primary btn-block" onClick={create}>
           {t('setup.moveIn')}
         </button>
+
+        <div class="card demo-card">
+          {live.length > 0 && (
+            <div class="demo-links">
+              <p><strong>{ta('demo.visit')}</strong></p>
+              <ul>
+                {live.map((h) => (
+                  <li key={h.slug}>
+                    <a href={siteUrl(h.slug, '')} target="_blank" rel="noopener">{h.title}</a>
+                    <span class="muted small"> · {h.tagline}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          <p>{ta('demo.pitch')}</p>
+          {!demos ? (
+            <button type="button" class="btn btn-block" onClick={() => setDemos(true)}>{ta('demo.try')}</button>
+          ) : (
+            <div class="demo-pick" role="group" aria-label={ta('demo.pick')}>
+              {DEMO_IDS.map((id) => (
+                <button
+                  type="button"
+                  key={id}
+                  class="btn btn-block"
+                  onClick={() => {
+                    const r = props.onDone(demoCopy(id, `${location.origin}/`))
+                    if (!r.ok) setError(r.reason)
+                  }}
+                >
+                  {DEMO_TITLES[id]}
+                </button>
+              ))}
+              <p class="muted small">{ta('demo.copyNote')}</p>
+            </div>
+          )}
+        </div>
+
+
 
         <div class="setup-alt">
           <p class="muted">{t('setup.have')}</p>

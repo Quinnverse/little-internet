@@ -2,6 +2,14 @@ import {useEffect,useRef,useState} from 'preact/hooks'
 
 /** A short local listening window. The first half second sets the room noise floor. */
 export function WishCandle({zh,onBlow}:{zh:boolean;onBlow:()=>void}){
+ const cake=useRef<HTMLCanvasElement>(null)
+ useEffect(()=>{
+   let active=true
+   void import('../../room3d/wishCake.ts').then(({drawWishCake})=>{
+     if(active&&cake.current)drawWishCake(cake.current)
+   }).catch(()=>{})
+   return ()=>{active=false}
+ },[])
  const [state,status]=useState('off')
  const version=useRef(0),stream=useRef<MediaStream|null>(null),context=useRef<AudioContext|null>(null),frame=useRef(0)
  const stop=()=>{version.current++;cancelAnimationFrame(frame.current);stream.current?.getTracks().forEach(t=>t.stop());stream.current=null
@@ -24,7 +32,7 @@ export function WishCandle({zh,onBlow}:{zh:boolean;onBlow:()=>void}){
    frame.current=requestAnimationFrame(tick)
   }catch{if(token===version.current){stop();status('error')}}
  }
- return <div class="candle-wish"><button onClick={blow}>🕯 {zh?'点一下吹灭':'Blow out candle'}</button>
+ return <div class="candle-wish"><button class="cake-on-stand" onClick={blow}><canvas ref={cake} aria-hidden="true"/><span>🕯 {zh?'点一下吹灭':'Blow out candle'}</span></button>
  {['off','error'].includes(state)?<button onClick={listen}>{zh?'用麦克风吹气':'Use microphone'}</button>:<button onClick={()=>{stop();status('off')}}>{state==='listen'?(zh?'轻轻吹气':'Blow gently'):(zh?'请安静片刻':'A moment of quiet')} · ■</button>}
  {state==='error'&&<small>{zh?'麦克风不可用，仍可点蜡烛。':'Mic unavailable. Tap the candle.'}</small>}</div>
 }

@@ -1,4 +1,5 @@
 import {windowLandscape} from './landscape.ts'
+import {LetterLights} from './letterLights.ts'
 import {boardTexture,type PinView} from './pinboard.ts'
 import * as THREE from 'three'
 import {
@@ -33,7 +34,7 @@ import { Pet, type PetState } from './pet.ts'
 import { SLOT_POSES } from './slots.ts'
 
 export type HomeData = {
-  period?: string; lampsOn?:boolean
+  period?: string; lampsOn?:boolean; lightTrigger?:string
   outfit?:'warm'|'cool'|'hidden';pins?:PinView[];sign?:string
   house: House
   wall: WallId
@@ -202,7 +203,7 @@ export class RoomView {
     this.pet = new Pet('white', opts.reduceMotion)
     if (kitReady()) this.pet.useModel(getModel('pet_ghost')!, getAnimations('pet_ghost'))
     this.scene.add(this.pet.group)
-    if(opts.ownerAvatar){this.avatar=new Avatar(opts.reduceMotion);this.avatar.place(2.5,4.2);this.scene.add(this.avatar.group)}
+    if(opts.ownerAvatar){this.avatar=new Avatar(opts.reduceMotion);this.avatar.place(4.55,2.9);this.scene.add(this.avatar.group)}
     this.ring = new THREE.Mesh(
       new THREE.RingGeometry(0.34, 0.42, 36),
       new THREE.MeshBasicMaterial({ color: '#ffd166', transparent: true, opacity: 0.95, depthWrite: false }),
@@ -245,7 +246,24 @@ export class RoomView {
       !prev || prev.house !== data.house || prev.wall !== data.wall || prev.floor !== data.floor || prev.welcome !== data.welcome || this.kitUsed !== kitReady()
     if (skinChanged) this.buildStatic(data)
     if(this.avatar){this.avatar.group.visible=this.mode==='home'&&data.outfit!=='hidden';this.avatar.setVariant(data.outfit==='cool'?'cool':'warm')}
-    if(skinChanged || prev?.pins!==data.pins || prev?.sign!==data.sign)this.refreshBoard(data)
+    if(skinChanged || prev?.sign!==data.sign){
+      if(this.stringLights){
+        const old=this.stringLights.group
+        this.pickRoots=this.pickRoots.filter(obj=>obj!==old)
+        old.removeFromParent()
+        if(!skinChanged)disposeTree(old)
+      }
+      this.stringLights=new LetterLights(data.sign||'HOME')
+      const group=this.stringLights.group
+      group.rotation.y=-Math.PI/2
+      group.position.set((data.house==='villa'?8.52:6)-.06,2.22,2.85)
+      this.root.add(group)
+      this.pickRoots.push(group)
+      if(!data.lightTrigger||data.lightTrigger==='enter')this.replayLights()
+    }
+    if(prev?.lampsOn===false && data.lampsOn!==false && data.lightTrigger==='lamps')this.replayLights()
+    this.stringLights?.lights(data.lampsOn!==false)
+    if(skinChanged || prev?.pins!==data.pins)this.refreshBoard(data)
     this.buildDynamic(data)
     this.lampsOn=data.lampsOn??true
     if(data.period)this.roomHour(data.period)
@@ -261,13 +279,16 @@ export class RoomView {
     this.dirty = true
   }
 
+  private stringLights?:LetterLights
+  replayLights(){this.stringLights?.play(performance.now());this.dirty=true}
+
   private boardEpoch=0
   private board?:THREE.Mesh<THREE.PlaneGeometry,THREE.MeshStandardMaterial>
   private async refreshBoard(data:HomeData){
     const epoch=++this.boardEpoch
     if(this.board){this.board.removeFromParent();this.board.geometry.dispose();this.board.material.map?.dispose();this.board.material.dispose();this.board=undefined}
-    if(!data.pins?.length&&!data.sign)return
-    const texture=await boardTexture(data.pins??[],data.sign??'')
+    if(!data.pins?.length)return
+    const texture=await boardTexture(data.pins??[])
     if(epoch!==this.boardEpoch||this.disposed){texture.dispose();return}
     this.board=new THREE.Mesh(new THREE.PlaneGeometry(1.6,.9),new THREE.MeshStandardMaterial({map:texture,roughness:.95}))
     this.board.position.set(1,1.93,.14);this.board.userData.pick='wall'
@@ -398,6 +419,7 @@ export class RoomView {
     new THREE.TextureLoader().load(
       url,
       (tex) => {
+        if(this.disposed||!g.parent){tex.dispose();return}
         tex.colorSpace = THREE.SRGBColorSpace
         const img = tex.image as { width: number; height: number }
         g.traverse((o) => {
@@ -414,6 +436,7 @@ export class RoomView {
             tex.repeat.set(1, have / want)
             tex.offset.set(0, (1 - have / want) / 2)
           }
+          ;(m.material as THREE.MeshStandardMaterial).map?.dispose()
           ;(m.material as THREE.MeshStandardMaterial).map = tex
           ;(m.material as THREE.MeshStandardMaterial).needsUpdate = true
         })
@@ -1021,6 +1044,7 @@ export class RoomView {
     this.last = now
     this.elapsed += dt
     const t = this.elapsed
+    this.stringLights?.update(now,!!this.opts.reduceMotion)
     const animated = !this.opts.reduceMotion
 
     if(this.following && this.avatar && !this.returnPose && !this.decorMode){this.want.tgt.copy(this.avatar.position);this.want.tgt.y=.62}
@@ -1034,6 +1058,11 @@ export class RoomView {
     const camChanged = before.some((v, i) => Math.abs(v - [this.az, this.pol, this.radius, this.tgt.x, this.tgt.y, this.tgt.z][i]!) > 1e-5)
     const sp = Math.sin(this.pol)
     this.camera.position.set(this.tgt.x + this.radius * sp * Math.sin(this.az), this.tgt.y + this.radius * Math.cos(this.pol), this.tgt.z + this.radius * sp * Math.cos(this.az))
+    const ceiling=this.shell?.group.getObjectByName('interior-ceiling')
+    if(ceiling){
+      const p=this.camera.position
+      ceiling.visible=this.mode==='home'&&p.y<3.16&&p.x>=0&&p.x<=(this.data?.house==='villa'?8.52:6)&&p.z>=0&&p.z<=6
+    }
     this.camera.lookAt(this.tgt)
 
     // Walls between the camera and the room fade out.
@@ -1140,16 +1169,25 @@ function nearestAz(current: number, target: number) {
 }
 
 export function disposeTree(root: THREE.Object3D) {
+  const materials = new Set<THREE.Material>()
+  const textures = new Set<THREE.Texture>()
+  const geometries = new Set<THREE.BufferGeometry>()
   root.traverse((o) => {
-    if (o.userData.kit) return // shared with the model cache
     const m = o as THREE.Mesh
-    if (m.geometry) m.geometry.dispose()
-    const mats = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []
-    for (const x of mats) {
-      for (const v of Object.values(x)) if (v && (v as THREE.Texture).isTexture) (v as THREE.Texture).dispose()
-      x.dispose()
+    if (m.geometry && !o.userData.kit) geometries.add(m.geometry)
+    const local = m.material ? (Array.isArray(m.material) ? m.material : [m.material]) : []
+    for (const mat of local) {
+      if (o.userData.kit && !mat.userData.roomOwned) continue
+      materials.add(mat)
+      for (const value of Object.values(mat)) {
+        const tex = value as THREE.Texture | null
+        if (tex?.isTexture && (!o.userData.kit || tex.userData.roomOwned)) textures.add(tex)
+      }
     }
   })
+  textures.forEach(t => t.dispose())
+  materials.forEach(m => m.dispose())
+  geometries.forEach(g => g.dispose())
 }
 
 let probed: boolean | undefined

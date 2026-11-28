@@ -27,15 +27,18 @@ self.addEventListener('fetch', (event) => {
   if (url.origin !== self.location.origin) return
   const root=new URL(self.registration.scope)
   if(url.pathname.startsWith(root.pathname) && VISION_FILES.test(url.pathname.slice(root.pathname.length)) && !url.search && !req.headers.has('range')){
-    event.respondWith((async()=>{
+    let saved = Promise.resolve()
+    const result=(async()=>{
       let cache
       try{cache=await caches.open(VISION_CACHE);const cached=await cache.match(req);if(cached)return cached}catch{}
       const response=await fetch(req)
       if(cache && response.status===200 && response.type==='basic'){
-        try{await cache.put(req,response.clone())}catch{}
+        saved=cache.put(req,response.clone()).catch(()=>{})
       }
       return response
-    })())
+    })()
+    event.respondWith(result)
+    event.waitUntil(result.then(()=>saved).catch(()=>{}))
     return
   }
   if (NEVER.test(url.pathname)) return

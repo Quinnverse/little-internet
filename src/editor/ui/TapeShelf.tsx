@@ -7,7 +7,7 @@ import {Sheet,run,assetUrl,type Ctx} from './common.tsx'
 export function TapeShelf({ctx,close}:{ctx:Ctx;close:()=>void}){
  const p=ctx.project,zh=p.site.lang==='zh',rows=p.posts.filter(x=>x.kind==='collection'&&x.tags.includes('cinema'))
  const [selected,select]=useState(''),[title,setTitle]=useState(''),[body,setBody]=useState(''),[cover,setCover]=useState(''),[date,setDate]=useState(''),[source,setSource]=useState('')
- const row=rows.find(x=>x.id===selected),key='tape:'+p.site.slug+':'+selected
+ const row=rows.find(x=>x.id===selected),key='tape:'+(p.privateHome?.libraryId??p.site.slug)+':'+selected
  useEffect(()=>{let valid=true,url='';setSource('');if(selected)void idbGet<File>(key).then(f=>{if(valid&&f){url=URL.createObjectURL(f);setSource(url)}});return()=>{valid=false;if(url)URL.revokeObjectURL(url)}},[key])
  useEffect(()=>()=>{if(source)URL.revokeObjectURL(source)},[source])
  function choose(id:string){const v=rows.find(x=>x.id===id);select(id);setTitle(v?.title??'');setBody(v?.body??'');setCover(v?.imageIds[0]??'');setDate(v?.fields.where??'')}

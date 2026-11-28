@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import {mkdirSync} from 'node:fs'
 const dir=process.env.SHOTS||'.v6-review'
 mkdirSync(dir,{recursive:true})
-const b=await chromium.launch({channel:process.env.PW_CHANNEL})
+const b=await chromium.launch({headless:process.env.HEADFUL!=='1',channel:process.env.PW_CHANNEL})
 try{
  const p=await b.newPage({viewport:{width:1600,height:900},locale:'en-US',...(process.env.VIDEOS?{recordVideo:{dir:process.env.VIDEOS,size:{width:1280,height:720}}}:{})})
  p.setDefaultTimeout(10000)
@@ -21,7 +21,12 @@ try{
  await p.getByRole('button',{name:'Home menu'}).click()
  await p.getByRole('button',{name:'Settings',exact:true}).click()
  await p.getByRole('button',{name:'Afternoon',exact:true}).click()
+ await p.getByLabel('Words in lights').fill('BLUE HOUR');await p.getByRole('button',{name:'Hang on wall'}).click()
  await p.screenshot({path:dir+'/settings.png'});await close()
+ await p.getByRole('button',{name:'Toggle immersive view'}).click()
+ await p.getByRole('button',{name:'Keep in album'}).click()
+ await p.getByText('Saved to your private album').waitFor()
+ await p.getByRole('button',{name:'Toggle immersive view'}).click()
  await p.getByRole('button',{name:'Home menu'}).click()
  await pick('wall');await p.getByPlaceholder('Leave a note').fill('Friday at home');await p.getByRole('button',{name:'Pin note'}).click()
  await p.getByRole('button',{name:'Friday at home'}).waitFor()
@@ -37,7 +42,8 @@ try{
  await p.locator('input[type=date]').fill('2026-12-01');await p.getByPlaceholder('What is special about this day?').fill('A birthday');await p.getByRole('button',{name:'＋'}).click()
  await p.getByText(/2026-12-01 · A birthday/).waitFor();await close()
  await pick('computer');await p.screenshot({path:dir+'/crt.png'});await p.getByRole('button',{name:'Night Window'}).click()
- await p.getByRole('button',{name:'Prepare a birthday wish'}).click();await p.locator('.moment-letter input').fill('LUNA');await p.getByRole('button',{name:/Fold the letter/}).click();await p.getByRole('button',{name:/Blow out candle/}).click();await p.locator('.night-greeting strong').getByText('LUNA').waitFor()
+ await p.getByRole('button',{name:'Prepare a birthday wish'}).click();await p.locator('.moment-letter input').fill('LUNA');await p.getByRole('button',{name:/Fold the letter/}).click();await p.waitForFunction(()=>document.querySelector('.cake-on-stand canvas')?.width===560)
+ await p.screenshot({path:dir+'/cake.png'});await p.getByRole('button',{name:/Blow out candle/}).click();await p.locator('.night-greeting strong').getByText('LUNA').waitFor()
  await p.screenshot({path:dir+'/birthday.png'});await p.getByRole('button',{name:'Keep this wish'}).click()
  await pick('records')
  const wav=Buffer.alloc(44+16000);wav.write('RIFF');wav.writeUInt32LE(wav.length-8,4);wav.write('WAVEfmt ',8);wav.writeUInt32LE(16,16);wav.writeUInt16LE(1,20);wav.writeUInt16LE(1,22);wav.writeUInt32LE(8000,24);wav.writeUInt32LE(16000,28);wav.writeUInt16LE(2,32);wav.writeUInt16LE(16,34);wav.write('data',36);wav.writeUInt32LE(16000,40)
@@ -51,6 +57,7 @@ try{
  console.log('Opening free canvas');await p.getByRole('button',{name:'Responsive grid'}).click()
  const frame=p.frameLocator('.at-frame')
  const widget=frame.locator('[data-w]').first()
+ await p.waitForFunction(()=>{const el=document.querySelector('.at-frame')?.contentDocument?.querySelector('[data-w]');return el?.ownerDocument.defaultView.getComputedStyle(el).position==='absolute'&&el.querySelector('button[title]')})
  const measure=()=>widget.evaluate(el=>{const css=getComputedStyle(el);return {x:parseFloat(css.left),w:parseFloat(css.width)}})
  const drag=async(title,dx,dy)=>{const loc=widget.locator('button[title^="'+title+'"]');await loc.scrollIntoViewIfNeeded();const r=await loc.boundingBox();assert(r);await p.mouse.move(r.x+r.width/2,r.y+r.height/2);await p.mouse.down();await p.mouse.move(r.x+r.width/2+dx,r.y+r.height/2+dy,{steps:8});await p.mouse.up();await p.waitForTimeout(350)}
  await widget.locator('button[title^="Move"]').waitFor()

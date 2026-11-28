@@ -149,8 +149,10 @@ const WallPinSchema = z.object({
 export type WallPin=z.infer<typeof WallPinSchema>
 const ProjectShape = {
   privateHome:z.object({
+    libraryId:id.optional(),
     pins:z.array(WallPinSchema).max(150).optional(),
     dates:z.array(z.object({id,day:z.iso.date(),name:z.string().max(100)})).max(200).optional(),
+    lightTrigger:z.enum(['enter','lamps','touch']).optional(),wishName:z.string().max(48).optional(),
     sign:z.string().max(48).optional(), wish:z.string().max(240).optional(),
     period:z.enum(['auto','morning','afternoon','dusk','midnight']).optional(), lampsOn:z.boolean().optional(),
     outfit:z.enum(['warm','cool','hidden']).optional(),paper:id.optional()

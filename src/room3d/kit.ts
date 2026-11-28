@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import {windowDrapes} from './interior.ts'
 import type { DecorKind, FloorId, House, MemoryKind, WallId } from '../core/room.ts'
 import type { BuildCtx, MemoryLook, Shell, Wall } from './builders.ts'
 import type { Exterior } from './exterior.ts'
@@ -84,10 +85,12 @@ function cloneMats(root: THREE.Object3D, recolor?: (name: string) => string | nu
         if (color) {
           c.color.set(color)
           c.map=sprigWallpaper()
+          c.map.userData.roomOwned=true
           c.onBeforeCompile=(shader)=>{
             shader.vertexShader=shader.vertexShader.replace('#include <uv_vertex>', '#include <uv_vertex>\nvec3 pointOnWall=(modelMatrix*vec4(position,1.)).xyz; vMapUv=vec2(pointOnWall.x+pointOnWall.z,pointOnWall.y)*.86;')
           }
         }
+        c.userData.roomOwned=true
         map.set(src, c)
         out.push(c)
       }
@@ -127,6 +130,18 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
 
   const doorPivot = group.getObjectByName('door_pivot') as THREE.Group
   doorPivot.userData.pick = 'door'
+  const curtains=group.getObjectByName('window_curtains')
+  if(curtains){
+    curtains.visible=false
+    const drapes=windowDrapes()
+    walls[0]!.group.add(drapes.group)
+    walls[0]!.mats.push(drapes.cloth)
+  }
+  const ceiling=new THREE.Mesh(new THREE.PlaneGeometry(6.12,6.12),new THREE.MeshStandardMaterial({color:'#eae0cc',roughness:.97}))
+  ceiling.rotation.x=Math.PI/2
+  ceiling.position.set(3,3.16,3)
+  ceiling.name='interior-ceiling'
+  group.add(ceiling)
   const glass = group.getObjectByName('window_glass')
   if (glass) {
     glass.userData.pick = 'window'
@@ -166,6 +181,7 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   // The screen shows a little homepage (the owner's website lives behind it).
   const screen = computer.getObjectByName('screen') as THREE.Mesh | undefined
   if (screen?.isMesh) {
+    screen.userData.kit=false
     screen.geometry = screen.geometry.clone()
     planarUV(screen)
     const tex = screenTexture()
@@ -199,6 +215,7 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
     const m = o as THREE.Mesh
     if (m.isMesh && (m.material as THREE.Material).name === 'emissive_led') {
       led = (m.material as THREE.MeshStandardMaterial).clone()
+      led.userData.roomOwned=true
       m.material = led
     }
   })
@@ -266,6 +283,7 @@ export function kitMemory(kind: MemoryKind, look: MemoryLook, ctx: BuildCtx): TH
   if (faceName) {
     const face = m.getObjectByName(faceName) as THREE.Mesh | undefined
     if (face?.isMesh) {
+      face.userData.kit=false
       face.geometry = face.geometry.clone()
       planarUV(face)
       face.material = new THREE.MeshStandardMaterial({
@@ -288,6 +306,7 @@ export function kitExterior(house: House, wall: WallId): Exterior {
   if (walls?.isMesh) {
     const m = (walls.material as THREE.MeshStandardMaterial).clone()
     m.color.set(WALL_COLORS[wall])
+    m.userData.roomOwned=true
     walls.material = m
   }
   const lamps: THREE.PointLight[] = []

@@ -85,10 +85,11 @@ export function PreviewFrame(props: {
             const handle=doc.createElement('button')
             handle.textContent=resize?'↔':'✥'
             handle.title=resize?'Resize / 调整宽度':'Move / 移动'
-            handle.style.cssText='position:absolute;bottom:4px;'+(resize?'right:4px':'left:4px')+';z-index:30;pointer-events:auto;touch-action:none;cursor:grab'
+            handle.style.cssText='position:absolute;top:4px;'+(resize?'right:4px':'left:4px')+';z-index:30;pointer-events:auto;touch-action:none;cursor:grab'
             if(doc.defaultView?.getComputedStyle(widget).position!=='absolute')widget.style.position='relative'
             widget.append(handle)
             let start:{x:number;y:number}|null=null
+            handle.type='button'
             handle.ondragstart=e=>e.preventDefault()
             handle.onpointerdown=e=>{e.preventDefault();e.stopPropagation();start={x:e.clientX,y:e.clientY};handle.setPointerCapture(e.pointerId)}
             handle.onpointercancel=()=>{start=null;widget.style.translate=''}
@@ -102,7 +103,7 @@ export function PreviewFrame(props: {
         'click',
         (e) => {
           const t = e.target as Element | null
-          if (t?.closest('audio')) return
+          if (t?.closest('audio, button[title]')) return
           e.preventDefault()
           const w = t?.closest('[data-w]')
           onSelect.current(w ? w.getAttribute('data-w') : null)

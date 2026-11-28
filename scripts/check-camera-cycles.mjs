@@ -2,7 +2,7 @@
 import { chromium } from 'playwright'
 import { writeFileSync } from 'node:fs'
 import { execFileSync } from 'node:child_process'
-const browser=await chromium.launch({headless:false,args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']})
+const browser=await chromium.launch({channel:process.env.PW_CHANNEL,headless:false,args:['--use-fake-device-for-media-stream','--use-fake-ui-for-media-stream']})
 try {
  const page=await browser.newPage({viewport:{width:390,height:844},hasTouch:true,locale:'en-US'})
  const cdp=await browser.newBrowserCDPSession()
@@ -23,6 +23,8 @@ try {
  await page.goto(process.env.BASE??'http://127.0.0.1:4331')
  await page.getByRole('button',{name:'Try a demo home'}).click()
  await page.getByRole('button',{name:'The Book Nook'}).click()
+ await page.getByRole('button',{name:'Skip tour'}).click()
+ await page.getByRole('button',{name:'Home menu'}).click()
  await page.getByRole('button',{name:'Boo perception'}).click()
  const options=page.locator('.home-perception details').first()
  await options.locator('summary').click()
@@ -33,7 +35,7 @@ try {
  const rows=[]
  for(let i=0;i<5;i++){
   await page.getByRole('button',{name:/Use camera/}).click()
-  await page.getByText(/Looking for hands/).waitFor({timeout:90000})
+  await page.waitForFunction(i=>performance.getEntriesByName('li-first-frame').length>0,i,{timeout:90000})
   if(i===0){await page.screenshot({path:process.env.SHOT??'camera-preview.png'});await page.getByRole('button',{name:'Hide preview'}).click();await page.locator('.cam-live').waitFor()}
   const on=await stats()
   await page.getByRole('button',{name:/Stop camera/}).click()

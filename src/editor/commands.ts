@@ -65,7 +65,11 @@ export function createProject(input: NewProjectInput): Project {
 
 export const updateSite =
   (patch: Partial<Project['site']>): Command =>
-  (p) => ({ ...p, site: { ...p.site, ...patch } })
+  (p) => ({
+    ...p,
+    ...(patch.slug && patch.slug!==p.site.slug ? {privateHome:{...p.privateHome,libraryId:p.privateHome?.libraryId??p.site.slug}} : {}),
+    site: { ...p.site, ...patch },
+  })
 
 export const updateGhost =
   (patch: Partial<Project['ghost']>): Command =>

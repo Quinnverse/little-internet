@@ -11,8 +11,9 @@ try{
   await page.getByRole('button',{name:'The Book Nook'}).click()
   await page.getByRole('button',{name:'Skip tour'}).click()
   const rows=[]
-  for(const label of ['cold','warm']){
-    if(label==='warm')await page.reload()
+  for(const label of ['cold','warm','cached offline']){
+    if(label!=='cold')await page.reload()
+    if(label==='cached offline')await page.context().setOffline(true)
     await page.locator('.room-canvas').waitFor()
     const ordinary=await page.evaluate(()=>performance.getEntriesByType('resource').filter(e=>e.name.includes('/vision/')).length)
     await page.getByRole('button',{name:'Home menu'}).click()

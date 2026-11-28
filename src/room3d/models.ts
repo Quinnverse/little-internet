@@ -1,6 +1,6 @@
 import * as THREE from 'three'
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js'
-import { MODELS_B64 } from './models.generated.ts'
+import {finishSurface} from './interior.ts'
 
 /**
  * The 3D kit: models made in Blender (assets/blender), quantized and embedded as base64 so the app and
@@ -21,7 +21,11 @@ function b64ToBuffer(b64: string): ArrayBuffer {
 
 /** Parses every embedded model once. Safe to call repeatedly. */
 export function preloadModels(): Promise<void> {
-  if (loading) return loading
+  loading ??= import('./models.generated.ts').then(({MODELS_B64}) => parseModels(MODELS_B64)).catch(error=>{loading=null;throw error})
+  return loading
+}
+
+function parseModels(MODELS_B64: Record<string,string>):Promise<void>{
   const loader = new GLTFLoader()
   const jobs = Object.entries(MODELS_B64).map(
     ([name, b64]) =>
@@ -31,9 +35,13 @@ export function preloadModels(): Promise<void> {
             b64ToBuffer(b64),
             '',
             (gltf) => {
+              const finished=new Set<THREE.Material>()
               gltf.scene.traverse((o) => {
                 const m = o as THREE.Mesh
                 if (m.isMesh) {
+                  for(const mat of Array.isArray(m.material)?m.material:[m.material]){
+                    if(!finished.has(mat)){finishSurface(mat as THREE.MeshStandardMaterial);finished.add(mat)}
+                  }
                   m.castShadow = true
                   m.receiveShadow = true
                 }
@@ -48,8 +56,7 @@ export function preloadModels(): Promise<void> {
         }
       }),
   )
-  loading = Promise.all(jobs).then(() => undefined)
-  return loading
+  return Promise.all(jobs).then(() => undefined)
 }
 
 export function hasModel(name: string): boolean {

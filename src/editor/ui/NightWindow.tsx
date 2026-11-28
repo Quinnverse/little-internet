@@ -12,7 +12,7 @@ export function NightWindow({ctx,close,letter}:{ctx:Ctx;close:()=>void;letter?:{
  const zh=ctx.project.site.lang==='zh',cv=useRef<HTMLCanvasElement>(null),sparks=useRef<Spark[]>([])
  const [stage,step]=useState<'sky'|'letter'|'wish'|'after'|'read'>(letter?'read':'sky'),[paused,pause]=useState(false),[sensing,sense]=useState(false)
  const [message,setMessage]=useState(letter?.message??ctx.project.privateHome?.wish??(zh?'愿你每次推门，都有灯等你。':'May there always be a light on when you get home.'))
- const [name,setName]=useState(letter?.name??ctx.project.privateHome?.sign??'WELCOME HOME')
+ const [name,setName]=useState(letter?.name??ctx.project.privateHome?.wishName??'WELCOME HOME')
  const reduced=matchMedia('(prefers-reduced-motion: reduce)').matches
  const charge=useRef(0),spread=useRef(1)
  const point=useRef({x:.5,y:.45})
@@ -40,7 +40,7 @@ export function NightWindow({ctx,close,letter}:{ctx:Ctx;close:()=>void;letter?:{
  onPointerMove={e=>{if(!e.buttons)return;const r=e.currentTarget.getBoundingClientRect();add((e.clientX-r.left)/r.width,(e.clientY-r.top)/r.height,3)}}/>
  {stage==='wish'&&<WishCandle zh={zh} onBlow={wish}/>}
  {stage==='after'&&<div class="night-greeting"><strong>{name}</strong><p>{message}</p></div>}</div>
- {stage==='read'?<article class="moment-letter"><strong>{name}</strong><p>{message}</p><button onClick={()=>step('wish')}>{zh?'把灯留给这个愿望':'Light a candle for this wish'}</button></article>:stage==='letter'?<div class="moment-letter"><label>{zh?'灯上的名字':'Name in lights'}<input maxLength={48} value={name} onInput={e=>setName(e.currentTarget.value)}/></label><textarea maxLength={240} value={message} onInput={e=>setMessage(e.currentTarget.value)}/><button onClick={()=>{if(run(ctx,p=>({...p,privateHome:{...p.privateHome,sign:name,wish:message}})))step('wish')}}>{zh?'折好信，点亮蜡烛':'Fold the letter and light a candle'}</button></div>:
+ {stage==='read'?<article class="moment-letter"><strong>{name}</strong><p>{message}</p><button onClick={()=>step('wish')}>{zh?'把灯留给这个愿望':'Light a candle for this wish'}</button></article>:stage==='letter'?<div class="moment-letter"><label>{zh?'灯上的名字':'Name in lights'}<input maxLength={48} value={name} onInput={e=>setName(e.currentTarget.value)}/></label><textarea maxLength={240} value={message} onInput={e=>setMessage(e.currentTarget.value)}/><button onClick={()=>{if(run(ctx,p=>({...p,privateHome:{...p.privateHome,wishName:name,wish:message}})))step('wish')}}>{zh?'折好信，点亮蜡烛':'Fold the letter and light a candle'}</button></div>:
  <div class="choice-row"><button onClick={()=>step('letter')}>{stage==='after'?(zh?'再来一次':'Replay'):(zh?'准备一场生日祝福':'Prepare a birthday wish')}</button><button onClick={burst}>{zh?'放一束烟花':'Release fireworks'}</button><button onClick={()=>pause(!paused)}>{paused?'▶':'Ⅱ'}</button>
  {stage==='after'&&<button onClick={()=>{if(run(ctx,addPost({id:randomId(),title:name,body:message,kind:'memo',createdAt:new Date().toISOString(),imageIds:[]})))close()}}>{zh?'收藏这次祝福':'Keep this wish'}</button>}</div>}
  <button class="chip" onClick={()=>sense(!sensing)}>{zh?'用手势画星光':'Paint with your hands'}</button>

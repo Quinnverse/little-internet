@@ -8,7 +8,9 @@ import { useEffect, useMemo, useRef, useState } from 'preact/hooks'
 import { publicProjection } from '../../core/privacy.ts'
 import type { Post, Project } from '../../core/schema.ts'
 import type { RoomView } from '../../room3d/view.ts'
-import { moveDecor, updateSite, type Command } from '../commands.ts'
+import {processPhoto} from '../images.ts'
+import {randomId} from '../ids.ts'
+import { addAsset,addPost,compose,moveDecor, updateSite, type Command } from '../commands.ts'
 import { setLang, t, useLang } from '../i18n.ts'
 import { run, type Ctx } from './common.tsx'
 import { Decorate } from './Decorate.tsx'
@@ -85,6 +87,14 @@ export function Home(props: { ctx: Ctx }) {
   const finishTour=()=>{setTour(-1);try{localStorage.setItem('boo-tour:'+ctx.project.site.slug,'1')}catch{}}
   const [toolsOpen,setToolsOpen]=useState(false)
   const [date,setDate]=useState(''),[occasion,setOccasion]=useState('')
+  async function keepRoomPhoto(){
+    if(!view)return
+    try{
+      const blob=await (await fetch(view.capturePhoto(aspect))).blob()
+      const asset={id:randomId(),...await processPhoto(new File([blob],'Room.jpg',{type:'image/jpeg'}))}
+      run(ctx,compose(addAsset(asset),addPost({id:randomId(),title:lang==='zh'?'我眼里的家':'Home, from here',body:'',kind:'photo',imageIds:[asset.id],createdAt:new Date().toISOString()})),lang==='zh'?'已收入私人相册':'Saved to your private album')
+    }catch{ctx.toast(lang==='zh'?'未能保存照片':'Could not save the photo','error')}
+  }
   const [aspect,setAspect]=useState(1.5)
   const [peek, setPeek] = useState(false)
   // Letters: the server is contacted only after the owner has opened People once on this device.
@@ -186,6 +196,7 @@ export function Home(props: { ctx: Ctx }) {
       return
     }
     switch (id) {
+      case 'light-sign':view?.replayLights();return
       case 'diary':
         return open({ kind: 'entry' }, 'diary')
       case 'computer':
@@ -413,14 +424,14 @@ export function Home(props: { ctx: Ctx }) {
       <ListeningRoom ctx={ctx} open={panel?.kind==='records'} close={close} playing={v=>{if(view)view.recordPlaying=v}}/>
       {panel?.kind==='wall'&&<MemoryWall ctx={ctx} close={close} openLetter={letter=>{view?.focus('window');setPanel({kind:'sky',letter})}}/>}
       {panel?.kind==='sky'&&<NightWindow ctx={ctx} close={close} letter={panel.letter}/>}
-      {panel?.kind==='desktop'&&<Sheet title="Little Internet OS" onClose={close}><div class="crt-desktop" style={ctx.project.assets.some(a=>a.id===ctx.project.privateHome?.paper)?{backgroundImage:'url('+assetUrl(ctx.project.assets.find(a=>a.id===ctx.project.privateHome?.paper)!)+')',backgroundSize:'cover'}:{}}>
-        <button onClick={()=>{setPanel(null);setPreviewing(ctx.project.web.published?'published':'draft')}}>▣ My Website</button>
-        <button onClick={()=>{setPanel(null);setAtelier(true)}}>✎ Website Atelier</button>
-        {([['cinema','Movie Collection'],['calendar','Calendar'],['journal','Memories'],['wall','Photo Album'],['records','Record Shelf'],['sky','Night Window'],['walk','Internet Neighbors'],['settings','Settings']] as const).map(([kind,label])=><button onClick={()=>setPanel({kind})}>{label}</button>)}</div><label>▧ {lang==='zh'?'桌面壁纸':'Wallpaper'} <select value={ctx.project.privateHome?.paper??''} onChange={e=>{const id=e.currentTarget.value;ctx.apply(p=>({...p,privateHome:{...p.privateHome,paper:id||undefined}}))}}><option value="">—</option>{ctx.project.posts.flatMap(post=>post.imageIds.map((id,i)=><option value={id}>{post.title} · {i+1}</option>))}</select></label></Sheet>}
+      {panel?.kind==='desktop'&&<Sheet title="Little Internet OS" onClose={close}><div class="crt-bezel"><div class="crt-status"><span>Little Internet OS</span><time>{new Date().toLocaleDateString(lang)}</time></div><div class="crt-desktop" style={ctx.project.assets.some(a=>a.id===ctx.project.privateHome?.paper)?{backgroundImage:'url('+assetUrl(ctx.project.assets.find(a=>a.id===ctx.project.privateHome?.paper)!)+')',backgroundSize:'cover'}:{}}>
+        <button onClick={()=>{setPanel(null);setPreviewing(ctx.project.web.published?'published':'draft')}}><Icon name="computer"/>{lang==='zh'?'我的网站':'My Website'}</button>
+        <button onClick={()=>{setPanel(null);setAtelier(true)}}><Icon name="palette"/>{lang==='zh'?'网站工坊':'Website Atelier'}</button>
+        {([['cinema','Movie Collection','录像带','cassette'],['calendar','Calendar','日历','note'],['journal','Memories','记忆','book'],['wall','Photo Album','相册','photo'],['records','Record Shelf','唱片架','shelf'],['sky','Night Window','夜空','moon'],['walk','Internet Neighbors','邻居','link'],['settings','Settings','设置','gear']] as const).map(([kind,label,cn,icon])=><button onClick={()=>setPanel({kind})}><Icon name={icon}/>{lang==='zh'?cn:label}</button>)}</div><div class="crt-hardware" aria-hidden="true"><i/><b/></div></div><label>▧ {lang==='zh'?'桌面壁纸':'Wallpaper'} <select value={ctx.project.privateHome?.paper??''} onChange={e=>{const id=e.currentTarget.value;ctx.apply(p=>({...p,privateHome:{...p.privateHome,paper:id||undefined}}))}}><option value="">—</option>{ctx.project.posts.flatMap(post=>post.imageIds.map((id,i)=><option value={id}>{post.title} · {i+1}</option>))}</select></label></Sheet>}
       {panel?.kind==='cinema'&&<TapeShelf ctx={ctx} close={close}/>}
       {panel?.kind==='calendar'&&<Sheet title={lang==='zh'?'值得记住的日子':'Days worth keeping'} onClose={close}><form onSubmit={e=>{e.preventDefault();const r=ctx.apply(p=>({...p,privateHome:{...p.privateHome,dates:[...(p.privateHome?.dates??[]),{id:'d'+crypto.randomUUID().replaceAll('-','').slice(0,12),day:date,name:occasion.trim()}]}}));if(r.ok)setOccasion('');else ctx.toast(r.reason,'error')}}><input required type="date" value={date} onInput={e=>setDate(e.currentTarget.value)}/><input required maxLength={100} value={occasion} placeholder={lang==='zh'?'这一天有什么特别？':'What is special about this day?'} onInput={e=>setOccasion(e.currentTarget.value)}/><button>＋</button></form>
       {[...(ctx.project.privateHome?.dates??[])].sort((a,b)=>a.day.localeCompare(b.day)).map(d=><p>{d.day} · {d.name} <button onClick={()=>ctx.apply(p=>({...p,privateHome:{...p.privateHome,dates:p.privateHome?.dates?.filter(x=>x.id!==d.id)}}))}>×</button></p>)}</Sheet>}
-      {immersed&&view&&<div class="photo-tools"><select aria-label="Photo aspect ratio" value={aspect} onChange={e=>setAspect(+e.currentTarget.value)}><option value="1">1∶1</option><option value="1.5">3∶2</option><option value={16/9}>16∶9</option></select><button onClick={()=>{const a=document.createElement('a');a.download='little-internet-home.jpg';a.href=view.capturePhoto(aspect);a.click()}}>{lang==='zh'?'拍照':'Take photo'}</button></div>}
+      {immersed&&view&&<div class="photo-tools"><select aria-label="Photo aspect ratio" value={aspect} onChange={e=>setAspect(+e.currentTarget.value)}><option value="1">1∶1</option><option value="1.5">3∶2</option><option value={16/9}>16∶9</option></select><button onClick={()=>{const a=document.createElement('a');a.download='little-internet-home.jpg';a.href=view.capturePhoto(aspect);a.click()}}>{lang==='zh'?'保存照片':'Download photo'}</button><button onClick={keepRoomPhoto}>{lang==='zh'?'收入相册':'Keep in album'}</button></div>}
       {previewing && <Preview direct onDecorate={()=>{setPreviewing(false);setAtelier(true)}} project={ctx.project} design={previewing} onClose={() => setPreviewing(false)} />}
       {atelier && (
         <WebAtelier

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 import type {WallPin} from '../core/schema.ts'
 export type PinView=WallPin & {url?:string}
 /** Rasterise private pins in stacking order. Only local editor data reaches this texture. */
-export async function boardTexture(pins:PinView[],sign:string){
+export async function boardTexture(pins:PinView[]){
  const c=document.createElement('canvas');c.width=768;c.height=432
  const g=c.getContext('2d')!
  g.fillStyle='#986e50';g.fillRect(0,0,c.width,c.height)
@@ -20,6 +20,5 @@ export async function boardTexture(pins:PinView[],sign:string){
    else{g.beginPath();g.arc(0,-h*.44,3,0,2*Math.PI);g.fill()}
    g.restore()
  })
- if(sign){g.font='bold 22px monospace';g.textAlign='center';g.fillStyle='#ffe3a5';g.shadowColor='#ffc754';g.shadowBlur=9;g.fillText(sign,c.width/2,28,c.width-20)}
  const texture=new THREE.CanvasTexture(c);texture.colorSpace=THREE.SRGBColorSpace;return texture
 }

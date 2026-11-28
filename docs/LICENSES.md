@@ -43,3 +43,5 @@ The locally served MediaPipe Face Landmarker float16 v1 bundle is by Google (Apa
 ## V6 room update
 
 The CRT controls, vents and speaker grille and the grooved record player are authored in the project's Blender source and distributed under the repository MIT licence. House selection illustrations and browser-synthesised room tone come from this project's earlier experience-integration branch. Owner recordings, album art and photographs are local user media. The reference videos, commercial album covers and game art are not included in the build.
+
+The small wood albedo in `src/room3d/textures/wood-table.jpg` is a resized derivative of Wood Table 001. Photography by Dimitrios Savva, processing by Rico Cilliers. The shipped file is embedded in the room renderer, including offline exports. [Source asset](https://polyhaven.com/a/wood_table_001) · [Poly Haven CC0 asset license](https://polyhaven.com/license).
