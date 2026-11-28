@@ -5,6 +5,7 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js'
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js'
 import { BokehPass } from 'three/examples/jsm/postprocessing/BokehPass.js'
+import { SSAOPass } from 'three/examples/jsm/postprocessing/SSAOPass.js'
 
 /** The difference between "a lit 3D scene" and "a photograph of a room" is almost entirely after the
  *  render: light bleeds off the lamps, corners hold a little darkness, and the grade pulls the whole
@@ -113,6 +114,16 @@ export function createPipeline(renderer: THREE.WebGLRenderer, scene: THREE.Scene
   // blended result comes out empty), so the grounded look is built from soft shadow decals instead.
   const renderPass = new RenderPass(scene, camera)
   composer.addPass(renderPass)
+
+  // Contact darkening everywhere at once. The decal shadows under furniture only cover footprints;
+  // this is what puts a seam where a wall meets a floor and keeps the shelf cavity from going flat.
+  // GTAO renders black in this scene, so plain SSAO — with a short radius, because this is a room,
+  // not an outdoor scene.
+  const ssao = new SSAOPass(scene, camera, w, h)
+  ssao.kernelRadius = 3
+  ssao.minDistance = 0.0015
+  ssao.maxDistance = 0.22
+  composer.addPass(ssao)
 
   // Depth of field, very shallow: the reference rooms are shot on a long lens and the far wall falls
   // off just enough to keep the furniture reading as an object in a space rather than a diagram.

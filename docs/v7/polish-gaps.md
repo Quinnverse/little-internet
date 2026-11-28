@@ -114,3 +114,24 @@ camera dropped to 1.19 polar so the rug and the floor carry more of the frame.
 Open, in priority order: real global illumination (bounce light off the floor is still faked), the
 shelf's cream band on every spine forms a visible staircase at close range, plank seams go too dark at
 1:1, and there is still no animated ambient motion inside the room itself.
+
+## Round 11 — the frame finally has occlusion, and the room breathes
+
+**SSAO is back in the chain, and it works.** GTAO rendered black here; plain `SSAOPass` does not.
+Short radius (3 px, 0.22 m max distance) because this is a room, not an outdoor scene. This is what
+finally put a seam where the wall meets the floor, darkened the shelf cavity, and stopped the desk
+from looking pasted onto the wall. Exposure went up 1.52 → 1.62 to pay for it.
+
+**The shelf was a picket fence.** Every book carried a cream band of nearly full spine width at
+nearly the same height, so thirty spines lined up into one white staircase. In Blender the band is now
+0.5–0.7 of the spine width, 4.5–6% tall, at 34–90% of the spine height, in muted `#cdbb9c`. Rebuilt
+`bookshelf` only, re-exported and re-packed.
+
+**Air.** The drapes have a vertex-shader breathe: two sines, squared by distance from the rail, 1.6 cm
+into the room and 0.7 cm sideways, driven by a shared `uWind` clock (`ctx.winds`). With the existing
+camera drift that is the first time anything in the room moves without the user touching it.
+
+Still open: two coincident wall quads at 4.32 m and 4.48 m (the shell's inner and outer faces) split
+the plaster into a faint pale rectangle on the left wall. Unifying the material made it worse — the
+overlapping quads then banded — so the real fix is to delete the outer face from the shell model or
+give it a different name and material, which is a one-line change in `build_props.py`.

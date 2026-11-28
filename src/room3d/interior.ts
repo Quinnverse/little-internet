@@ -47,6 +47,18 @@ export function finishSurface(mat: THREE.MeshStandardMaterial) {
 export function windowDrapes() {
   const group=new THREE.Group()
   const cloth=new THREE.MeshStandardMaterial({color:'#d8bba4',roughness:.94,side:THREE.DoubleSide,transparent:true})
+  // Air. A room where nothing moves is a photograph of a room; the drapes are the cheapest place to
+  // put a slow breath in the frame, and they anchor the window light to something physical.
+  cloth.onBeforeCompile=shader=>{
+    shader.uniforms.uWind={value:0}
+    shader.vertexShader='uniform float uWind;\n'+shader.vertexShader.replace('#include <begin_vertex>',
+      `#include <begin_vertex>
+      float wW=clamp((2.46-position.y)/1.55,0.0,1.0);
+      wW*=wW;
+      transformed.z+=sin(uWind*1.15+position.y*2.1+position.x*1.4)*0.016*wW;
+      transformed.x+=sin(uWind*0.83+position.y*1.6)*0.007*wW;`)
+  }
+  cloth.userData.wind=true
   for(const side of [-1,1]){
     const g=new THREE.PlaneGeometry(1,1,36,12),p=g.attributes.position!
     for(let i=0;i<p.count;i++){

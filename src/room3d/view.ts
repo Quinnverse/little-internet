@@ -110,10 +110,10 @@ export class RoomView {
   private opts: ViewOptions
   private root = new THREE.Group()
   // DEV-only handle so a probe can name the mesh that is the wrong colour instead of guessing.
-  expose() { if (import.meta.env.DEV) (window as unknown as Record<string, unknown>).__room = this.root }
+  expose() { if (import.meta.env.DEV) { const w = window as unknown as Record<string, unknown>; w.__room = this.root; w.__cam = this.camera; w.THREE = THREE } }
   private dynamic = new THREE.Group()
   private shell!: Shell
-  private ctx: BuildCtx = { lamps: [], glows: [] }
+  private ctx: BuildCtx = { lamps: [], glows: [], winds: [] }
   private sun = new THREE.DirectionalLight('#ffd9a8', 3.2)
   private hemi = new THREE.HemisphereLight('#cfe2f2', '#6b5a45', 0.42)
   private ambient = new THREE.AmbientLight('#ffe9cf', 0.1)
@@ -1061,7 +1061,7 @@ export class RoomView {
     this.ambient.intensity = lerp(0.16, 0.1)
     this.rim.intensity = lerp(0.62, 0.42)
     this.rim.color.set(n > 0.5 ? '#6c86c8' : '#b9d4ee')
-    this.renderer.toneMappingExposure = lerp(1.52, 1.42)
+    this.renderer.toneMappingExposure = lerp(1.62, 1.5)
     for (const l of this.ctx.lamps) {
       const base = (l.userData.base as number) ?? 1
       const flick = l.userData.flicker ? 1 + Math.sin(performance.now() / 120) * 0.05 : 1
@@ -1142,6 +1142,10 @@ export class RoomView {
     const t = this.elapsed
     this.stringLights?.update(now,!!this.opts.reduceMotion)
     const animated = !this.opts.reduceMotion
+    // The curtains are the only thing in the frame that moves on its own, so they get the clock.
+    if (animated) for (const m of this.ctx.winds) for (const sh of (m.userData.shaders as { uniforms: Record<string, { value: number }> }[] | undefined) ?? []) {
+      if (sh.uniforms.uWind) sh.uniforms.uWind.value = t
+    }
 
     if(this.following && this.avatar && !this.returnPose && !this.decorMode){this.want.tgt.copy(this.avatar.position);this.want.tgt.y=.62}
     // Camera easing.

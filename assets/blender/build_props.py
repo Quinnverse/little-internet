@@ -581,8 +581,11 @@ def item_bookshelf():
                 bx(w, h, 0.24, (x + w / 2, top + h / 2, D / 2), spine, bevel=0.004, name="book")
                 # One cream band on the spine is enough: it breaks the slab without paying for a
                 # page block and a title line on ninety books.
-                band_y = top + h * random.uniform(0.6, 0.78)
-                bx(w * 0.9, h * 0.085, 0.012, (x + w / 2, band_y, D / 2 + 0.121), "#e6d8bb", bevel=0.0, name="book-band")
+                # A band nearly as wide as the spine, at nearly the same height on every book, joins up
+                # into one white staircase across the shelf. Narrower, shorter, and spread over most of
+                # the spine so the row reads as labelled books instead of a picket fence.
+                band_y = top + h * random.uniform(0.34, 0.9)
+                bx(w * random.uniform(0.5, 0.7), h * random.uniform(0.045, 0.06), 0.008, (x + w / 2, band_y, D / 2 + 0.119), "#cdbb9c", bevel=0.0, name="book-band")
             x += w + 0.004
     bx(0.6, 0.5, 0.36, (-0.4, 2.525 + 0.25, 0.28), "#c9a36d", bevel=0.03, name="wicker")
     co(0.1, 0.08, 0.14, (0.5, 2.525 + 0.07, 0.26), RED, name="pot")

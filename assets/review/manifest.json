@@ -22,9 +22,9 @@
   {
     "name": "bookshelf",
     "category": "furniture",
-    "triangles": 9900,
-    "meshes": 158,
-    "glb_bytes": 1021532,
+    "triangles": 8820,
+    "meshes": 140,
+    "glb_bytes": 909368,
     "budget": 5000,
     "within_budget": false,
     "ok": true

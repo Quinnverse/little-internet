@@ -7,6 +7,8 @@ export type BuildCtx = {
   lamps: THREE.PointLight[]
   /** Emissive things that should be dimmer in daylight (screens, flames). */
   glows: { mat: THREE.MeshStandardMaterial; day: number; night: number }[]
+  /** Materials that breathe: curtains. Updated once per frame with the elapsed time. */
+  winds: THREE.Material[]
 }
 
 const WOOD = '#b57d4a'

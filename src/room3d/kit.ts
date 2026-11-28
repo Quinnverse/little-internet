@@ -376,6 +376,13 @@ export function kitShell(house: House, wallId: WallId, floorId: FloorId, ctx: Bu
     const drapes=windowDrapes()
     walls[0]!.group.add(drapes.group)
     walls[0]!.mats.push(drapes.cloth)
+    ctx.winds.push(drapes.cloth)
+    // Collect the compiled shader so the render loop can drive its clock.
+    const prevCompile=drapes.cloth.onBeforeCompile
+    drapes.cloth.onBeforeCompile=(shader,renderer)=>{
+      prevCompile.call(drapes.cloth,shader,renderer)
+      ;(drapes.cloth.userData.shaders??=[]).push(shader)
+    }
   }
   // A flat, evenly lit plane at the top of the frame is the fastest way to make a room look like a
   // cardboard box, so the ceiling gets the same plaster tooth as the walls and a tone below the walls.
@@ -535,7 +542,23 @@ export function kitFurniture(ctx: BuildCtx, hasWelcome: boolean): { group: THREE
   scrap.position.set(4.95, 0.055, 1.55)
   scrap.rotation.set(0.4, 0.9, 0.2)
   g.add(scrap)
-  picks.push(put(g, 'photo_wall', { at: [1.0, 1.75, 0.0], pick:'wall' }))
+  // The photo-wall panel exists only as a tap target for the wallpaper editor. Left visible it is a
+  // blank pale board over the wall, and under SSAO it reads as a hard-edged stain.
+  const photoWall = put(g, 'photo_wall', { at: [1.0, 1.75, 0.0], pick:'wall' })
+  photoWall.traverse((o) => {
+    const mesh = o as THREE.Mesh
+    if (!mesh.isMesh) return
+    // It still cast a soft rectangle of shadow onto the wall behind it — the pale stain.
+    mesh.castShadow = false
+    mesh.receiveShadow = false
+    for (const m of Array.isArray(mesh.material) ? mesh.material : [mesh.material]) {
+      m.transparent = true
+      m.opacity = 0
+      m.depthWrite = false
+      m.colorWrite = false
+    }
+  })
+  picks.push(photoWall)
   put(g, 'wall_clock', { at: [3.2, 2.78, 0.0] })
   picks.push(put(g, 'calendar', { at: [0.0, 2.3, 0.5], yaw: Math.PI / 2, pick:'calendar' }))
 
